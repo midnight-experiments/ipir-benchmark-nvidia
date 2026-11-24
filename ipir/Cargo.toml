@@ -1,0 +1,27 @@
+# The CPU side of the benchmark: the IPIR+SP crates of `valargroup/ipir-sp` (vendor/, see vendor/ORIGIN.md) with this
+# design's patch 0001 applied (patches/), and the benchmark programs (bench/).
+[workspace]
+resolver = "2"
+members = [
+  "bench",
+  "vendor/ipir-sp/inspiring",
+  "vendor/ipir-sp/reinspiring",
+  "vendor/ipir-sp/ipir-native-client",
+  "vendor/ipir-sp/ipir-sp",
+  "vendor/ipir-sp/simplepir-kernel",
+]
+default-members = ["bench"]
+
+# The vendored crates take spiral-rs from their workspace, as upstream's root manifest declares it.
+[workspace.dependencies]
+spiral-rs = { package = "valar-spiral-rs", version = "=0.5.3-rc.1" }
+
+# Upstream's release profile.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+# As upstream: spiral-rs's Barrett reduction relies on wrapping u64 arithmetic.
+[profile.dev.package.valar-spiral-rs]
+overflow-checks = false

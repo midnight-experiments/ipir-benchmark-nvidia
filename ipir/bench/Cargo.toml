@@ -1,0 +1,14 @@
+[package]
+name = "ipir-bench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "Compile timing of IPIR+SP column blocks for the NVIDIA benchmark"
+
+[dependencies]
+ipir-sp = { path = "../vendor/ipir-sp/ipir-sp", features = ["native-reinspiring"] }
+reinspiring = { path = "../vendor/ipir-sp/reinspiring" }
+rand_chacha = "0.3.1"
+rayon = "1"
+libc = "0.2"

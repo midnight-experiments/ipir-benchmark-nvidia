@@ -1,0 +1,74 @@
+--- a/ipir-native-client/src/lib.rs
++++ b/ipir-native-client/src/lib.rs
+@@ -323,8 +323,22 @@
+     /// Domain-separated expansion bound to profile, database shape and snapshot ID.
+     /// Snapshot IDs identify data versions but do not authenticate their contents.
+     pub fn new(profile: NativeProfile, seed: [u8; 32], snapshot: [u8; 32]) -> Self {
++        Self::expand(profile, seed, snapshot, true)
++    }
++
++    /// UmbraDB patch 0001: as [`Self::new`], but the identifier does not hash the column count, so the query
++    /// polynomials and the packing setup depend on the rows alone and a table can gain column blocks without changing
++    /// the masks of the blocks it has. A distinct domain tag keeps these identifiers apart from [`Self::new`]'s.
++    pub fn new_without_columns(profile: NativeProfile, seed: [u8; 32], snapshot: [u8; 32]) -> Self {
++        Self::expand(profile, seed, snapshot, false)
++    }
++
++    fn expand(profile: NativeProfile, seed: [u8; 32], snapshot: [u8; 32], bind_columns: bool) -> Self {
+         let mut h = Sha256::new();
+         h.update(b"ipir-sp/native/v1/setup");
++        if !bind_columns {
++            h.update(b"/umbradb-without-columns-v1/");
++        }
+         h.update(profile.pack.encoding());
+         if profile.request_magic() == b"RNQ2" {
+             h.update(b"/kh-transport-v2/");
+@@ -340,13 +354,19 @@
+         if profile.dithered_query {
+             h.update(b"/dithered-query-v1/");
+         }
+-        for n in [
+-            profile.rows,
+-            profile.cols,
+-            profile.query_bits,
+-            profile.response_bits,
+-        ] {
+-            h.update((n as u64).to_le_bytes());
++        if bind_columns {
++            for n in [
++                profile.rows,
++                profile.cols,
++                profile.query_bits,
++                profile.response_bits,
++            ] {
++                h.update((n as u64).to_le_bytes());
++            }
++        } else {
++            for n in [profile.rows, profile.query_bits, profile.response_bits] {
++                h.update((n as u64).to_le_bytes());
++            }
+         }
+         h.update(seed);
+         h.update(snapshot);
+@@ -899,6 +919,21 @@
+                 }
+             }
+         }
++    }
++    #[test]
++    fn setup_without_columns_ignores_the_column_count() {
++        // UmbraDB patch 0001.
++        let pack = NativeParams::new(8, 54, 16, 19, 2, SecretDistribution::Gaussian).unwrap();
++        let narrow = NativeProfile::new(pack.clone(), 16, 24).unwrap();
++        let wide = NativeProfile::new(pack.clone(), 16, 48).unwrap();
++        let taller = NativeProfile::new(pack, 32, 24).unwrap();
++        let a = NativePublicSetup::new_without_columns(narrow.clone(), [7; 32], [19; 32]);
++        let b = NativePublicSetup::new_without_columns(wide, [7; 32], [19; 32]);
++        let c = NativePublicSetup::new_without_columns(taller, [7; 32], [19; 32]);
++        assert_eq!(a.id, b.id);
++        assert_eq!(a.query_masks(), b.query_masks());
++        assert_ne!(a.id, c.id);
++        assert_ne!(a.id, NativePublicSetup::new(narrow, [7; 32], [19; 32]).id);
+     }
+     #[test]
+     fn dithered_setup_id_known_answers() {

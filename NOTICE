@@ -1,0 +1,28 @@
+ipir-benchmark-nvidia
+Licensed under the Apache License, Version 2.0 (LICENSE).
+
+This repository contains code copied from UmbraDB (https://github.com/midnightntwrk/umbradb), licensed under the
+Apache License, Version 2.0 (LICENSE, identical to UmbraDB's):
+
+- gpu/device.ts, gpu/ipir.ts, gpu/ipir-wgsl.ts, gpu/ipir-wire.ts (from examples/private-shielded-sync/gpu/) and
+  ipir/sizes.ts (from examples/private-shielded-sync/ipir/), unchanged, at commit
+  c620f0e76db4e5d78001eb3dc3a45363c10f47da ("examples/private-shielded-sync/gpu: IPIR+SP's answer on the GPU, byte
+  for byte as the add-on's", 2026-11-16);
+- ipir/vendor/ and ipir/Cargo.lock (adapted), from examples/private-shielded-sync/ipir/ at commit
+  4f362386a1b6fbbf041cceed92f8fba432ee2600.
+
+ipir/vendor/ipir-sp/ holds five crates of the IPIR+SP repository of the Zcash wallet services
+(https://github.com/valargroup/ipir-sp, commit 791b5287a26e4fe021f6f1a8fe70b7ab23849787), each licensed
+MIT OR Apache-2.0 (ipir/vendor/ORIGIN.md, ipir/vendor/LICENSE-MIT, ipir/vendor/LICENSE-APACHE), with one patch of
+this design applied (ipir/patches/0001-setup-without-columns.patch).
+
+UmbraDB's NOTICE follows.
+
+UmbraDB
+Copyright 2026 Charles Hoskinson <Charles.Hoskinson@gmail.com>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0

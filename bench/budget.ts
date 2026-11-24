@@ -1,0 +1,266 @@
+/**
+ * Task 3: the 3 s block budget, simulated. Six tables stay resident on the GPU and answer calls of 32 requests at a
+ * steady rate (open loop: call k is due at k / rate seconds, whatever happened to the calls before it). Every
+ * `--interval-ms` (6 s, the chain's block time) a chain block arrives and changes one column block of each table;
+ * its work is:
+ *
+ * 1. compile: the CPU builds the six changed column blocks (`ipir/bench` `block_worker`, a separate process, so this
+ *    process's event loop keeps issuing calls): setup expansion, the block's whole hint columns and its packing
+ *    matrix. The hints of a block are recomputed whole: an upper bound for the hint updates of new records, which
+ *    are not built yet;
+ * 2. upload: the six new blocks (cells and a compiled matrix) copied to the GPU and laid out there, by creating a
+ *    one-block `GpuIpirTable` of each table's rows (the same copies and layout kernels as a table's `create`) and
+ *    releasing it. The matrices uploaded are synthetic (the content does not change the time).
+ *
+ * The block's work time (compile + upload) is compared with 3 s, and the calls' latency (from the moment a call is
+ * due to its answer in host memory) with and without block work running.
+ *
+ *   deno run <permissions> bench/budget.ts --worker ipir/target/release/block_worker --out FILE
+ *     [--set today|10m] [--rates 2,5,10] [--modes seq,pool] [--blocks 30] [--interval-ms 6000] [--baseline-s 20]
+ *     [--pool-threads N]
+ *
+ * Modes (`block_worker`): `seq`, the blocks one after another on all cores at normal priority; `pool`, all at once on
+ * a pool of half the logical cores at the lowest priority; `pool-seq`, one after another on that pool.
+ */
+import { GpuIpirTable } from "../gpu/ipir.ts";
+import { openBenchGpu, options, residentBytes, scoped, stats, syntheticCells, syntheticMatrix, syntheticRequests, syntheticSetupId, xorshift } from "./lib.ts";
+
+const SETS: Record<string, { name: string; rows: number; cols: number }[]> = {
+  today: [
+    { name: "read", rows: 2048, cols: 2048 },
+    { name: "nullifier", rows: 2048, cols: 2048 },
+    { name: "shielded groups", rows: 2048, cols: 4096 },
+    { name: "Dust groups", rows: 6144, cols: 28672 },
+    { name: "first coins", rows: 2048, cols: 2048 },
+    { name: "generation groups", rows: 2048, cols: 4096 },
+  ],
+  "10m": [
+    { name: "read", rows: 14336, cols: 34816 },
+    { name: "nullifier", rows: 16384, cols: 18432 },
+    { name: "shielded groups", rows: 8192, cols: 20480 },
+    { name: "Dust groups", rows: 6144, cols: 28672 },
+    { name: "first coins", rows: 2048, cols: 2048 },
+    { name: "generation groups", rows: 2048, cols: 4096 },
+  ],
+};
+
+const opts = options(Deno.args);
+const out = opts.get("out");
+const workerPath = opts.get("worker");
+if (!out || !workerPath) throw new Error("--out FILE and --worker PATH are required");
+const setName = opts.get("set") ?? "today";
+const tables = SETS[setName];
+if (!tables) throw new Error(`unknown set ${setName}`);
+const rates = (opts.get("rates") ?? "2,5,10").split(",").map(Number);
+const modes = (opts.get("modes") ?? "seq,pool").split(",");
+const blocks = Number(opts.get("blocks") ?? 30);
+const intervalMs = Number(opts.get("interval-ms") ?? 6000);
+const baselineS = Number(opts.get("baseline-s") ?? 20);
+const BUDGET_MS = 3000;
+const log = (s: string) => console.error(`budget ${setName}: ${s}`);
+
+/** Lines from the worker's stdout, one at a time. */
+class Worker {
+  readonly #child: Deno.ChildProcess;
+  readonly #writer: WritableStreamDefaultWriter<Uint8Array>;
+  readonly #lines: AsyncIterator<string>;
+  constructor(path: string, rows: number[], poolThreads?: string) {
+    this.#child = new Deno.Command(path, {
+      args: [rows.join(","), ...(poolThreads ? [poolThreads] : [])],
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "inherit",
+    }).spawn();
+    this.#writer = this.#child.stdin.getWriter();
+    let buffer = "";
+    const reader = this.#child.stdout.pipeThrough(new TextDecoderStream()).getReader();
+    this.#lines = (async function* () {
+      while (true) {
+        const nl = buffer.indexOf("\n");
+        if (nl >= 0) {
+          const line = buffer.slice(0, nl);
+          buffer = buffer.slice(nl + 1);
+          yield line;
+          continue;
+        }
+        const { value, done } = await reader.read();
+        if (done) return;
+        buffer += value;
+      }
+    })();
+  }
+  async line(): Promise<Record<string, unknown>> {
+    const r = await this.#lines.next();
+    if (r.done) throw new Error("block_worker exited");
+    return JSON.parse(r.value);
+  }
+  async send(cmd: string): Promise<void> {
+    await this.#writer.write(new TextEncoder().encode(cmd + "\n"));
+  }
+  async close(): Promise<void> {
+    await this.send("quit").catch(() => {});
+    await this.#writer.close().catch(() => {});
+    await this.#child.status;
+  }
+}
+
+interface Call {
+  table: number;
+  due: number;
+  end: number;
+}
+
+const result: Record<string, unknown> = {
+  set: setName,
+  tables,
+  rates,
+  modes,
+  blocks,
+  intervalMs,
+  baselineS,
+  budgetMs: BUDGET_MS,
+  residentBytes: tables.reduce((a, t) => a + residentBytes(t.rows, t.cols), 0),
+  note: "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+};
+let stage = "opening the GPU";
+try {
+  const gpu = await openBenchGpu();
+  const { device } = gpu;
+  let lost: string | null = null;
+  device.lost.then((i) => (lost = `device lost (${i.reason}): ${i.message}`));
+  result.gpu = gpu.description;
+  stage = "compiling the kernels";
+  await scoped(device, stage, () => GpuIpirTable.compileKernels(device));
+
+  // The resident tables and their calls.
+  const resident: { table: GpuIpirTable; requests: Uint8Array }[] = [];
+  const uploads: { rows: number; cells: Uint16Array; setupId: Uint8Array }[] = [];
+  let matrix: Int32Array | null = null;
+  for (const [i, t] of tables.entries()) {
+    stage = `uploading table ${t.name} ${t.rows}x${t.cols}`;
+    log(stage);
+    const next = xorshift(0xb10c ^ (i * 7919) ^ t.rows ^ t.cols);
+    const cells = syntheticCells(t.rows, t.cols, next);
+    const matrices = Array.from({ length: t.cols / 2048 }, () => syntheticMatrix(next));
+    matrix ??= matrices[0]!;
+    const setupId = syntheticSetupId(next);
+    const table = await scoped(device, stage, () => GpuIpirTable.create(device, { rows: t.rows, cols: t.cols, cells, setupId, matrices }));
+    resident.push({ table, requests: syntheticRequests(t.rows, 32, setupId, next) });
+    uploads.push({ rows: t.rows, cells: cells.slice(0, t.rows * 2048), setupId });
+  }
+  stage = "warming up";
+  for (const r of resident) await scoped(device, stage, () => r.table.respond(r.requests, 32));
+
+  stage = "starting block_worker";
+  const worker = new Worker(workerPath, tables.map((t) => t.rows), opts.get("pool-threads"));
+  result.worker = await worker.line();
+  log(`worker ready: ${JSON.stringify(result.worker)}`);
+
+  /** Issues calls at `rate` per second, round robin over the tables, until `stop()`; returns the calls. */
+  function calls(rate: number) {
+    const done: Call[] = [];
+    const failures: string[] = [];
+    const t0 = performance.now();
+    let k = 0;
+    let stopped = false;
+    let pending = 0;
+    let timer: number | undefined;
+    const tick = () => {
+      if (stopped) return;
+      const now = performance.now();
+      while (t0 + (k * 1000) / rate <= now) {
+        const due = t0 + (k * 1000) / rate;
+        const i = k % resident.length;
+        const r = resident[i]!;
+        k++;
+        pending++;
+        r.table.respond(r.requests, 32).then(
+          () => done.push({ table: i, due, end: performance.now() }),
+          (e) => failures.push(String(e)),
+        ).finally(() => pending--);
+      }
+      timer = setTimeout(tick, Math.max(0, t0 + (k * 1000) / rate - performance.now()));
+    };
+    tick();
+    return {
+      async stop() {
+        stopped = true;
+        clearTimeout(timer);
+        while (pending > 0) await new Promise((r) => setTimeout(r, 5));
+        return { done, failures, issued: k };
+      },
+    };
+  }
+
+  const latency = (cs: Call[]) => stats(cs.map((c) => c.end - c.due));
+  const runs: Record<string, unknown>[] = [];
+  for (const rate of rates) {
+    stage = `baseline at ${rate} calls/s`;
+    log(stage);
+    const base = calls(rate);
+    await new Promise((r) => setTimeout(r, baselineS * 1000));
+    const b = await base.stop();
+    if (lost) throw new Error(lost);
+    runs.push({ rate, mode: "none", calls: b.done.length, failures: b.failures.slice(0, 5), answerLatencyMs: latency(b.done) });
+    log(`  answers p50 ${latency(b.done).p50} ms, p99 ${latency(b.done).p99} ms`);
+
+    for (const mode of modes) {
+      stage = `${mode} at ${rate} calls/s`;
+      log(stage);
+      const run = calls(rate);
+      const work: { start: number; end: number; compileMs: number; uploadMs: number; workMs: number; worker: unknown }[] = [];
+      const phase0 = performance.now();
+      for (let b = 0; b < blocks; b++) {
+        const due = phase0 + b * intervalMs;
+        const wait = due - performance.now();
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        const start = performance.now();
+        await worker.send(`go ${mode}`);
+        const reply = await worker.line();
+        const compiled = performance.now();
+        for (const u of uploads) {
+          const one = await scoped(device, "uploading a block", () =>
+            GpuIpirTable.create(device, { rows: u.rows, cols: 2048, cells: u.cells, setupId: u.setupId, matrices: [matrix!] }));
+          one.release();
+        }
+        const end = performance.now();
+        work.push({ start, end, compileMs: compiled - start, uploadMs: end - compiled, workMs: end - start, worker: reply });
+        if (lost) throw new Error(lost);
+      }
+      await new Promise((r) => setTimeout(r, Math.min(intervalMs, 2000)));
+      const c = await run.stop();
+      const overlaps = (x: Call) => work.some((w) => x.due < w.end && x.end > w.start);
+      const during = c.done.filter(overlaps);
+      const idle = c.done.filter((x) => !overlaps(x));
+      const workMs = work.map((w) => w.workMs);
+      const row = {
+        rate,
+        mode,
+        blocks: work.length,
+        blockWorkMs: stats(workMs),
+        compileMs: stats(work.map((w) => w.compileMs)),
+        uploadMs: stats(work.map((w) => w.uploadMs)),
+        overBudget: workMs.filter((x) => x > BUDGET_MS).length,
+        calls: c.done.length,
+        failures: c.failures.slice(0, 5),
+        answerLatencyMs: { all: latency(c.done), duringBlockWork: latency(during), outsideBlockWork: latency(idle) },
+        work: work.map((w) => ({ compileMs: w.compileMs, uploadMs: w.uploadMs, workMs: w.workMs, worker: w.worker })),
+      };
+      runs.push(row);
+      log(`  block work p50 ${row.blockWorkMs.p50} ms, p99 ${row.blockWorkMs.p99} ms (${row.overBudget}/${work.length} over 3 s); answers during work p50 ${row.answerLatencyMs.duringBlockWork.p50} ms, p99 ${row.answerLatencyMs.duringBlockWork.p99} ms`);
+    }
+  }
+  await worker.close();
+  for (const r of resident) r.table.release();
+  result.ok = true;
+  result.runs = runs;
+  await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
+  device.destroy();
+} catch (e) {
+  result.ok = false;
+  result.stage = stage;
+  result.error = String((e as Error)?.message ?? e);
+  log(`FAILED at ${stage}: ${result.error}`);
+  await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
+  Deno.exit(1);
+}

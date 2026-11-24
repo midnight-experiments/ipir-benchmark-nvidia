@@ -1,0 +1,10 @@
+{
+  "lock": false,
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "tasks": {
+    "typecheck": "deno check bench/*.ts gpu/*.ts ipir/sizes.ts"
+  }
+}

@@ -1,0 +1,5 @@
+# The toolchain the proof of concept's IPIR+SP add-on is built with (upstream pins 1.89; its crates build and pass
+# on 1.92). rustup installs it on the first `cargo` call in this repository.
+[toolchain]
+channel = "1.92.0"
+profile = "minimal"
