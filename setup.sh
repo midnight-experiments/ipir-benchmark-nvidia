@@ -5,50 +5,52 @@
 # Linux: an NVIDIA GPU through Vulkan (nvidia-smi, vulkaninfo). macOS: Apple silicon through Metal (no NVIDIA tools).
 #
 # It does not install system packages or drivers (that needs root): it prints the commands to run when something
-# is missing.
+# is missing. ./bench.sh runs this script first, and with --install-deps installs the packages too.
+#
+#   ./setup.sh         # for a run on this host's GPU
+#   ./setup.sh --cpu   # for the CPU backend only: a missing or unusable GPU is reported, and does not fail the setup
 set -euo pipefail
 cd "$(dirname "$0")"
 DENO_VERSION=2.7.5
-ok=1
+CPU_ONLY=0
+[[ "${1:-}" == --cpu ]] && CPU_ONLY=1
+ok=1       # what every backend needs
+gpu_ok=1   # what a run on the GPU needs
 
 echo "== GPU"
 if [[ "$(uname)" == Darwin ]]; then
   system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Chipset Model|Total Number of Cores|Metal' || true
 elif command -v nvidia-smi >/dev/null; then
-  nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader || ok=0
+  nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader || gpu_ok=0
   # Resizable BAR is on when the BAR1 aperture covers the framebuffer.
   nvidia-smi -q -d MEMORY | awk '/FB Memory Usage/{s="fb"} /BAR1 Memory Usage/{s="bar1"} /Total/ && s {print s" total: "$3" "$4; s=""}'
 else
   echo "nvidia-smi not found: install the NVIDIA driver (Ubuntu: sudo ubuntu-drivers install, or sudo apt install nvidia-driver-570)"
-  echo "(only the CPU backend, ./run-all.sh --backend cpu, runs without a GPU)"
-  ok=0
+  echo "(only the CPU backend runs without a GPU: ./bench.sh --cpu-only)"
+  gpu_ok=0
 fi
 if [[ "$(uname)" == Linux ]]; then
   if command -v vulkaninfo >/dev/null; then
-    vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|deviceType|driverName|driverInfo|apiVersion' || true
-    if vulkaninfo --summary 2>/dev/null | grep -qi 'llvmpipe\|lavapipe'; then
-      if ! vulkaninfo --summary 2>/dev/null | grep -qi 'nvidia'; then
-        echo "Vulkan sees only a software device (llvmpipe): the NVIDIA Vulkan driver is missing (README, Troubleshooting)"
-        ok=0
+    vk=$(vulkaninfo --summary 2>/dev/null || true)
+    grep -E 'deviceName|deviceType|driverName|driverInfo|apiVersion' <<<"$vk" || true
+    # The NVIDIA Vulkan driver is libGLX_nvidia.so.0, found through an ICD file. Containers (most GPU rentals) often
+    # have the library but not the file, or neither when the container lacks the `graphics` driver capability.
+    if command -v nvidia-smi >/dev/null && ! grep -i 'nvidia' <<<"$vk" >/dev/null; then
+      echo "Vulkan does not see the NVIDIA GPU$(grep -i 'llvmpipe\|lavapipe' <<<"$vk" >/dev/null && echo ' (only a software device, llvmpipe)')."
+      if ldconfig -p 2>/dev/null | grep 'libGLX_nvidia.so.0' >/dev/null; then
+        echo "The driver library is there, so its ICD file is missing: create it with"
+        echo "  sudo mkdir -p /usr/share/vulkan/icd.d && echo '{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"libGLX_nvidia.so.0\",\"api_version\":\"1.3\"}}' | sudo tee /usr/share/vulkan/icd.d/nvidia_icd.json"
+      elif [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+        echo "This is a container without the NVIDIA Vulkan driver (libGLX_nvidia.so.0): start the container with"
+        echo "  NVIDIA_DRIVER_CAPABILITIES=all (or compute,utility,graphics); see the README, 'The nvidia file'"
+      else
+        echo "The NVIDIA Vulkan driver (libGLX_nvidia.so.0) is missing: sudo apt install libnvidia-gl-<driver branch>"
       fi
+      gpu_ok=0
     fi
   else
     echo "vulkaninfo not found: sudo apt install vulkan-tools libvulkan1"
-    ok=0
-  fi
-  # The NVIDIA Vulkan driver is libGLX_nvidia.so.0, found through an ICD file. Containers (most GPU rentals) often
-  # have the library but not the file, or neither when the container lacks the `graphics` driver capability.
-  if command -v nvidia-smi >/dev/null && ! ls /usr/share/vulkan/icd.d/nvidia_icd*.json /etc/vulkan/icd.d/nvidia_icd*.json >/dev/null 2>&1; then
-    if ldconfig -p 2>/dev/null | grep 'libGLX_nvidia.so.0' >/dev/null; then
-      echo "no NVIDIA Vulkan ICD file, but the driver library is there: create it with"
-      echo "  sudo mkdir -p /usr/share/vulkan/icd.d && echo '{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"libGLX_nvidia.so.0\",\"api_version\":\"1.3\"}}' | sudo tee /usr/share/vulkan/icd.d/nvidia_icd.json"
-    elif [[ -f /.dockerenv || -f /run/.containerenv ]]; then
-      echo "in a container without the NVIDIA Vulkan driver (libGLX_nvidia.so.0): start the container with"
-      echo "  NVIDIA_DRIVER_CAPABILITIES=all (or compute,utility,graphics); see the README, 'The nvidia file'"
-    else
-      echo "no NVIDIA Vulkan driver (libGLX_nvidia.so.0): sudo apt install libnvidia-gl-<driver branch>"
-    fi
-    ok=0
+    gpu_ok=0
   fi
 fi
 command -v patch >/dev/null || { echo "patch not found (ipir/build-stock.sh needs it): sudo apt install patch"; ok=0; }
@@ -95,6 +97,9 @@ rc=$?
 set -e
 .tools/deno/deno eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));const w=s.webgpu??{};console.log(w.error?"ERROR: "+w.error:`${w.summary} (vendor ${w.vendor}, device ${w.device}, timestamp queries: ${w.timestampQuery}, software: ${w.software})`);console.log(`GPU backend: ${s.gpuBackend}; memory-budget layer: ${s.memoryBudgetLayer}`)' /tmp/ipir-bench-sysinfo.$$.json
 rm -f /tmp/ipir-bench-sysinfo.$$.json
-[[ $rc == 3 ]] && { echo "the adapter is a software rasterizer: fix the Vulkan driver before running (README, Troubleshooting)"; ok=0; }
+[[ $rc == 3 ]] && { echo "the adapter is a software rasterizer: fix the Vulkan driver before running (README, Troubleshooting)"; gpu_ok=0; }
 
-if [[ $ok == 1 ]]; then echo "== ready: ./run-all.sh --quick to check, then ./run-all.sh"; else echo "== fix the items above, then run ./setup.sh again"; exit 1; fi
+if [[ $ok == 0 ]]; then echo "== fix the items above, then run ./setup.sh again"; exit 1; fi
+if [[ $gpu_ok == 1 ]]; then echo "== ready: ./bench.sh (or ./run-all.sh --quick to check, then ./run-all.sh)"
+elif [[ $CPU_ONLY == 1 ]]; then echo "== ready for the CPU backend only: ./bench.sh --cpu-only (or ./run-all.sh --backend cpu)"
+else echo "== fix the GPU items above, then run ./setup.sh again (or ./setup.sh --cpu for the CPU backend only)"; exit 1; fi

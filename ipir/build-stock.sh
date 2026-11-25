@@ -9,7 +9,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 IPIR=$PWD
 SRC=target/stock/src
-STAMP=$( { cat patches/0002-faster-block-compile.patch Cargo.toml Cargo.lock; find bench vendor -type f -not -name .DS_Store | LC_ALL=C sort | xargs cat; } | shasum -a 256 | cut -c1-64)
+sha256() { if command -v sha256sum >/dev/null; then sha256sum; else shasum -a 256; fi; }
+STAMP=$( { cat patches/0002-faster-block-compile.patch Cargo.toml Cargo.lock; find bench vendor -type f -not -name .DS_Store | LC_ALL=C sort | xargs cat; } | sha256 | cut -c1-64)
 if [[ "$(cat "$SRC/.stamp" 2>/dev/null)" != "$STAMP" ]]; then
   echo "== preparing the stock source in ipir/$SRC (patch 0002 reversed)"
   rm -rf "$SRC"
