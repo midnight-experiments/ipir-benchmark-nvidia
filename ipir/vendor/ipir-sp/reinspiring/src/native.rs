@@ -1203,8 +1203,7 @@ pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, Reinspiri
 fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
     let d = masks.len();
     // Each destination gets exactly one input here. Row-wise filling avoids
-    // scattering writes across the entire integer matrix; rows are allocated
-    // in parallel too.
+    // scattering writes across the entire integer matrix.
     let mut polys: Vec<Vec<i64>> = (0..d)
         .into_par_iter()
         .map(|k| {
@@ -1339,7 +1338,7 @@ mod decompose_fast_path_tests {
     use super::*;
     use rand::{Rng, SeedableRng};
 
-    // decompose before the i64 rewrite, verbatim.
+    // Reference: the i128 definition, with Euclidean remainders and division.
     fn decompose_reference(a: &[u64], p: &NativeParams) -> Vec<Vec<u64>> {
         let mut out = vec![vec![0; p.d]; p.ell];
         let z = 1i128 << p.bits;

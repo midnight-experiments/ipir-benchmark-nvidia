@@ -30,9 +30,8 @@ pub fn tau_coeffs(p: &[u64], g: u64, q: u64) -> Vec<u64> {
     let two_d = 2 * d as u64;
     let mut out = vec![0u64; d];
     if d.is_power_of_two() && q.is_power_of_two() && g % 2 == 1 {
-        // An odd g permutes the d slots, so each slot is written once from zero:
-        // the remainders below equal the general loop's, without division or
-        // a sign branch that mispredicts on the permutation's irregular pattern.
+        // An odd g permutes the d slots, so each slot is written once from zero
+        // and the general loop's remainders reduce to masks.
         let mask = q - 1;
         for (i, &c) in p.iter().enumerate() {
             let e = (i as u64).wrapping_mul(g) & (two_d - 1);
@@ -471,7 +470,7 @@ mod tau_fast_path_tests {
     use super::*;
     use rand::{Rng, SeedableRng};
 
-    // tau_coeffs before the power-of-two fast path, verbatim.
+    // Reference: the general loop, with remainders.
     fn tau_coeffs_reference(p: &[u64], g: u64, q: u64) -> Vec<u64> {
         let d = p.len();
         let two_d = 2 * d as u64;

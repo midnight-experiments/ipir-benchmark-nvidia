@@ -886,7 +886,8 @@ mod exact_fast_path_tests {
     use super::*;
     use rand::{Rng, SeedableRng};
 
-    // The public_dot arithmetic before the division-free rewrite, verbatim.
+    // Reference: the same dot product through spiral's to_ntt, multiply and
+    // from_ntt, reconstructed with u128 remainders.
     fn public_dot_reference(ctx: &LiftContext, a: &PreparedPublicDot, b: &[Vec<u64>]) -> Vec<u64> {
         let mut residues = Vec::with_capacity(a.transforms.len());
         for (params, operands) in ctx.params.iter().zip(&a.transforms) {
