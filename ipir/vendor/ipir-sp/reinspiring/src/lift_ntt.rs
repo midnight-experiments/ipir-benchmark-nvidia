@@ -5,6 +5,7 @@
 //! proves that the entire signed sum fits two primes. Public preprocessing
 //! checks full-sum capacity with `prepare_public_dot` before accumulation.
 use crate::error::ReinspiringError;
+use rayon::prelude::*;
 use spiral_rs::{
     params::Params,
     poly::{from_ntt_alloc, multiply, to_ntt_alloc, PolyMatrix, PolyMatrixNTT, PolyMatrixRaw},
@@ -615,6 +616,25 @@ impl LiftContext {
         a: &PreparedPublicDot,
         b: &[Vec<u64>],
     ) -> Result<Vec<u64>, ReinspiringError> {
+        self.dot(a, b, false)
+    }
+
+    /// `public_dot` with the auxiliary primes evaluated in parallel on the
+    /// current Rayon pool, for a caller on a sequential critical path. Same words.
+    pub(crate) fn public_dot_parallel_primes(
+        &self,
+        a: &PreparedPublicDot,
+        b: &[Vec<u64>],
+    ) -> Result<Vec<u64>, ReinspiringError> {
+        self.dot(a, b, true)
+    }
+
+    fn dot(
+        &self,
+        a: &PreparedPublicDot,
+        b: &[Vec<u64>],
+        parallel_primes: bool,
+    ) -> Result<Vec<u64>, ReinspiringError> {
         if a.d != self.d || a.q != self.q || a.transforms[0].len() != b.len() {
             return Err(ReinspiringError::LweShape(
                 "public dot context or shape mismatch".into(),
@@ -633,14 +653,12 @@ impl LiftContext {
                 ));
             }
         }
-        let mut operand = vec![0u64; self.d];
-        let mut residues = Vec::with_capacity(a.transforms.len());
-        for ((params, operands), quotients) in
-            self.params.iter().zip(&a.transforms).zip(&a.quotients)
-        {
+        let residue = |j: usize| {
+            let params = &self.params[j];
             let p = params.modulus;
+            let mut operand = vec![0u64; self.d];
             let mut sum = vec![0u64; self.d];
-            for ((lhs, lhs_quotients), rhs) in operands.iter().zip(quotients).zip(b) {
+            for ((lhs, lhs_quotients), rhs) in a.transforms[j].iter().zip(&a.quotients[j]).zip(b) {
                 if a.right_bound < p {
                     // centered(x, q) + p when negative; |centered| <= right_bound < p.
                     for (dst, &x) in operand.iter_mut().zip(rhs) {
@@ -660,8 +678,16 @@ impl LiftContext {
                 }
             }
             ntt_inverse(params, &mut sum);
-            residues.push(sum);
-        }
+            sum
+        };
+        let residues: Vec<Vec<u64>> = if parallel_primes {
+            (0..a.transforms.len())
+                .into_par_iter()
+                .map(residue)
+                .collect()
+        } else {
+            (0..a.transforms.len()).map(residue).collect()
+        };
         Ok(if residues.len() == 2 {
             (0..self.d)
                 .map(|i| self.reconstruct_two(residues[0][i], residues[1][i]))

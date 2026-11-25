@@ -944,7 +944,11 @@ impl NativePreprocessed {
                 let inverse =
                     spiral_rs::number_theory::invert_uint_mod(exps[step], (2 * d) as u64).unwrap();
                 let unrotated: Vec<_> = ds.iter().map(|x| tau_coeffs(x, inverse, q)).collect();
-                let update = tau_coeffs(&lift.public_dot(&public_w, &unrotated)?, exps[step], q);
+                let update = tau_coeffs(
+                    &lift.public_dot_parallel_primes(&public_w, &unrotated)?,
+                    exps[step],
+                    q,
+                );
                 for (a, x) in half[idx - 1].iter_mut().zip(update) {
                     *a = (*a + x) & (q - 1);
                 }
