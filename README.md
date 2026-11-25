@@ -70,6 +70,55 @@ To send the results back, either push them from the machine
 or copy the bundle off it (`scp`) and unpack it at the top of a clone. The `.md` summary alone is enough to read the
 numbers; the `.json` holds the per-call and per-block data.
 
+## Results so far
+
+Three machines. Each figure comes from the results file named in the table; `site/` has the same figures in the form
+the overview page reads.
+
+| Machine | Backend | GPU | CPU | Results |
+|---|---|---|---|---|
+| RTX 2060 desktop | `nvidia-no-bar` | GeForce RTX 2060, 6 GB, no resizable BAR (Vulkan layer loaded) | Ryzen 7 2700X, 8 cores / 16 threads | `results/pop-os-2026-11-25-hidebudget-quiet.md` (stock crates), `results/pop-os-2026-11-25-hidebudget-opt.md` (patch 0002); they predate the GPU build of the blocks |
+| M4 Max | `metal` | Apple M4 Max, 40-core GPU | Apple M4 Max, 16 cores | `results/m4-max-2026-11-25-metal.md`; it predates the GPU build of the blocks |
+| RTX 4090 host | `nvidia` | GeForce RTX 4090, 24 GB, resizable BAR on | Ryzen 7 7700X, 8 cores / 16 threads | `results/rtx4090-2026-11-25-nvidia-nobudget.md`: a partial run on a shared machine, see `results/rtx4090-notes.md` |
+
+**Answering a call of 32 requests** (step 1): wall time, and in brackets the GPU's own time, in ms.
+
+| rows × cols | RTX 2060 | M4 Max | RTX 4090 |
+|---|---|---|---|
+| 2048 × 2048 | 16.2 (2.2) | 16.0 (1.5) | 14.9 (0.3) |
+| 6144 × 28672 | 53.2 (33.6) | 45.8 (27.5) | 20.7 (5.7) |
+| 14336 × 34816 | 87.1 (63.8) | 76.1 (53.9) | 28.3 (11.5) |
+| 32768 × 32768 | 147.5 (109.3) | 123.2 (94.5) | did not fit: 3 GiB of the card were free |
+
+**Compiling one column block** (steps 2 and 2b): wall time in ms.
+
+| | RTX 2060 host | M4 Max | RTX 4090 host |
+|---|---|---|---|
+| On the CPU, stock crates, 2,048 rows | 1,164 | 337 | 643 (566 when the machine was quiet) |
+| On the CPU, patch 0002, 2,048 rows | 389 | 94 | 307 (217 when the machine was quiet) |
+| On the CPU, patch 0002, 32,768 rows | 771 | 189 | 642 |
+| On the GPU, 2,048 rows | not in a full run yet | not run yet | 39, of which 26 on the GPU |
+| On the GPU, 32,768 rows | not in a full run yet | not run yet | 52, of which 29 on the GPU |
+
+On the RTX 4090 the two chains take 25.2 ms of the GPU's time at every table height; the hints take 0.4 to 2.9 ms,
+the aggregation 0.5 ms and the matrix compilation 0.3 ms. The GPU build's output equals the CPU's in 24 of 24 checked
+blocks there, and in 24 of 24 on the RTX 2060.
+
+**One chain block: one column block of each of six tables** (steps 2b and 3), at today's shapes and at the
+10-million-output shapes, in seconds. A block arrives every 6 s; what its work leaves is the time to answer.
+
+| | RTX 2060 host | M4 Max | RTX 4090 host |
+|---|---|---|---|
+| Compile on the CPU, stock crates (one after another, p50) | 6.71 / 7.56 | 2.05 / 2.25 | not run yet |
+| Compile on the CPU, patch 0002 (one after another, p50) | 2.18 / 2.54 | 0.63 / 0.68 | not run yet |
+| Compile on the GPU (wall; GPU time in brackets) | not in a full run yet | not run yet | 0.05 (0.033) / 0.07 (0.036) |
+| Block work, CPU compile with patch 0002 on a low-priority pool, plus upload (p50, 2 calls/s) | 1.94 / 2.06 | 0.54 / 0.68 | not run yet |
+| Block work, blocks built on the GPU (p50) | not in a full run yet | not run yet | not run yet |
+
+With the stock crates the RTX 2060 host goes over the 3 s budget in every block; with patch 0002 it stays under it
+except in 6 of 30 blocks at the 10-million-output shapes when the blocks are compiled one after another. The RTX 4090
+host's CPU figures were taken under another user's load.
+
 ## What it measures
 
 | Step | Script | What |
