@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # One-time setup: checks the GPU stack, installs the pinned Deno into .tools/ (no root needed), fetches the Rust
-# dependencies and builds the CPU side. Run once after cloning; then ./run-all.sh.
+# dependencies and builds the CPU side, with patch 0002 and without it. Run once after cloning; then ./run-all.sh.
+#
+# Linux: an NVIDIA GPU through Vulkan (nvidia-smi, vulkaninfo). macOS: Apple silicon through Metal (no NVIDIA tools).
 #
 # It does not install system packages or drivers (that needs root): it prints the commands to run when something
 # is missing.
@@ -10,11 +12,16 @@ DENO_VERSION=2.7.5
 ok=1
 
 echo "== GPU"
-if command -v nvidia-smi >/dev/null; then
+if [[ "$(uname)" == Darwin ]]; then
+  system_profiler SPDisplaysDataType 2>/dev/null | grep -E 'Chipset Model|Total Number of Cores|Metal' || true
+elif command -v nvidia-smi >/dev/null; then
   nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader || ok=0
+  # Resizable BAR is on when the BAR1 aperture covers the framebuffer.
+  nvidia-smi -q -d MEMORY | awk '/FB Memory Usage/{s="fb"} /BAR1 Memory Usage/{s="bar1"} /Total/ && s {print s" total: "$3" "$4; s=""}'
 else
   echo "nvidia-smi not found: install the NVIDIA driver (Ubuntu: sudo ubuntu-drivers install, or sudo apt install nvidia-driver-570)"
-  [[ "$(uname)" == Linux ]] && ok=0
+  echo "(only the CPU backend, ./run-all.sh --backend cpu, runs without a GPU)"
+  ok=0
 fi
 if [[ "$(uname)" == Linux ]]; then
   if command -v vulkaninfo >/dev/null; then
@@ -61,7 +68,9 @@ if ! command -v cargo >/dev/null; then
 fi
 command -v cc >/dev/null || { echo "no C compiler/linker: sudo apt install build-essential"; exit 1; }
 (cd ipir && cargo fetch --locked && cargo build --release --locked --offline -p ipir-bench)
-ipir/target/release/compile_block 2048 1 1 >/dev/null && echo "compile_block runs"
+ipir/build-stock.sh
+ipir/target/release/compile_block 2048 1 1 >/dev/null && echo "compile_block runs (patch 0002)"
+ipir/target/stock/release/compile_block 2048 1 1 >/dev/null && echo "compile_block runs (stock)"
 
 echo "== WebGPU adapter as Deno sees it"
 [[ "$(uname)" == Linux ]] && export DENO_WEBGPU_BACKEND="${DENO_WEBGPU_BACKEND:-vulkan}"
@@ -69,7 +78,7 @@ set +e
 .tools/deno/deno run --allow-read --allow-run --allow-env --allow-sys bench/sysinfo.ts > /tmp/ipir-bench-sysinfo.$$.json
 rc=$?
 set -e
-.tools/deno/deno eval 'const w=JSON.parse(Deno.readTextFileSync(Deno.args[0])).webgpu??{};console.log(w.error?"ERROR: "+w.error:`${w.summary} (vendor ${w.vendor}, device ${w.device}, timestamp queries: ${w.timestampQuery}, software: ${w.software})`)' /tmp/ipir-bench-sysinfo.$$.json
+.tools/deno/deno eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));const w=s.webgpu??{};console.log(w.error?"ERROR: "+w.error:`${w.summary} (vendor ${w.vendor}, device ${w.device}, timestamp queries: ${w.timestampQuery}, software: ${w.software})`);console.log(`GPU backend: ${s.gpuBackend}; memory-budget layer: ${s.memoryBudgetLayer}`)' /tmp/ipir-bench-sysinfo.$$.json
 rm -f /tmp/ipir-bench-sysinfo.$$.json
 [[ $rc == 3 ]] && { echo "the adapter is a software rasterizer: fix the Vulkan driver before running (README, Troubleshooting)"; ok=0; }
 

@@ -2,6 +2,12 @@
  * The machine, for the results file: GPU name, driver and memory (nvidia-smi), the Vulkan device list (vulkaninfo),
  * the WebGPU adapter Deno sees, CPU model and cores, RAM, OS, Deno and Rust versions, and the load average.
  *
+ * Also the GPU backend this host's answers run on (`gpuBackend`): `metal` on macOS; on Linux with an NVIDIA GPU,
+ * `nvidia` when resizable BAR is on and `nvidia-no-bar` when it is off. Resizable BAR is decided from `nvidia-smi -q
+ * -d MEMORY`: on when the BAR1 total is at least the framebuffer total (`nvidiaMemory` keeps the raw values). And
+ * whether the Vulkan layer in `tools/hide-memory-budget-layer/` is loaded (`memoryBudgetLayer`, from
+ * `VK_INSTANCE_LAYERS`).
+ *
  *   deno run <permissions> bench/sysinfo.ts [--no-adapter]
  *
  * Prints one JSON object. Exits 3 when the adapter is a software one (llvmpipe, lavapipe, SwiftShader, a fallback
@@ -20,25 +26,30 @@ async function run(cmd: string, args: string[]): Promise<string | null> {
     return null;
   }
 }
+/** A file's text; through `cat` when Deno refuses the read (Deno 2 refuses `/proc` and `/sys` without --allow-all). */
 async function read(path: string): Promise<string | null> {
   try {
     return await Deno.readTextFile(path);
   } catch {
-    return null;
+    return await run("cat", [path]);
   }
 }
 
 const os = Deno.build.os;
 const info: Record<string, unknown> = {
   date: new Date().toISOString(),
-  hostname: Deno.hostname(),
+  hostname: Deno.env.get("IPIR_BENCH_HOST") || Deno.hostname(),
   os,
   arch: Deno.build.arch,
   osRelease: Deno.osRelease(),
   loadavg: Deno.loadavg(),
   deno: Deno.version,
-  env: { DENO_WEBGPU_BACKEND: Deno.env.get("DENO_WEBGPU_BACKEND") ?? null },
+  env: Object.fromEntries(
+    ["DENO_WEBGPU_BACKEND", "VK_INSTANCE_LAYERS", "VK_LAYER_PATH", "VK_DRIVER_FILES", "VK_ICD_FILENAMES"].map((k) => [k, Deno.env.get(k) ?? null]),
+  ),
 };
+const layers = (Deno.env.get("VK_INSTANCE_LAYERS") ?? "").split(":");
+info.memoryBudgetLayer = layers.includes("VK_LAYER_IPIRBENCH_hide_memory_budget");
 
 // GPU: nvidia-smi.
 const smiFields = [
@@ -53,6 +64,25 @@ info.nvidiaSmi = smi === null ? null : smi.split("\n").map((line) => {
 });
 info.nvidiaSmiVersion = (await run("nvidia-smi", ["--version"]))?.split("\n").filter(Boolean) ?? null;
 info.gpuProcesses = await run("nvidia-smi", ["--query-compute-apps=pid,process_name,used_memory", "--format=csv,noheader"]);
+// Resizable BAR: with it, the BAR1 aperture covers the whole framebuffer (BAR1 total >= FB total); without it, BAR1 is
+// a small window (256 MiB on most cards).
+const smiMemory = await run("nvidia-smi", ["-q", "-d", "MEMORY"]);
+if (smiMemory !== null) {
+  const total = (section: string) => {
+    const m = smiMemory.match(new RegExp(`${section}[^\\n]*\\n\\s*Total\\s*:\\s*(\\d+)\\s*MiB`));
+    return m ? Number(m[1]) : null;
+  };
+  const fbTotalMiB = total("FB Memory Usage");
+  const bar1TotalMiB = total("BAR1 Memory Usage");
+  const bar1Used = smiMemory.match(/BAR1 Memory Usage[\s\S]*?Used\s*:\s*(\d+)\s*MiB/);
+  info.nvidiaMemory = {
+    fbTotalMiB,
+    bar1TotalMiB,
+    bar1UsedMiB: bar1Used ? Number(bar1Used[1]) : null,
+    resizableBar: fbTotalMiB !== null && bar1TotalMiB !== null ? bar1TotalMiB >= fbTotalMiB : null,
+    raw: smiMemory,
+  };
+} else info.nvidiaMemory = null;
 const vk = await run("vulkaninfo", ["--summary"]);
 if (vk !== null) {
   const devices: Record<string, string>[] = [];
@@ -86,6 +116,13 @@ if (os === "linux") {
   info.perfCores = await run("sysctl", ["-n", "hw.perflevel0.physicalcpu"]);
   info.efficiencyCores = await run("sysctl", ["-n", "hw.perflevel1.physicalcpu"]);
   info.distro = `macOS ${await run("sw_vers", ["-productVersion"])}`;
+  try {
+    const sp = JSON.parse((await run("system_profiler", ["SPDisplaysDataType", "-json"])) ?? "{}");
+    const g = sp.SPDisplaysDataType?.[0];
+    info.macGpu = g ? { model: g.sppci_model ?? g._name ?? null, cores: g.sppci_cores ? Number(g.sppci_cores) : null, metal: g.spdisplays_mtlgpufamilysupport ?? null } : null;
+  } catch {
+    info.macGpu = null;
+  }
 }
 info.logicalCpus = navigator.hardwareConcurrency;
 info.physicalCpus = os === "linux"
@@ -93,6 +130,13 @@ info.physicalCpus = os === "linux"
   : Number(await run("sysctl", ["-n", "hw.physicalcpu"])) || null;
 info.rustc = await run("rustc", ["--version"]);
 info.cargo = await run("cargo", ["--version"]);
+
+const nvidiaMemory = info.nvidiaMemory as { resizableBar: boolean | null } | null;
+info.gpuBackend = os === "darwin"
+  ? "metal"
+  : info.nvidiaSmi
+  ? nvidiaMemory?.resizableBar === true ? "nvidia" : nvidiaMemory?.resizableBar === false ? "nvidia-no-bar" : "nvidia-unknown-bar"
+  : null;
 
 let software = false;
 if (opts.get("no-adapter") !== "true") {
