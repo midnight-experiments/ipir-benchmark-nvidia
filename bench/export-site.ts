@@ -10,14 +10,16 @@
  * first input that has one. Shapes that did not fit or failed are left out; a section no input has is an empty array.
  *
  * Options:
- *   --backend NAME     the backend (required for `/1` inputs; otherwise from the first input)
+ *   --backend NAME     the backend (required for `/1` inputs, and for a run whose resizable BAR was not detected
+ *                      either way, `nvidia-unknown-bar`; otherwise from the first input)
  *   --label TEXT       the machine's short name (default: from the CPU and GPU names)
  *   --machine JSON     values of `machine` to set, for what the results file did not record (for example
  *                      '{"cpu":"AMD Ryzen 7 2700X","ramGiB":31,"rebar":false,"memoryBudgetLayer":true}')
  *   --date YYYY-MM-DD  the date (default: the latest input's)
  *   --commit SHA       the commit that holds the inputs (default: the last commit that changed them; the inputs must
- *                      be committed and unchanged)
- *   --out FILE         default: results/<host>-<date>-<backend>-site.json
+ *                      be committed and unchanged). `--commit none`: the inputs are not committed yet, and
+ *                      `source.commit` is null (`bench.sh` exports this way, on the machine that made the run)
+ *   --out FILE         default: site/<host>-<date>-<backend>-site.json
  *
  * Shapes are written `rows × cols` (U+00D7). `execMs` is the GPU's own time from timestamp queries, null on the CPU.
  */
@@ -53,11 +55,17 @@ for (const { path, build } of inputs) {
   files.push({ path, build, r });
 }
 
-const backend = (opts.get("backend") ?? files.find((f) => f.r.backend?.name)?.r.backend.name) as Backend | undefined;
-if (!backend || !(BACKENDS as readonly string[]).includes(backend)) throw new Error(`--backend must be one of ${BACKENDS.join(", ")}: ${backend}`);
+const named: string | undefined = opts.get("backend") ?? files.find((f) => f.r.backend?.name)?.r.backend.name;
+const backend = named as Backend | undefined;
+if (!backend || !(BACKENDS as readonly string[]).includes(backend)) {
+  const hint = named === "nvidia-unknown-bar" ? " (resizable BAR was not detected either way: pass --backend nvidia or --backend nvidia-no-bar)" : "";
+  throw new Error(`--backend must be one of ${BACKENDS.join(", ")}: ${backend}${hint}`);
+}
 for (const f of files) {
+  // A run names its own backend. `nvidia-unknown-bar` is the one name --backend may settle, as either NVIDIA backend.
   const own = f.r.backend?.name;
-  if (own && own !== backend) throw new Error(`${f.path} is backend ${own}, not ${backend}`);
+  const settles = own === "nvidia-unknown-bar" && (backend === "nvidia" || backend === "nvidia-no-bar");
+  if (own && own !== backend && !settles) throw new Error(`${f.path} is backend ${own}, not ${backend}`);
 }
 
 async function git(args: string[]): Promise<string> {
@@ -65,13 +73,14 @@ async function git(args: string[]): Promise<string> {
   if (!r.success) throw new Error(`git ${args.join(" ")}: ${new TextDecoder().decode(r.stderr)}`);
   return new TextDecoder().decode(r.stdout).trim();
 }
-let commit = opts.get("commit");
-if (!commit) {
+let commit: string | null | undefined = opts.get("commit");
+if (commit === "none") commit = null;
+else if (!commit) {
   const paths = files.map((f) => f.path);
   const dirty = await git(["status", "--porcelain", "--", ...paths]);
   if (dirty) throw new Error(`commit the inputs first, or pass --commit:\n${dirty}`);
   commit = await git(["log", "-1", "--format=%H", "--", ...paths]);
-  if (!commit) throw new Error("the inputs are not in any commit: commit them first, or pass --commit");
+  if (!commit) throw new Error("the inputs are not in any commit: commit them first, or pass --commit (a SHA, or none)");
 }
 
 const round = (x: number | null | undefined, d: number): number | null =>
@@ -146,7 +155,7 @@ const machine: Record<string, unknown> = {
   gpu: cpuOnly ? null : m.gpu ?? null,
   gpuMemoryMiB: cpuOnly ? null : m.vramMiB ?? null,
   driver: cpuOnly ? null : m.driver ?? null,
-  rebar: cpuOnly ? null : first.backend?.resizableBar ?? null,
+  rebar: cpuOnly ? null : first.backend?.resizableBar ?? (backend === "nvidia" ? true : backend === "nvidia-no-bar" ? false : null),
   memoryBudgetLayer: first.backend?.memoryBudgetLayer ?? false,
   loadAtStart: load(m.loadavgStart),
 };
@@ -173,7 +182,7 @@ const site = {
   budget,
 };
 const host = m.hostname ?? "host";
-const out = opts.get("out") ?? `results/${host}-${date}-${backend}-site.json`;
+const out = opts.get("out") ?? `site/${host}-${date}-${backend}-site.json`;
 await Deno.writeTextFile(out, JSON.stringify(site, null, 1) + "\n");
 console.error(
   `wrote ${out}: ${fetch.length} fetch shapes, compile ${compile.stock.length} stock / ${compile.patch0002.length} patch 0002, ` +
