@@ -6,6 +6,8 @@
  * The raw dir holds what `run-all.sh` wrote: `meta.json`, `sysinfo-start.json`, `sysinfo-end.json`, `fetch.json`,
  * and for each build of the vendored crates (`stock`, without patch 0002, and `patch0002`) `compile-<build>.jsonl`,
  * `budget-today-<build>.json` and `budget-10m-<build>.json` (any may be missing if its step failed or was skipped).
+ * On a GPU backend also the blocks built on the GPU: `gpu-build-check.json` (its output against the CPU's),
+ * `gpu-compile.json` (its time) and `budget-<set>-gpu.json`; in the results, `gpuCompile` and `budget.gpu`.
  *
  * The results file (schema `ipir-benchmark-nvidia/2`) records the backend (`backend.name`: `cpu`, `metal`, `nvidia`
  * or `nvidia-no-bar`; where the answers ran; resizable BAR; the memory-budget layer) and keeps the compile and the
@@ -37,7 +39,9 @@ const sysEnd = await json("sysinfo-end.json");
 const fetch = await json("fetch.json");
 const BUILDS = ["stock", "patch0002"] as const;
 const budget: Record<string, Record<string, any>> = {};
-for (const b of BUILDS) budget[b] = { today: await json(`budget-today-${b}.json`), "10m": await json(`budget-10m-${b}.json`) };
+for (const b of [...BUILDS, "gpu"]) budget[b] = { today: await json(`budget-today-${b}.json`), "10m": await json(`budget-10m-${b}.json`) };
+// The GPU build of the blocks: null when the run had none.
+const gpuCompile = meta?.gpuCompile ? { check: await json("gpu-build-check.json"), timing: await json("gpu-compile.json") } : null;
 
 // Compile: per (rows, tables at once), medians over the repetitions.
 function compileOf(compileLines: any[] | null): any[] | null {
@@ -100,7 +104,7 @@ const machine = {
   loadavgStart: s.loadavg,
   loadavgEnd: sysEnd?.loadavg ?? null,
 };
-const results = { schema: "ipir-benchmark-nvidia/2", meta, backend, machine, compile, fetch, budget, sysinfoStart: sysStart, sysinfoEnd: sysEnd };
+const results = { schema: "ipir-benchmark-nvidia/2", meta, backend, machine, compile, gpuCompile, fetch, budget, sysinfoStart: sysStart, sysinfoEnd: sysEnd };
 await Deno.writeTextFile(outJson, JSON.stringify(results, null, 1));
 
 // Markdown.
@@ -161,7 +165,7 @@ if (fetch) {
   lines.push("");
 } else lines.push("Not run or failed (see the raw files).", "");
 
-const buildName = (b: string) => (b === "stock" ? "stock crates" : "with patch 0002");
+const buildName = (b: string) => (b === "stock" ? "stock crates" : b === "gpu" ? "blocks built on the GPU" : "with patch 0002");
 lines.push("## 2. `compile` one column block on the CPU", "");
 if (BUILDS.some((b) => compile[b])) {
   lines.push("Whole build of a one-block table (2,048 columns): hint columns + packing matrix. Median of the repetitions.", "");
@@ -174,24 +178,60 @@ if (BUILDS.some((b) => compile[b])) {
   lines.push("");
 } else lines.push("Not run or failed.", "");
 
+if (gpuCompile) {
+  lines.push("## 2b. `compile` one column block on the GPU", "");
+  const checks: any[] = gpuCompile.check?.checks ?? [];
+  const equal = checks.filter((c) => c.equal === true).length;
+  lines.push(
+    checks.length
+      ? `The same work on the GPU (WebGPU kernels, \`gpu/block-build.ts\`). Output against the CPU's (\`pack_digest\`'s SHA-256 over every output word): ` +
+        `**${equal} of ${checks.length} blocks equal**${equal === checks.length ? "" : " — THE GPU BUILD DIFFERS, its times mean nothing"}.`
+      : "The same work on the GPU (WebGPU kernels, `gpu/block-build.ts`). The check of its output against the CPU's did not run.",
+    "",
+  );
+  const t = gpuCompile.timing;
+  if (t?.ok) {
+    lines.push("Wall: from writing the block's cells to the build's end. GPU: the GPU's own time (timestamp queries), all stages and each alone. Median of the repetitions.", "");
+    lines.push("| rows | at once | wall | GPU | hints | aggregation | chains | compile | GPU memory besides the cells |", "|---|---|---|---|---|---|---|---|---|");
+    for (const s of t.shapes ?? []) {
+      const st = s.stagesExecMedianMs ?? {};
+      lines.push(`| ${s.rows} | 1 | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(st.hints, 2)} ms | ${f(st.aggregation, 2)} ms | ${f(st.chains, 2)} ms | ${f(st.compile, 2)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+      for (const m of s.atOnce ?? []) lines.push(`| ${s.rows} | ${m.tables} | ${f(m.wallMs?.median)} ms | ${f(m.execMs?.median)} ms | | | | | ${f(m.scratchBytes / 2 ** 20, 0)} MiB |`);
+    }
+    lines.push("");
+    if (t.sets?.length) {
+      lines.push("One chain block: one column block of each of the six tables, built at once (all chains in one dispatch).", "");
+      lines.push("| shapes | rows of the six tables | wall | GPU | GPU memory besides the cells |", "|---|---|---|---|---|");
+      for (const s of t.sets) lines.push(`| ${s.set === "today" ? "today's starting shapes" : "10 million outputs"} | ${s.rows.join(", ")} | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+      lines.push("");
+    }
+  } else lines.push(`Timing not run or failed${t?.error ? `: ${String(t.error).slice(0, 300)}` : ""}.`, "");
+}
+
 lines.push("## 3. The 3 s block budget, simulated", "");
 lines.push(
   (backend.answer === "cpu"
     ? "Per chain block: compile one changed column block of each of six tables on the CPU while the CPU also answers calls of 32 at a steady rate (no upload: block work is the compile). "
     : "Per chain block: compile one changed column block of each of six tables on the CPU, then upload the six to the GPU, while the GPU answers calls of 32 at a steady rate. ") +
     "The compile recomputes each block's whole hint columns: an upper bound, since hint updates for new records are not built. " +
+    (gpuCompile ? "\"Blocks built on the GPU\": the six blocks are built on the GPU that is answering instead (compile = their cells written and built in one submission; upload = their layout for the answer from the build's GPU buffers). " : "") +
     "Latency: from the moment a call is due to its answer; \"during\" = calls overlapping a block's work.",
   "",
 );
-for (const [build, name, b] of BUILDS.flatMap((x) => Object.entries(budget[x]!).map(([n, v]) => [x, n, v] as const))) {
+for (const [build, name, b] of [...BUILDS, "gpu"].flatMap((x) => Object.entries(budget[x]!).map(([n, v]) => [x, n, v] as const))) {
   if (!b) continue;
   lines.push(`### Shapes: ${name === "today" ? "today's starting shapes" : "10 million outputs"}, ${buildName(build)}`, "");
   lines.push(b.tables.map((t: any) => `${t.name} ${t.rows} × ${t.cols}`).join(", ") + `; ${f(b.residentBytes / 2 ** 30, 2)} GiB resident.`, "");
   if (!b.ok) {
-    lines.push(`Failed at ${b.stage}: ${b.error}`, "");
+    lines.push(b.doesNotFit ? `Does not fit in the GPU's memory (at ${b.stage}): ${b.error}` : `Failed at ${b.stage}: ${b.error}`, "");
     continue;
   }
-  lines.push(`Pool: ${b.worker?.pool_threads} threads (${b.worker?.pool_priority}); ${b.blocks} blocks every ${b.intervalMs / 1000} s.`, "");
+  lines.push(
+    b.worker
+      ? `Pool: ${b.worker.pool_threads} threads (${b.worker.pool_priority}); ${b.blocks} blocks every ${b.intervalMs / 1000} s.`
+      : `${b.blocks} blocks every ${b.intervalMs / 1000} s; the build holds ${f((b.gpuBuild?.scratchBytes + b.gpuBuild?.cellsBytes) / 2 ** 20, 0)} MiB of GPU memory.`,
+    "",
+  );
   lines.push(
     "| calls/s | mode | block work p50 / p99 | compile p50 / p99 | upload p50 | over 3 s | answer p50 / p99 during work | answer p50 / p99 no block work | calls dropped |",
     "|---|---|---|---|---|---|---|---|---|",

@@ -22,6 +22,11 @@
  *   --out FILE         default: site/<host>-<date>-<backend>-site.json
  *
  * Shapes are written `rows × cols` (U+00D7). `execMs` is the GPU's own time from timestamp queries, null on the CPU.
+ *
+ * A run that built the blocks on the GPU (`gpu/block-build.ts`) also has `gpuCompile` (null otherwise): `check`, how
+ * many of the checked blocks equal the CPU's output; `one`, one table per row count, with the GPU's time per stage;
+ * `atOnce`, several tables of a row count at once; `sets`, one chain block of the six tables. And `budget.gpu`: the
+ * budget cells with the blocks built on the GPU that is answering (`compileP50S` is then the GPU build).
  */
 import { options } from "./lib.ts";
 
@@ -104,7 +109,21 @@ if (fetchFile) {
 
 // compile and budget, per build.
 const compile: Record<Build, Any[]> = { stock: [], patch0002: [] };
-const budget: Record<Build, Any[]> = { stock: [], patch0002: [] };
+const budget: Record<Build | "gpu", Any[]> = { stock: [], patch0002: [], gpu: [] };
+/** A budget set's cells for the page. */
+function budgetRows(s: Any, set: string): Any[] {
+  return s.runs.filter((x: Any) => x.mode !== "none").map((run: Any) => ({
+    shapes: set,
+    callsPerSec: run.rate,
+    mode: run.mode,
+    blockWorkP50S: round(run.blockWorkMs.p50 / 1000, 3),
+    blockWorkP99S: round(run.blockWorkMs.p99 / 1000, 3),
+    compileP50S: round(run.compileMs.p50 / 1000, 3),
+    uploadP50Ms: round(run.uploadMs?.p50, 2),
+    over3s: run.overBudget,
+    blocks: run.blocks,
+  }));
+}
 for (const f of files) {
   const per: [Build, Any, Any][] = f.r.schema === "ipir-benchmark-nvidia/1"
     ? [[f.build!, f.r.compile, f.r.budget]]
@@ -124,20 +143,35 @@ for (const f of files) {
       const s = bud?.[set];
       if (!s?.ok) continue;
       if (budget[b].some((x) => x.shapes === set)) throw new Error(`two inputs have the ${set} budget of build ${b}`);
-      for (const run of s.runs.filter((x: Any) => x.mode !== "none")) {
-        budget[b].push({
-          shapes: set,
-          callsPerSec: run.rate,
-          mode: run.mode,
-          blockWorkP50S: round(run.blockWorkMs.p50 / 1000, 3),
-          blockWorkP99S: round(run.blockWorkMs.p99 / 1000, 3),
-          compileP50S: round(run.compileMs.p50 / 1000, 3),
-          uploadP50Ms: round(run.uploadMs?.p50, 2),
-          over3s: run.overBudget,
-          blocks: run.blocks,
-        });
-      }
+      budget[b].push(...budgetRows(s, set));
     }
+  }
+}
+
+// The blocks built on the GPU: from the first input that has them.
+const gpuFile = files.find((f) => f.r.gpuCompile);
+let gpuCompile: Any = null;
+if (gpuFile) {
+  const g = gpuFile.r.gpuCompile;
+  const checks: Any[] = g.check?.checks ?? [];
+  const t = g.timing?.ok ? g.timing : null;
+  gpuCompile = {
+    check: { blocks: checks.length, equal: checks.filter((c) => c.equal === true).length },
+    one: (t?.shapes ?? []).map((s: Any) => ({
+      rows: s.rows,
+      wallMs: round(s.wallMs?.median, 2),
+      execMs: round(s.execMs?.median, 2),
+      hintsMs: round(s.stagesExecMedianMs?.hints, 2),
+      aggregationMs: round(s.stagesExecMedianMs?.aggregation, 2),
+      chainsMs: round(s.stagesExecMedianMs?.chains, 2),
+      compileMs: round(s.stagesExecMedianMs?.compile, 2),
+    })),
+    atOnce: (t?.shapes ?? []).flatMap((s: Any) => (s.atOnce ?? []).map((m: Any) => ({ rows: s.rows, tables: m.tables, wallMs: round(m.wallMs?.median, 2), execMs: round(m.execMs?.median, 2) }))),
+    sets: (t?.sets ?? []).map((s: Any) => ({ shapes: s.set, wallMs: round(s.wallMs?.median, 2), execMs: round(s.execMs?.median, 2), gpuMemoryMiB: round(s.scratchBytes / 2 ** 20, 0) })),
+  };
+  for (const set of ["today", "10m"] as const) {
+    const s = gpuFile.r.budget?.gpu?.[set];
+    if (s?.ok) budget.gpu.push(...budgetRows(s, set));
   }
 }
 
@@ -179,6 +213,7 @@ const site = {
   machine: Object.fromEntries(order.map((k) => [k, machine[k] ?? null])),
   fetch,
   compile,
+  gpuCompile,
   budget,
 };
 const host = m.hostname ?? "host";
@@ -186,5 +221,6 @@ const out = opts.get("out") ?? `site/${host}-${date}-${backend}-site.json`;
 await Deno.writeTextFile(out, JSON.stringify(site, null, 1) + "\n");
 console.error(
   `wrote ${out}: ${fetch.length} fetch shapes, compile ${compile.stock.length} stock / ${compile.patch0002.length} patch 0002, ` +
-    `budget ${budget.stock.length} stock / ${budget.patch0002.length} patch 0002`,
+    `budget ${budget.stock.length} stock / ${budget.patch0002.length} patch 0002 / ${budget.gpu.length} GPU build` +
+    (gpuCompile ? `; GPU compile: ${gpuCompile.check.equal} of ${gpuCompile.check.blocks} blocks equal, ${gpuCompile.one.length} row counts` : ""),
 );

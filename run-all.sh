@@ -6,9 +6,11 @@
 #   ./run-all.sh --backend cpu   # the answers on the CPU instead of the GPU
 #   ./run-all.sh --quick         # small shapes and few blocks (a few minutes), to check that it works
 #
-# Steps 2 (compile) and 3 (budget) run twice: with the stock vendored crates and with patch 0002.
+# Steps 2 (compile) and 3 (budget) run twice on the CPU: with the stock vendored crates and with patch 0002. On a GPU
+# backend they also run with the blocks built on the GPU (gpu/block-build.ts), after a check that the GPU's output
+# equals the CPU's.
 # Other options: --builds stock,patch0002 (which of the two), --skip-build, --skip-compile, --skip-fetch,
-# --skip-budget, --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
+# --skip-budget, --skip-gpu-compile (no GPU build of the blocks), --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
 # a GPU that is not NVIDIA's), --name NAME (results file name instead of <host>-<date>-<backend>).
 # Environment: DENO (the deno binary), DENO_WEBGPU_BACKEND (default "vulkan" on Linux), CARGO_BUILD_JOBS,
 # IPIR_BENCH_HOST (the host name in file names and results, instead of `hostname -s`), IPIR_BENCH_PREFLIGHT (a JSON
@@ -23,7 +25,7 @@ if [[ "$(uname)" == Darwin && -z "${IPIR_BENCH_CAFFEINATED:-}" ]] && command -v 
   IPIR_BENCH_CAFFEINATED=1 exec caffeinate -s -i -m "$0" "$@"
 fi
 
-QUICK=0 SKIP_BUILD=0 SKIP_COMPILE=0 SKIP_FETCH=0 SKIP_BUDGET=0 ALLOW_NON_NVIDIA=0 NAME="" BACKEND_OPT=gpu
+QUICK=0 SKIP_BUILD=0 SKIP_COMPILE=0 SKIP_FETCH=0 SKIP_BUDGET=0 SKIP_GPU_COMPILE=0 ALLOW_NON_NVIDIA=0 NAME="" BACKEND_OPT=gpu
 BUILDS=stock,patch0002 GPU_CHECK=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,9 +37,10 @@ while [[ $# -gt 0 ]]; do
     --skip-compile) SKIP_COMPILE=1 ;;
     --skip-fetch) SKIP_FETCH=1 ;;
     --skip-budget) SKIP_BUDGET=1 ;;
+    --skip-gpu-compile) SKIP_GPU_COMPILE=1 ;;
     --allow-non-nvidia) ALLOW_NON_NVIDIA=1 ;;
     --name) NAME="$2"; shift ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -88,12 +91,16 @@ if [[ $QUICK == 1 ]]; then
   FETCH_ARGS=(--shapes 2048x2048,2048x4096,4096x8192 --largest "" --runs 3)
   COMPILE_ARGS=(2048,8192 1 1,4)
   BUDGET_SETS=(today)
-  BUDGET_ARGS=(--rates 2,5 --modes seq,pool --blocks 4 --baseline-s 5)
+  BUDGET_ARGS=(--rates 2,5 --blocks 4 --baseline-s 5)
+  GPU_CHECK_ARGS=(--rows 2048,8192 --seeds 1 --sets today)
+  GPU_COMPILE_ARGS=(--rows 2048,8192 --reps 3 --at-once 4 --sets today --set-reps 3)
 else
   FETCH_ARGS=(--runs 9)
   COMPILE_ARGS=(2048,8192,16384,32768 3 1,4)
   BUDGET_SETS=(today 10m)
-  BUDGET_ARGS=(--rates 2,5,10 --modes seq,pool --blocks 30 --baseline-s 20)
+  BUDGET_ARGS=(--rates 2,5,10 --blocks 30 --baseline-s 20)
+  GPU_CHECK_ARGS=(--rows 2048,8192,16384,32768 --seeds 1,2,3 --sets today,10m)
+  GPU_COMPILE_ARGS=(--rows 2048,8192,16384,32768 --reps 5 --at-once 4,6 --sets today,10m --set-reps 10)
 fi
 
 # 1. Build the CPU side: with patch 0002 (ipir/target/release/) and without (ipir/target/stock/release/).
@@ -107,7 +114,9 @@ for b in "${BUILD_LIST[@]}"; do
     [[ -x "$(bindir "$b")/$p" ]] || { echo "$(bindir "$b")/$p is missing: build failed?" >&2; exit 1; }
   done
 done
-[[ -x ipir/target/release/cpu_fetch ]] || { echo "ipir/target/release/cpu_fetch is missing: build failed?" >&2; exit 1; }
+for p in cpu_fetch gpu_build_prep pack_digest; do
+  [[ -x ipir/target/release/$p ]] || { echo "ipir/target/release/$p is missing: build failed?" >&2; exit 1; }
+done
 
 # 2. The machine, and the adapter check. The CPU backend needs no GPU; it uses one, if there is a usable one, only
 # to check its answers.
@@ -132,11 +141,20 @@ if [[ $ANSWER == gpu ]] && command -v nvidia-smi >/dev/null && [[ $ALLOW_NON_NVI
   echo "Try DENO_WEBGPU_BACKEND=vulkan, check vulkaninfo --summary, or pass --allow-non-nvidia." >&2
   exit 1
 fi
+# The GPU build of the blocks: on a GPU backend whose adapter has the limits its kernels need.
+GPU_COMPILE=0
+if [[ $ANSWER == gpu && $SKIP_GPU_COMPILE == 0 ]]; then
+  if [[ "$("$DENO" eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));console.log(s.webgpu?.blockBuild===true)' "$RAW/sysinfo-start.json")" == true ]]; then
+    GPU_COMPILE=1
+  else
+    echo "the adapter lacks the limits the GPU block build needs (1,024 invocations per workgroup, 32 KB of workgroup memory): blocks are built on the CPU only"
+  fi
+fi
 VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ' || true)
 RAM_MIB=$("$DENO" eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));console.log(s.memTotalKiB?Math.floor(s.memTotalKiB/1024):"")' "$RAW/sysinfo-start.json")
 
 cat > "$RAW/meta.json" <<JSON
-{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
+{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"gpuCompile":$([[ $GPU_COMPILE == 1 ]] && echo true || echo false),"gpuCompileSteps":"$([[ $SKIP_COMPILE == 0 ]] && echo -n compile)$([[ $SKIP_BUDGET == 0 ]] && echo -n ,budget)","repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
 JSON
 
 # 3. compile (task 2), for each build.
@@ -145,6 +163,15 @@ if [[ $SKIP_COMPILE == 0 ]]; then
     echo "== compile one column block on the CPU, build $b (rows, reps, at once: ${COMPILE_ARGS[*]})"
     "$(bindir "$b")/compile_block" "${COMPILE_ARGS[@]}" | tee "$RAW/compile-$b.jsonl" || echo "compile step ($b) failed" >&2
   done
+fi
+
+# 3b. compile on the GPU: first that its output equals the CPU's, then its time.
+if [[ $SKIP_COMPILE == 0 && $GPU_COMPILE == 1 ]]; then
+  echo "== compile on the GPU: its output against the CPU's (${GPU_CHECK_ARGS[*]})"
+  "$DENO" run "${PERMS[@]}" bench/check-gpu-build.ts --out "$RAW/gpu-build-check.json" "${GPU_CHECK_ARGS[@]}" \
+    || echo "the GPU build's check failed or found a difference" >&2
+  echo "== compile on the GPU: time (${GPU_COMPILE_ARGS[*]})"
+  "$DENO" run "${PERMS[@]}" bench/gpu-compile.ts --out "$RAW/gpu-compile.json" "${GPU_COMPILE_ARGS[@]}" || echo "gpu compile step failed" >&2
 fi
 
 # 4. fetch (task 1): on the GPU, or on the CPU (with patch 0002, the repository's default build).
@@ -169,10 +196,18 @@ if [[ $SKIP_BUDGET == 0 ]]; then
     [[ $ANSWER == cpu ]] && ANSWER_ARGS=(--answer cpu --cpu-server "$(bindir "$b")/cpu_server")
     for set in "${BUDGET_SETS[@]}"; do
       echo "== block budget, shapes: $set, build $b, answers on the $ANSWER"
-      "$DENO" run "${PERMS[@]}" bench/budget.ts --set "$set" --worker "$(bindir "$b")/block_worker" \
+      "$DENO" run "${PERMS[@]}" bench/budget.ts --set "$set" --worker "$(bindir "$b")/block_worker" --modes seq,pool \
         --out "$RAW/budget-$set-$b.json" ${ANSWER_ARGS[@]+"${ANSWER_ARGS[@]}"} "${BUDGET_ARGS[@]}" || echo "budget step ($set, $b) failed" >&2
     done
   done
+  # The same with the blocks built on the GPU that is answering.
+  if [[ $GPU_COMPILE == 1 ]]; then
+    for set in "${BUDGET_SETS[@]}"; do
+      echo "== block budget, shapes: $set, blocks built on the GPU"
+      "$DENO" run "${PERMS[@]}" bench/budget.ts --set "$set" --modes gpu --gpu-prep ipir/target/release/gpu_build_prep \
+        --out "$RAW/budget-$set-gpu.json" "${BUDGET_ARGS[@]}" || echo "budget step ($set, GPU build) failed or does not fit" >&2
+    done
+  fi
 fi
 
 "$DENO" run "${PERMS[@]}" bench/sysinfo.ts --no-adapter > "$RAW/sysinfo-end.json" || true

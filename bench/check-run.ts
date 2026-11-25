@@ -32,6 +32,15 @@ for (const b of builds) {
   say(Array.isArray(c) && c.length > 0, `compile, build ${b}: ${c?.length ?? 0} measurement(s)`);
 }
 
+// compile on the GPU: its output against the CPU's, and its time.
+if (r.meta?.gpuCompile && String(r.meta?.gpuCompileSteps ?? "compile").includes("compile")) {
+  const checks: Any[] = r.gpuCompile?.check?.checks ?? [];
+  const equal = checks.filter((c) => c.equal === true).length;
+  say(checks.length > 0 && equal === checks.length, `compile on the GPU against the CPU's output: ${equal} of ${checks.length} block(s) equal`);
+  const t = r.gpuCompile?.timing;
+  say(t?.ok === true, `compile on the GPU, time: ${t?.ok ? `${t.shapes?.length ?? 0} row count(s), ${t.sets?.length ?? 0} set(s)` : `failed${t?.error ? ` (${String(t.error).slice(0, 300)})` : " or missing"}`}`);
+}
+
 // fetch.
 const shapeOf = (x: Any) => `${x.rows}x${x.cols}`;
 const results: Any[] | null = r.fetch?.results ?? null;
@@ -74,6 +83,17 @@ for (const b of builds) {
     say(s.ok === true && runs.length > 0, `budget ${set}, build ${b}: ${runs.length} run(s)${s.ok === true ? "" : `, not ok${s.error ? ` (${String(s.error).slice(0, 300)})` : ""}`}`);
     const over = runs.filter((x) => x.overBudget > 0).length;
     if (over) console.log(`note    budget ${set}, build ${b}: ${over} of ${runs.length} run(s) had a block over 3 s (a result, not a failure)`);
+  }
+}
+
+// budget with the blocks built on the GPU. Not fitting in the GPU's memory is a result (in a full run).
+if (r.meta?.gpuCompile && String(r.meta?.gpuCompileSteps ?? "").includes("budget")) {
+  for (const set of sets) {
+    const s: Any = r.budget?.gpu?.[set] ?? null;
+    if (!s) say(false, `budget ${set}, blocks built on the GPU: missing`);
+    else if (s.ok === true) say(true, `budget ${set}, blocks built on the GPU: ${(s.runs ?? []).filter((x: Any) => x.mode === "gpu").length} run(s)`);
+    else if (s.doesNotFit && !quick) console.log(`note    budget ${set}, blocks built on the GPU: does not fit in the GPU's memory (${String(s.error ?? "").slice(0, 200)})`);
+    else say(false, `budget ${set}, blocks built on the GPU: not ok (${String(s.error ?? "").slice(0, 300)})`);
   }
 }
 
