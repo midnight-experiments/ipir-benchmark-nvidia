@@ -1,105 +1,3 @@
---- a/ipir-sp/src/native.rs
-+++ b/ipir-sp/src/native.rs
-@@ -6,7 +6,7 @@
- };
- use rayon::prelude::*;
- use reinspiring::{
--    lift_ntt::LiftContext,
-+    lift_ntt::{LiftContext, PreparedPublicDot},
-     native::{NativeKeys, NativePreprocessed},
-     ReinspiringError,
- };
-@@ -233,17 +233,7 @@
-                 .into_par_iter()
-                 .map(|block| {
-                     let hint_start = Instant::now();
--                    let masks: Result<Vec<_>, _> = (block * d..(block + 1) * d)
--                        .into_par_iter()
--                        .map(|col| {
--                            let coeffs: Vec<Vec<u64>> = db[col * p.rows()..(col + 1) * p.rows()]
--                                .chunks_exact(d)
--                                .map(|poly| poly.iter().map(|&x| x.into()).collect())
--                                .collect();
--                            lift.public_dot(&public_polys, &coeffs)
--                        })
--                        .collect();
--                    let masks = masks?;
-+                    let masks = hint_masks(&lift, &public_polys, &db, p.rows(), d, block)?;
-                     let hint = hint_start.elapsed();
-                     let pack_start = Instant::now();
-                     let timed = |(pre, analysis)| (pre, analysis, hint, pack_start.elapsed());
-@@ -317,6 +307,24 @@
-             analyses,
-         ))
-     }
-+    /// Feeds the database layout and every retained output word of every block to
-+    /// `sink`, so a program can compare builds bit for bit. Read only.
-+    #[doc(hidden)]
-+    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
-+        sink(&[self.interleaved as u8]);
-+        match &self.db {
-+            NativeDatabase::U16(x) => {
-+                for chunk in x.chunks(1 << 16) {
-+                    let bytes: Vec<u8> = chunk.iter().flat_map(|v| v.to_le_bytes()).collect();
-+                    sink(&bytes);
-+                }
-+            }
-+            NativeDatabase::U8(x) => sink(x),
-+        }
-+        for block in &self.pre {
-+            block.digest_words(sink);
-+        }
-+    }
-     /// Bytes retained for database entries (1 per entry for 8-bit storage, else 2).
-     pub fn database_bytes(&self) -> usize {
-         match &self.db {
-@@ -473,6 +481,46 @@
-     }
- }
- 
-+/// Database-by-query-mask hints of one output block: for each of its d columns, the
-+/// public dot product of the column (as rows/d polynomials) with the query masks.
-+fn hint_masks<T: DatabaseEntry>(
-+    lift: &LiftContext,
-+    public_polys: &PreparedPublicDot,
-+    db: &[T],
-+    rows: usize,
-+    d: usize,
-+    block: usize,
-+) -> Result<Vec<Vec<u64>>, ReinspiringError> {
-+    (block * d..(block + 1) * d)
-+        .into_par_iter()
-+        .map(|col| {
-+            let coeffs: Vec<Vec<u64>> = db[col * rows..(col + 1) * rows]
-+                .chunks_exact(d)
-+                .map(|poly| poly.iter().map(|&x| x.into()).collect())
-+                .collect();
-+            lift.public_dot(public_polys, &coeffs)
-+        })
-+        .collect()
-+}
-+
-+/// The hints `NativeServer::build_with_concurrency` computes for every output block,
-+/// through the same code, for bit-for-bit comparison of builds. Not part of the API.
-+#[doc(hidden)]
-+pub fn digest_hint_masks(
-+    setup: &NativePublicSetup,
-+    db: &[u16],
-+) -> Result<Vec<Vec<Vec<u64>>>, ReinspiringError> {
-+    let p = setup.profile();
-+    let d = p.packing().d();
-+    let q = p.packing().q();
-+    let lift = LiftContext::new(d, q)?;
-+    let public_polys =
-+        lift.prepare_public_dot(setup.query_masks(), (p.packing().p() - 1).min(q / 2))?;
-+    (0..p.cols() / d)
-+        .map(|block| hint_masks(&lift, &public_polys, db, p.rows(), d, block))
-+        .collect()
-+}
-+
- fn err(s: &str) -> ReinspiringError {
-     ReinspiringError::InvalidParams(s.into())
- }
 --- a/reinspiring/src/compile.rs
 +++ b/reinspiring/src/compile.rs
 @@ -29,6 +29,18 @@
@@ -138,7 +36,7 @@
      if ts.is_empty() || ts.len() != exponents.len() || !(2..=(1 << 62)).contains(&q) {
          return Err(ReinspiringError::InvalidParams(
              "invalid Compile inputs".into(),
-@@ -238,10 +260,25 @@
+@@ -238,12 +260,22 @@
      }
      // tau_g(X^j) = X^j (X^(2j))^((g-1)/2). Missing exponents
      // have zero coefficients; repeated exponents add in the generating polynomial.
@@ -146,29 +44,26 @@
 -    for (t, &g) in ts.iter().zip(exponents) {
 -        for (dst, &x) in p_hat[((g - 1) / 2) as usize].iter_mut().zip(t) {
 -            *dst = (*dst + x) % q;
-+    let mut p_hat: Vec<Vec<u64>> = (0..d).map(|_| Vec::new()).collect();
++    let mut p_hat: Vec<Option<Vec<u64>>> = vec![None; d];
 +    for (t, &g) in ts.into_iter().zip(exponents) {
-+        let row = &mut p_hat[((g - 1) / 2) as usize];
-+        if row.is_empty() {
++        match &mut p_hat[((g - 1) / 2) as usize] {
 +            // (0 + x) % q = x: the coefficients are canonical.
-+            *row = t;
-+        } else if q.is_power_of_two() {
-+            for (dst, &x) in row.iter_mut().zip(&t) {
-+                *dst = (*dst + x) & (q - 1);
++            slot @ None => *slot = Some(t),
++            Some(row) => {
++                for (dst, &x) in row.iter_mut().zip(&t) {
++                    *dst = (*dst + x) % q;
++                }
 +            }
-+        } else {
-+            for (dst, &x) in row.iter_mut().zip(&t) {
-+                *dst = (*dst + x) % q;
-+            }
-+        }
-+    }
-+    for row in &mut p_hat {
-+        if row.is_empty() {
-+            *row = vec![0; d];
          }
      }
++    let p_hat = p_hat
++        .into_iter()
++        .map(|row| row.unwrap_or_else(|| vec![0; d]))
++        .collect();
      compile_validated_fft(p_hat, q)
-@@ -347,20 +384,30 @@
+ }
+ 
+@@ -347,20 +379,36 @@
                      .zip(right.par_iter_mut())
                      .enumerate()
                      .with_min_len(16)
@@ -198,22 +93,41 @@
 +                            let (low, high) = scratch.split_at_mut(r);
 +                            let (u_low, u_high) = u.split_at_mut(r);
 +                            for ((dst, u), &x) in low.iter_mut().zip(u_low).zip(&v[d - r..]) {
-+                                let t = (x ^ !sign).wrapping_sub(!sign);
++                                let t = negate_if(x, !sign);
 +                                *dst = u.wrapping_sub(t) & mask;
 +                                *u = u.wrapping_add(t) & mask;
 +                            }
 +                            for ((dst, u), &x) in high.iter_mut().zip(u_high).zip(&v[..d - r]) {
-+                                let t = (x ^ sign).wrapping_sub(sign);
++                                let t = negate_if(x, sign);
 +                                *dst = u.wrapping_sub(t) & mask;
 +                                *u = u.wrapping_add(t) & mask;
 +                            }
 +                            std::mem::swap(v, scratch);
++                            // The transform covers the first d coefficients;
++                            // a longer row keeps the rest, and scratch stays d long.
++                            if scratch.len() > d {
++                                v.extend_from_slice(&scratch[d..]);
++                                scratch.truncate(d);
++                            }
 +                        },
 +                    );
              });
              len *= 2;
          }
-@@ -417,3 +464,56 @@
+@@ -387,6 +435,12 @@
+     }
+ }
+ 
++// -x (wrapping) when mask is all ones, x when it is zero.
++#[inline(always)]
++fn negate_if(x: u64, mask: u64) -> u64 {
++    (x ^ mask).wrapping_sub(mask)
++}
++
+ fn rotate_by_x_power(p: &[u64], exp_mod_2d: usize, q: u64) -> Vec<u64> {
+     let d = p.len();
+     let e = exp_mod_2d % (2 * d);
+@@ -417,3 +471,56 @@
      ring_fft_inplace(&mut a, q);
      a
  }
@@ -270,18 +184,157 @@
 +        }
 +    }
 +}
+--- /dev/null
++++ b/reinspiring/src/lazy_ntt.rs
+@@ -0,0 +1,121 @@
++//! Spiral's single-prime NTT with lazy Shoup products, and the Shoup helpers
++//! that the exact public dot product and its CRT reconstruction share.
++use spiral_rs::params::Params;
++
++// Shoup multiplication by a fixed w < p < 2^62 with quotient = floor(w * 2^64 / p):
++// for any x < 2^64 the result is congruent to x * w and lies in [0, 2p), so the
++// wrapping u64 arithmetic is exact (the bound spiral's `multiply_root` uses).
++#[inline(always)]
++pub(crate) fn mul_shoup_lazy(x: u64, w: u64, quotient: u64, p: u64) -> u64 {
++    let estimate = ((u128::from(x) * u128::from(quotient)) >> 64) as u64;
++    x.wrapping_mul(w).wrapping_sub(estimate.wrapping_mul(p))
++}
++
++pub(crate) fn shoup_quotient(w: u64, p: u64) -> u64 {
++    ((u128::from(w) << 64) / u128::from(p)) as u64
++}
++
++// Branch-free: on uniformly distributed residues a compare-and-jump mispredicts
++// about half the time, which costs more than the arithmetic around it.
++#[inline(always)]
++pub(crate) fn reduce_once(x: u64, p: u64) -> u64 {
++    std::hint::select_unpredictable(x >= p, x.wrapping_sub(p), x)
++}
++
++// Spiral's single-prime `ntt_forward_alt` on its own tables, with lazy Shoup
++// products in [0, 2p) instead of fully reduced ones. Every stage keeps values in
++// [0, 4p) and congruent to spiral's; the final pass returns the same canonical
++// residues word for word. `params` holds one prime.
++pub(crate) fn ntt_forward(params: &Params, a: &mut [u64]) {
++    let p = params.modulus;
++    let two_p = 2 * p;
++    let roots = params.get_ntt_forward_table(0);
++    let quotients = params.get_ntt_forward_prime_table(0);
++    let n = a.len();
++    let (mut m, mut t) = (1, n / 2);
++    while m < n {
++        for (i, block) in a.chunks_exact_mut(2 * t).enumerate() {
++            let (w, w_quotient) = (roots[m + i], quotients[m + i]);
++            let (xs, ys) = block.split_at_mut(t);
++            for (x, y) in xs.iter_mut().zip(ys.iter_mut()) {
++                let cx = reduce_once(*x, two_p);
++                let v = mul_shoup_lazy(*y, w, w_quotient, p);
++                *x = cx + v;
++                *y = cx + two_p - v;
++            }
++        }
++        m *= 2;
++        t /= 2;
++    }
++    for x in a.iter_mut() {
++        *x = reduce_once(reduce_once(*x, two_p), p);
++    }
++}
++
++// Spiral's single-prime `ntt_inverse_alt` (its tables fold in the 1/2 per
++// stage), with lazy Shoup products. Inputs are canonical; values stay in
++// [0, 2p) and congruent to spiral's, and the output is canonical.
++pub(crate) fn ntt_inverse(params: &Params, a: &mut [u64]) {
++    let p = params.modulus;
++    let two_p = 2 * p;
++    let roots = params.get_ntt_inverse_table(0);
++    let quotients = params.get_ntt_inverse_prime_table(0);
++    let n = a.len();
++    let (mut h, mut t) = (n / 2, 1);
++    while h >= 1 {
++        for (i, block) in a.chunks_exact_mut(2 * t).enumerate() {
++            let (w, w_quotient) = (roots[h + i], quotients[h + i]);
++            let (xs, ys) = block.split_at_mut(t);
++            for (x, y) in xs.iter_mut().zip(ys.iter_mut()) {
++                let (vx, vy) = (*x, *y);
++                let difference = two_p - vy + vx;
++                let sum =
++                    vx + vy - std::hint::select_unpredictable(vx << 1 >= difference, two_p, 0);
++                *x = (sum + (p & (difference & 1).wrapping_neg())) >> 1;
++                *y = mul_shoup_lazy(difference, w, w_quotient, p);
++            }
++        }
++        h /= 2;
++        t *= 2;
++    }
++    for x in a.iter_mut() {
++        *x = reduce_once(reduce_once(*x, two_p), p);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::lift_ntt::LiftContext;
++    use rand::{Rng, SeedableRng};
++
++    #[test]
++    fn transforms_equal_spiral_word_for_word() {
++        let mut rng = rand::rngs::StdRng::seed_from_u64(0x0002);
++        for d in [2, 8, 64, 2048, 4096] {
++            let ctx = LiftContext::new(d, 1 << 54).unwrap();
++            for params in &ctx.params {
++                let p = params.modulus;
++                for pattern in 0..8 {
++                    let input: Vec<u64> = (0..d)
++                        .map(|i| match pattern {
++                            0 => 0,
++                            1 => p - 1,
++                            2 => u64::from(i == 0),
++                            3 => [p - 1, 0][i % 2],
++                            _ => rng.gen::<u64>() % p,
++                        })
++                        .collect();
++                    let (mut ours, mut theirs) = (input.clone(), input.clone());
++                    ntt_forward(params, &mut ours);
++                    spiral_rs::ntt::ntt_forward(params, &mut theirs);
++                    assert_eq!(ours, theirs, "forward d={d} p={p} pattern={pattern}");
++                    let (mut ours, mut theirs) = (input.clone(), input);
++                    ntt_inverse(params, &mut ours);
++                    spiral_rs::ntt::ntt_inverse(params, &mut theirs);
++                    assert_eq!(ours, theirs, "inverse d={d} p={p} pattern={pattern}");
++                }
++            }
++        }
++    }
++}
+--- a/reinspiring/src/lib.rs
++++ b/reinspiring/src/lib.rs
+@@ -14,6 +14,7 @@
+ 
+ pub mod compile;
+ pub mod error;
++mod lazy_ntt;
+ pub mod lift_ntt;
+ pub mod matrix;
+ pub mod modswitch;
 --- a/reinspiring/src/lift_ntt.rs
 +++ b/reinspiring/src/lift_ntt.rs
-@@ -5,6 +5,7 @@
+@@ -5,6 +5,8 @@
  //! proves that the entire signed sum fits two primes. Public preprocessing
  //! checks full-sum capacity with `prepare_public_dot` before accumulation.
  use crate::error::ReinspiringError;
++use crate::lazy_ntt::{mul_shoup_lazy, ntt_forward, ntt_inverse, reduce_once, shoup_quotient};
 +use rayon::prelude::*;
  use spiral_rs::{
      params::Params,
      poly::{from_ntt_alloc, multiply, to_ntt_alloc, PolyMatrix, PolyMatrixNTT, PolyMatrixRaw},
-@@ -38,6 +39,8 @@
-     params: Vec<Params>,
+@@ -35,9 +37,11 @@
+ pub struct LiftContext {
+     d: usize,
+     q: u64,
+-    params: Vec<Params>,
++    pub(crate) params: Vec<Params>,
      product: u128,
      inverses: [u64; 2],
 +    // Shoup quotients for division-free CRT: inverses[0] mod p1, inverses[1] mod p2, p0 mod p2.
@@ -289,7 +342,7 @@
  }
  
  /// Offline transforms of a public left operand. The prime count is selected
-@@ -68,6 +71,8 @@
+@@ -68,6 +72,8 @@
      right_bound: u64,
      // prime, operand, NTT coefficient
      transforms: Vec<Vec<Vec<u64>>>,
@@ -298,7 +351,27 @@
  }
  
  impl Drop for PreparedLiftRight {
-@@ -319,7 +324,11 @@
+@@ -100,8 +106,8 @@
+         masks: &[Vec<u64>],
+         support: u64,
+     ) -> Result<PreparedLiftOperand, ReinspiringError> {
+-        let dot = self.prepare_public_dot(masks, support)?;
+-        if dot.transforms.len() != 2 {
++        let transforms = self.public_dot_transforms(masks, support)?;
++        if transforms.len() != 2 {
+             return Err(ReinspiringError::InvalidParams(
+                 "decoder requires two-prime capacity".into(),
+             ));
+@@ -111,7 +117,7 @@
+             q: self.q,
+             sum_fits_two: true,
+             transforms: (0..masks.len())
+-                .map(|i| dot.transforms.iter().map(|p| p[i].clone()).collect())
++                .map(|i| transforms.iter().map(|p| p[i].clone()).collect())
+                 .collect(),
+         })
+     }
+@@ -319,7 +325,18 @@
          } else {
              delta
          };
@@ -308,10 +381,17 @@
 +            PRIMES[1],
 +        );
 +        let x = r0 as u128 + p0 * t as u128;
++        self.center_mod_q(x, product)
++    }
++
++    // x < product is the residue of a signed integer of magnitude below
++    // product / 2: recover the integer, then reduce it modulo q.
++    #[inline(always)]
++    fn center_mod_q(&self, x: u128, product: u128) -> u64 {
          let signed = if x > product / 2 {
              x as i128 - product as i128
          } else {
-@@ -360,12 +369,18 @@
+@@ -360,12 +377,18 @@
              .iter()
              .map(|&p| Params::init(d, &[p], 6.4, 1, 2, 20, 1, 1, 1, 1, false, 0, 0, 1, 1, 0))
              .collect();
@@ -330,19 +410,11 @@
          })
      }
  
-@@ -556,7 +571,7 @@
-                 "insufficient public dot CRT capacity".into(),
-             ));
-         };
--        let transforms = self.params[..count]
-+        let transforms: Vec<Vec<Vec<u64>>> = self.params[..count]
-             .iter()
-             .map(|params| {
-                 a.iter()
-@@ -570,11 +585,26 @@
-                     .collect()
-             })
-             .collect();
+@@ -525,6 +548,37 @@
+         a: &[Vec<u64>],
+         right_bound: u64,
+     ) -> Result<PreparedPublicDot, ReinspiringError> {
++        let transforms = self.public_dot_transforms(a, right_bound)?;
 +        let quotients = transforms
 +            .iter()
 +            .zip(&self.params)
@@ -357,16 +429,50 @@
 +                    .collect()
 +            })
 +            .collect();
-         Ok(PreparedPublicDot {
-             d: self.d,
-             q: self.q,
-             right_bound,
-             transforms,
++        Ok(PreparedPublicDot {
++            d: self.d,
++            q: self.q,
++            right_bound,
++            transforms,
 +            quotients,
-         })
++        })
++    }
++
++    // The capacity checks and transforms of `prepare_public_dot` (prime,
++    // operand, NTT coefficient), without the Shoup quotients `public_dot` uses.
++    fn public_dot_transforms(
++        &self,
++        a: &[Vec<u64>],
++        right_bound: u64,
++    ) -> Result<Vec<Vec<Vec<u64>>>, ReinspiringError> {
+         if a.is_empty() || right_bound > self.q / 2 {
+             return Err(ReinspiringError::LweShape(
+                 "invalid public dot bound or shape".into(),
+@@ -556,7 +610,7 @@
+                 "insufficient public dot CRT capacity".into(),
+             ));
+         };
+-        let transforms = self.params[..count]
++        Ok(self.params[..count]
+             .iter()
+             .map(|params| {
+                 a.iter()
+@@ -569,13 +623,7 @@
+                     })
+                     .collect()
+             })
+-            .collect();
+-        Ok(PreparedPublicDot {
+-            d: self.d,
+-            q: self.q,
+-            right_bound,
+-            transforms,
+-        })
++            .collect())
      }
  
-@@ -586,81 +616,128 @@
+     /// Evaluate a capacity-checked public dot product. Accumulate in the
+@@ -586,81 +634,121 @@
          a: &PreparedPublicDot,
          b: &[Vec<u64>],
      ) -> Result<Vec<u64>, ReinspiringError> {
@@ -397,12 +503,11 @@
 +        let (q, half) = (self.q, self.q / 2);
          for poly in b {
              self.validate(poly)?;
-+            // |centered(x, q)| > right_bound, for canonical x.
-             if poly
-                 .iter()
+-            if poly
+-                .iter()
 -                .any(|&x| centered(x, self.q).unsigned_abs() > a.right_bound as u128)
-+                .any(|&x| std::hint::select_unpredictable(x > half, q - x, x) > a.right_bound)
-             {
+-            {
++            if poly.iter().any(|&x| centered_abs(x, q) > a.right_bound) {
                  return Err(ReinspiringError::LweShape(
                      "public dot coefficient exceeds bound".into(),
                  ));
@@ -436,7 +541,11 @@
 +                if a.right_bound < p {
 +                    // centered(x, q) + p when negative; |centered| <= right_bound < p.
 +                    for (dst, &x) in operand.iter_mut().zip(rhs) {
-+                        *dst = std::hint::select_unpredictable(x > half, p.wrapping_sub(q - x), x);
++                        *dst = std::hint::select_unpredictable(
++                            x > half,
++                            p.wrapping_sub(centered_abs(x, q)),
++                            x,
++                        );
 +                    }
 +                } else {
 +                    for (dst, &x) in operand.iter_mut().zip(rhs) {
@@ -478,6 +587,29 @@
 +            (0..self.d)
                  .map(|i| self.reconstruct_two(residues[0][i], residues[1][i]))
 -                .collect());
+-        }
+-        let product: u128 = PRIMES[..residues.len()]
+-            .iter()
+-            .map(|&x| x as u128)
+-            .product();
+-        Ok((0..self.d)
+-            .map(|i| {
+-                let mut x = residues[0][i] as u128;
+-                let mut m = PRIMES[0] as u128;
+-                for j in 1..residues.len() {
+-                    let p = PRIMES[j] as u128;
+-                    let delta = (residues[j][i] as u128 + p - x % p) % p;
+-                    x += m * (delta * self.inverses[j - 1] as u128 % p);
+-                    m *= p;
+-                }
+-                let signed = if x > product / 2 {
+-                    x as i128 - product as i128
+-                } else {
+-                    x as i128
+-                };
+-                signed.rem_euclid(self.q as i128) as u64
+-            })
+-            .collect())
 +                .collect()
 +        } else {
 +            (0..self.d)
@@ -487,7 +619,9 @@
 +    }
 +
 +    // Canonical residues modulo all three primes. Mixed-radix (Garner) CRT
-+    // with Shoup products; the signed value is reduced modulo q.
++    // with Shoup products; the signed value is reduced modulo q. `multiply`,
++    // `sum_prepared` and `sum_cached` compute the same three-prime CRT with
++    // u128 remainders, so this file has two of them.
 +    fn reconstruct_three(&self, r0: u64, r1: u64, r2: u64) -> u64 {
 +        let [p0, p1, p2] = PRIMES;
 +        // r0 < p0 < p1, so r0 is already reduced modulo p1.
@@ -515,130 +649,24 @@
 +            p2,
 +        );
 +        let x = r0 as u128 + p0 as u128 * t1 as u128 + p0 as u128 * p1 as u128 * t2 as u128;
-+        let signed = if x > self.product / 2 {
-+            x as i128 - self.product as i128
-+        } else {
-+            x as i128
-+        };
-+        if self.q.is_power_of_two() {
-+            signed as u64 & (self.q - 1)
-+        } else {
-+            signed.rem_euclid(self.q as i128) as u64
-         }
--        let product: u128 = PRIMES[..residues.len()]
--            .iter()
--            .map(|&x| x as u128)
--            .product();
--        Ok((0..self.d)
--            .map(|i| {
--                let mut x = residues[0][i] as u128;
--                let mut m = PRIMES[0] as u128;
--                for j in 1..residues.len() {
--                    let p = PRIMES[j] as u128;
--                    let delta = (residues[j][i] as u128 + p - x % p) % p;
--                    x += m * (delta * self.inverses[j - 1] as u128 % p);
--                    m *= p;
--                }
--                let signed = if x > product / 2 {
--                    x as i128 - product as i128
--                } else {
--                    x as i128
--                };
--                signed.rem_euclid(self.q as i128) as u64
--            })
--            .collect())
++        self.center_mod_q(x, self.product)
      }
  
      /// Sum independent exact products, reducing each one before accumulation.
-@@ -688,6 +765,87 @@
+@@ -688,6 +776,12 @@
      }
  }
  
-+// Shoup multiplication by a fixed w < p < 2^62 with quotient = floor(w * 2^64 / p):
-+// for any x < 2^64 the result is congruent to x * w and lies in [0, 2p), so the
-+// wrapping u64 arithmetic is exact (the bound spiral's `multiply_root` uses).
++// |centered(x, q)| for a canonical x, in u64 and without a branch.
 +#[inline(always)]
-+fn mul_shoup_lazy(x: u64, w: u64, quotient: u64, p: u64) -> u64 {
-+    let estimate = ((u128::from(x) * u128::from(quotient)) >> 64) as u64;
-+    x.wrapping_mul(w).wrapping_sub(estimate.wrapping_mul(p))
-+}
-+
-+fn shoup_quotient(w: u64, p: u64) -> u64 {
-+    ((u128::from(w) << 64) / u128::from(p)) as u64
-+}
-+
-+// Branch-free: on uniformly distributed residues a compare-and-jump mispredicts
-+// about half the time, which costs more than the arithmetic around it.
-+#[inline(always)]
-+fn reduce_once(x: u64, p: u64) -> u64 {
-+    std::hint::select_unpredictable(x >= p, x.wrapping_sub(p), x)
-+}
-+
-+// Spiral's single-prime `ntt_forward_alt` on its own tables, with lazy Shoup
-+// products in [0, 2p) instead of fully reduced ones. Every stage keeps values in
-+// [0, 4p) and congruent to spiral's; the final pass returns the same canonical
-+// residues word for word. `params` holds one prime.
-+fn ntt_forward(params: &Params, a: &mut [u64]) {
-+    let p = params.modulus;
-+    let two_p = 2 * p;
-+    let roots = params.get_ntt_forward_table(0);
-+    let quotients = params.get_ntt_forward_prime_table(0);
-+    let n = a.len();
-+    let (mut m, mut t) = (1, n / 2);
-+    while m < n {
-+        for (i, block) in a.chunks_exact_mut(2 * t).enumerate() {
-+            let (w, w_quotient) = (roots[m + i], quotients[m + i]);
-+            let (xs, ys) = block.split_at_mut(t);
-+            for (x, y) in xs.iter_mut().zip(ys.iter_mut()) {
-+                let cx = reduce_once(*x, two_p);
-+                let v = mul_shoup_lazy(*y, w, w_quotient, p);
-+                *x = cx + v;
-+                *y = cx + two_p - v;
-+            }
-+        }
-+        m *= 2;
-+        t /= 2;
-+    }
-+    for x in a.iter_mut() {
-+        *x = reduce_once(reduce_once(*x, two_p), p);
-+    }
-+}
-+
-+// Spiral's single-prime `ntt_inverse_alt` (its tables fold in the 1/2 per
-+// stage), with lazy Shoup products. Inputs are canonical; values stay in
-+// [0, 2p) and congruent to spiral's, and the output is canonical.
-+fn ntt_inverse(params: &Params, a: &mut [u64]) {
-+    let p = params.modulus;
-+    let two_p = 2 * p;
-+    let roots = params.get_ntt_inverse_table(0);
-+    let quotients = params.get_ntt_inverse_prime_table(0);
-+    let n = a.len();
-+    let (mut h, mut t) = (n / 2, 1);
-+    while h >= 1 {
-+        for (i, block) in a.chunks_exact_mut(2 * t).enumerate() {
-+            let (w, w_quotient) = (roots[h + i], quotients[h + i]);
-+            let (xs, ys) = block.split_at_mut(t);
-+            for (x, y) in xs.iter_mut().zip(ys.iter_mut()) {
-+                let (vx, vy) = (*x, *y);
-+                let difference = two_p - vy + vx;
-+                let sum =
-+                    vx + vy - std::hint::select_unpredictable(vx << 1 >= difference, two_p, 0);
-+                *x = (sum + (p & (difference & 1).wrapping_neg())) >> 1;
-+                *y = mul_shoup_lazy(difference, w, w_quotient, p);
-+            }
-+        }
-+        h /= 2;
-+        t *= 2;
-+    }
-+    for x in a.iter_mut() {
-+        *x = reduce_once(reduce_once(*x, two_p), p);
-+    }
++fn centered_abs(x: u64, q: u64) -> u64 {
++    std::hint::select_unpredictable(x > q / 2, q - x, x)
 +}
 +
  /// Exact modular product using a checked auxiliary context.
  pub fn mul_mod_q(a: &[u64], b: &[u64], q: u64) -> Vec<u64> {
      LiftContext::new(a.len(), q)
-@@ -724,6 +882,201 @@
+@@ -724,6 +818,164 @@
  }
  
  #[cfg(test)]
@@ -646,8 +674,31 @@
 +    use super::*;
 +    use rand::{Rng, SeedableRng};
 +
++    // Reference CRT: mixed radix with u128 remainders over the first
++    // residues.len() primes, centered, then reduced modulo ctx.q.
++    fn crt_by_division(ctx: &LiftContext, residues: &[u64]) -> u64 {
++        let product: u128 = PRIMES[..residues.len()]
++            .iter()
++            .map(|&x| x as u128)
++            .product();
++        let mut x = residues[0] as u128;
++        let mut m = PRIMES[0] as u128;
++        for j in 1..residues.len() {
++            let p = PRIMES[j] as u128;
++            let delta = (residues[j] as u128 + p - x % p) % p;
++            x += m * (delta * ctx.inverses[j - 1] as u128 % p);
++            m *= p;
++        }
++        let signed = if x > product / 2 {
++            x as i128 - product as i128
++        } else {
++            x as i128
++        };
++        signed.rem_euclid(ctx.q as i128) as u64
++    }
++
 +    // Reference: the same dot product through spiral's to_ntt, multiply and
-+    // from_ntt, reconstructed with u128 remainders.
++    // from_ntt, reconstructed with crt_by_division.
 +    fn public_dot_reference(ctx: &LiftContext, a: &PreparedPublicDot, b: &[Vec<u64>]) -> Vec<u64> {
 +        let mut residues = Vec::with_capacity(a.transforms.len());
 +        for (params, operands) in ctx.params.iter().zip(&a.transforms) {
@@ -681,58 +732,12 @@
 +            }
 +            residues.push(from_ntt_alloc(&sum).as_slice().to_vec());
 +        }
-+        let product: u128 = PRIMES[..residues.len()]
-+            .iter()
-+            .map(|&x| x as u128)
-+            .product();
 +        (0..ctx.d)
 +            .map(|i| {
-+                let mut x = residues[0][i] as u128;
-+                let mut m = PRIMES[0] as u128;
-+                for j in 1..residues.len() {
-+                    let p = PRIMES[j] as u128;
-+                    let delta = (residues[j][i] as u128 + p - x % p) % p;
-+                    x += m * (delta * ctx.inverses[j - 1] as u128 % p);
-+                    m *= p;
-+                }
-+                let signed = if x > product / 2 {
-+                    x as i128 - product as i128
-+                } else {
-+                    x as i128
-+                };
-+                signed.rem_euclid(ctx.q as i128) as u64
++                let column: Vec<u64> = residues.iter().map(|r| r[i]).collect();
++                crt_by_division(ctx, &column)
 +            })
 +            .collect()
-+    }
-+
-+    #[test]
-+    fn transforms_equal_spiral_word_for_word() {
-+        let mut rng = rand::rngs::StdRng::seed_from_u64(0x0002);
-+        for d in [2, 8, 64, 2048, 4096] {
-+            let ctx = LiftContext::new(d, 1 << 54).unwrap();
-+            for params in &ctx.params {
-+                let p = params.modulus;
-+                for pattern in 0..8 {
-+                    let input: Vec<u64> = (0..d)
-+                        .map(|i| match pattern {
-+                            0 => 0,
-+                            1 => p - 1,
-+                            2 => u64::from(i == 0),
-+                            3 => [p - 1, 0][i % 2],
-+                            _ => rng.gen::<u64>() % p,
-+                        })
-+                        .collect();
-+                    let (mut ours, mut theirs) = (input.clone(), input.clone());
-+                    ntt_forward(params, &mut ours);
-+                    spiral_rs::ntt::ntt_forward(params, &mut theirs);
-+                    assert_eq!(ours, theirs, "forward d={d} p={p} pattern={pattern}");
-+                    let (mut ours, mut theirs) = (input.clone(), input);
-+                    ntt_inverse(params, &mut ours);
-+                    spiral_rs::ntt::ntt_inverse(params, &mut theirs);
-+                    assert_eq!(ours, theirs, "inverse d={d} p={p} pattern={pattern}");
-+                }
-+            }
-+        }
 +    }
 +
 +    #[test]
@@ -760,21 +765,7 @@
 +            for [r0, r1, r2] in cases {
 +                for count in [2, 3] {
 +                    let residues = [r0, r1, r2];
-+                    let product: u128 = PRIMES[..count].iter().map(|&x| x as u128).product();
-+                    let mut x = r0 as u128;
-+                    let mut m = p0 as u128;
-+                    for j in 1..count {
-+                        let p = PRIMES[j] as u128;
-+                        let delta = (residues[j] as u128 + p - x % p) % p;
-+                        x += m * (delta * ctx.inverses[j - 1] as u128 % p);
-+                        m *= p;
-+                    }
-+                    let signed = if x > product / 2 {
-+                        x as i128 - product as i128
-+                    } else {
-+                        x as i128
-+                    };
-+                    let expected = signed.rem_euclid(q as i128) as u64;
++                    let expected = crt_by_division(&ctx, &residues[..count]);
 +                    let actual = if count == 2 {
 +                        ctx.reconstruct_two(r0, r1)
 +                    } else {
@@ -891,35 +882,20 @@
                  }
              })
              .collect();
-@@ -1136,6 +1148,27 @@
+@@ -1136,6 +1148,12 @@
      pub fn other_mask(&self) -> Option<&[u64]> {
          self.a_other.as_deref()
      }
-+    /// Feeds every retained output word (setup id, both masks, the compiled matrix
-+    /// and any leftover transforms) to `sink`, so a program can compare builds bit
-+    /// for bit. Read only.
++    /// The compiled key-switching matrix, read only, so a program can compare
++    /// builds word for word. Not part of the API.
 +    #[doc(hidden)]
-+    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
-+        sink(&self.id);
-+        sink(bytemuck::cast_slice(&self.a));
-+        match &self.a_other {
-+            Some(other) => {
-+                sink(b"other");
-+                sink(bytemuck::cast_slice(other));
-+            }
-+            None => sink(b"none"),
-+        }
-+        self.h.digest_words(sink);
-+        if let Some(leftover) = &self.leftover {
-+            for poly in leftover.transforms.iter().flatten() {
-+                sink(bytemuck::cast_slice(poly));
-+            }
-+        }
++    pub fn matrix(&self) -> &NativeMatrix {
++        &self.h
 +    }
  }
  
  /// Signed approximate gadget digits, least significant retained limb first.
-@@ -1144,17 +1177,21 @@
+@@ -1144,17 +1162,27 @@
  pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, ReinspiringError> {
      validate_poly(a, p)?;
      let mut out = vec![vec![0; p.d]; p.ell];
@@ -927,6 +903,12 @@
 +    // NativeParams fixes q = 2^q_bits <= 2^56 and bits, dropped <= 27, and a < q,
 +    // so every intermediate is a non-negative i64 (digits aside): masks equal the
 +    // Euclidean remainders and shifts the exact divisions of the i128 definition.
++    debug_assert!(
++        p.q.is_power_of_two()
++            && p.q <= 1 << 56
++            && p.bits <= MAX_GADGET_BITS
++            && p.dropped <= MAX_GADGET_BITS
++    );
 +    let z = 1i64 << p.bits;
 +    let rounding = if p.dropped == 0 {
 +        0
@@ -950,7 +932,7 @@
          }
      }
      Ok(out)
-@@ -1167,45 +1204,27 @@
+@@ -1167,45 +1195,27 @@
      let d = masks.len();
      // Each destination gets exactly one input here. Row-wise filling avoids
      // scattering writes across the entire integer matrix.
@@ -1012,7 +994,7 @@
          len *= 2;
      }
      let shift = d.trailing_zeros();
-@@ -1220,7 +1239,7 @@
+@@ -1220,7 +1230,7 @@
              .collect());
      }
      let mut wide: Vec<Vec<i128>> = polys
@@ -1021,7 +1003,7 @@
          .map(|poly| poly.into_iter().map(i128::from).collect())
          .collect();
      integer_ring_fft_wide(&mut wide, len);
-@@ -1249,33 +1268,58 @@
+@@ -1249,33 +1259,58 @@
      }
  }
  fn integer_ring_fft_wide(a: &mut [Vec<i128>], mut len: usize) {
@@ -1099,7 +1081,7 @@
  }
  
  fn invalid(s: &str) -> ReinspiringError {
-@@ -1289,6 +1333,70 @@
+@@ -1289,6 +1324,70 @@
      }
  }
  
@@ -1131,7 +1113,7 @@
 +    fn i64_digits_equal_i128_definition_for_every_profile() {
 +        let mut rng = rand::rngs::StdRng::seed_from_u64(0xdec0);
 +        let mut profiles = 0;
-+        for q_bits in 16..=56u32 {
++        for q_bits in 1..=63u32 {
 +            for bits in 1..=MAX_GADGET_BITS {
 +                for ell in 1..=8 {
 +                    let Ok(p) =
@@ -1172,7 +1154,7 @@
      use super::*;
 --- a/reinspiring/src/native_matrix.rs
 +++ b/reinspiring/src/native_matrix.rs
-@@ -89,17 +89,33 @@
+@@ -89,17 +89,30 @@
                  .checked_add(block.cols)
                  .filter(|&x| x <= 32768)
                  .ok_or_else(|| ReinspiringError::InvalidParams("native matrix too wide".into()))?;
@@ -1186,57 +1168,45 @@
 -                narrow &= i32::try_from(signed).is_ok();
 -                fits27 &= (-(1i128 << 26)..(1i128 << 26)).contains(&signed);
 -                packed28 &= (-(1i128 << 27)..(1i128 << 27)).contains(&signed);
-+            // (noncanonical, narrow, fits27, packed28) over the block, in parallel.
-+            let flags = block
++            // One parallel scan: any noncanonical word, and the range of the
++            // centered words (canonical words fit i64 because q <= 2^56).
++            let (noncanonical, lo, hi) = block
 +                .data
 +                .par_chunks(1 << 16)
 +                .map(|chunk| {
-+                    chunk.iter().fold((false, true, true, true), |f, &x| {
-+                        let signed = centered(x, q);
-+                        (
-+                            f.0 | (x >= q),
-+                            f.1 & i32::try_from(signed).is_ok(),
-+                            f.2 & (-(1i128 << 26)..(1i128 << 26)).contains(&signed),
-+                            f.3 & (-(1i128 << 27)..(1i128 << 27)).contains(&signed),
-+                        )
++                    chunk.iter().fold((false, 0i64, 0i64), |(bad, lo, hi), &x| {
++                        let signed = centered(x, q) as i64;
++                        (bad | (x >= q), lo.min(signed), hi.max(signed))
 +                    })
 +                })
 +                .reduce(
-+                    || (false, true, true, true),
-+                    |a, b| (a.0 | b.0, a.1 & b.1, a.2 & b.2, a.3 & b.3),
++                    || (false, 0, 0),
++                    |a, b| (a.0 | b.0, a.1.min(b.1), a.2.max(b.2)),
 +                );
-+            if flags.0 {
++            if noncanonical {
 +                return Err(ReinspiringError::InvalidParams(
 +                    "noncanonical native matrix".into(),
 +                ));
              }
-+            narrow &= flags.1;
-+            fits27 &= flags.2;
-+            packed28 &= flags.3;
++            let width = signed_width(lo, hi);
++            narrow &= width <= 32;
++            fits27 &= width <= 27;
++            packed28 &= width <= 28;
          }
          let count = rows
              .checked_mul(cols)
-@@ -216,6 +232,23 @@
-         };
-         signed_width(lo, hi)
-     }
-+    /// Feeds the storage label, shape, modulus and every stored word to `sink`, so a
-+    /// program can compare compiled matrices bit for bit. Read only.
-+    #[doc(hidden)]
-+    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
-+        sink(self.storage().label().as_bytes());
-+        for x in [self.rows as u64, self.cols as u64, self.q] {
-+            sink(&x.to_le_bytes());
-+        }
-+        match &self.words {
-+            Words::Narrow(x) => sink(bytemuck::cast_slice(&x[..])),
-+            Words::Packed { bits, data } => {
-+                sink(&(*bits as u64).to_le_bytes());
-+                sink(&data[..]);
-+            }
-+            Words::Wide(x) => sink(bytemuck::cast_slice(&x[..])),
-+        }
-+    }
-     /// Bytes retained for coefficient words (excluding the small object header).
-     pub fn storage_bytes(&self) -> usize {
-         match &self.words {
+--- a/reinspiring/tests/compile_unit.rs
++++ b/reinspiring/tests/compile_unit.rs
+@@ -132,3 +132,12 @@
+     expected[0] = vec![8, 0];
+     assert_eq!(ring_fft_eval_pow2(&input, 16), expected);
+ }
++
++#[test]
++fn ring_fft_keeps_the_tail_of_a_longer_row() {
++    use reinspiring::compile::ring_fft_eval_pow2;
++    // The first row sets d; a longer row keeps its coefficients past d.
++    let input = vec![vec![1, 2, 3, 4], vec![5, 6, 7, 8, 9, 10]];
++    let expected = vec![vec![6, 8, 10, 12], vec![12, 12, 12, 12, 9, 10]];
++    assert_eq!(ring_fft_eval_pow2(&input, 16), expected);
++}
