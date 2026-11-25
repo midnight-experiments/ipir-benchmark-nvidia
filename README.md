@@ -119,6 +119,39 @@ With the stock crates the RTX 2060 host goes over the 3 s budget in every block;
 except in 6 of 30 blocks at the 10-million-output shapes when the blocks are compiled one after another. The RTX 4090
 host's CPU figures were taken under another user's load.
 
+**Memory.** On the GPU, a table keeps 2 bytes a cell and 32 MiB a column block (its compiled matrix). The six
+tables of the block budget:
+
+| GPU memory | Today's shapes (21 column blocks) | 10-million-output shapes (53 column blocks) |
+|---|---|---|
+| Resident tables: cells | 392 MiB | 2,208 MiB |
+| Resident tables: compiled matrices | 672 MiB | 1,696 MiB |
+| Resident tables, total | 1,064 MiB | 3,904 MiB |
+| Building one chain block on the GPU: working memory | 898 MiB | 898 MiB |
+| Building one chain block on the GPU: the six blocks' cells | 64 MiB | 192 MiB |
+
+- The GPU build's working memory is 128 MiB a table built at once (its hint masks, slots, digits and matrix, 32 MiB
+  each) and 128 MiB shared: 256 MiB for one table, 641 MiB for four, 898 MiB for six. The block budget runs it with
+  one hint-mask buffer for all six tables, 774 MiB.
+- Answering a call needs scratch memory for the time of the call: 13 MiB for a call of 32 at 2048 × 2048, 86 MiB at
+  14336 × 34816, 167 MiB at 32768 × 32768 (under 11 MiB for a call of 1).
+- On the 6 GB RTX 2060 (`nvidia-smi`, during a trial): the 10-million-output tables took 3,984 MiB, and the GPU
+  build's buffers 1,024 MiB more. With the 538 MiB the desktop was using, about 60 MiB of the card were left, and
+  laying a built block out for the answer did not fit. So on that card the block budget with blocks built on the GPU
+  runs at today's shapes only.
+
+On the host, the CPU compile's peak memory (the whole process, with the block's cells; `/usr/bin/time -l
+compile_block` on the M4 Max):
+
+| CPU compile, peak memory | Patch 0002 | Stock crates |
+|---|---|---|
+| One block, 2,048 rows | 252 MiB | 326 MiB |
+| One block, 32,768 rows | 384 MiB | 448 MiB |
+| Four blocks at once, 2,048 rows | 662 MiB | 1,042 MiB |
+| Four blocks at once, 32,768 rows | 1,172 MiB | 1,305 MiB |
+
+Not measured: the memory of a whole server process, and of the CPU backend's resident tables.
+
 ## What it measures
 
 | Step | Script | What |
