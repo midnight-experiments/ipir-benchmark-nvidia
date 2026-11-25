@@ -176,8 +176,22 @@ tables of the block budget:
   14336 × 34816, 167 MiB at 32768 × 32768 (under 11 MiB for a call of 1).
 - On the 6 GB RTX 2060 (`nvidia-smi`, during a trial): the 10-million-output tables took 3,984 MiB, and the GPU
   build's buffers 1,024 MiB more. With the 538 MiB the desktop was using, about 60 MiB of the card were left, and
-  laying a built block out for the answer did not fit. So on that card the block budget with blocks built on the GPU
-  runs at today's shapes only.
+  laying a built block out for the answer did not fit.
+- **The largest size at which that card builds its blocks on the GPU is 8 million shielded outputs.** Trials of 5
+  blocks with the tables the design's shape rule gives at each size (`bench/budget.ts --tables`), beside the same
+  three Dust tables:
+
+  | Shielded outputs | Resident tables | Peak GPU memory in use (of 6,144 MiB) | Block work with the blocks built on the GPU |
+  |---|---|---|---|
+  | 7 million | 3,416 MiB | 5,074 MiB | 0.28 s, 4.7 % of the 6 s |
+  | 8 million | 3,656 MiB | 5,299 MiB | 0.27 s, 4.5 % of the 6 s |
+  | 9 million | 4,104 MiB | does not fit | |
+  | 10 million | 3,904 MiB | does not fit | |
+
+  (The shape rule gives 9 million outputs larger tables than 10 million.) The card has 5,606 MiB for the server
+  once the desktop's 538 MiB are counted, and the build needs about 0.9 GiB beside the tables, plus room to lay a
+  block out. Building the six tables three at a time would need about 0.3 GiB less, enough for the
+  10-million-output tables; that is not built.
 
 On the host, the CPU compile's peak memory (the whole process, with the block's cells; `/usr/bin/time -l
 compile_block` on the M4 Max):
@@ -268,7 +282,7 @@ the result over. `./setup.sh --cpu` is for the CPU backend alone: a missing or u
 backend) and `results/<host>-<date>-<backend>.md` (a short summary, also printed at the end). It also writes raw files
 and a log in `results/raw/<host>-<date>-<backend>/`, which git ignores. Options: `--backend cpu`, `--builds
 stock,patch0002`, `--quick`, `--skip-build`, `--skip-compile`, `--skip-fetch`, `--skip-budget`, `--no-gpu-check`,
-`--budget-sets today`, `--skip-gpu-compile`, `--allow-non-nvidia`, `--name NAME`. `IPIR_BENCH_HOST=<name>` sets the host name used in the file names and results.
+`--budget-sets today`, `--skip-gpu-compile`, `--allow-non-nvidia`, `--name NAME`. `bench/budget.ts --tables ROWSxCOLS,...` runs step 3 alone at any six table shapes. `IPIR_BENCH_HOST=<name>` sets the host name used in the file names and results.
 `run-all.sh` does not load the Vulkan layer: on a GPU without resizable BAR, load it first
 (`tools/hide-memory-budget-layer/README.md`), or use `bench.sh`.
 

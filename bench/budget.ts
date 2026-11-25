@@ -25,7 +25,7 @@
  * dropped and counted as `cancelled`.
  *
  *   deno run <permissions> bench/budget.ts --worker ipir/target/release/block_worker --out FILE
- *     [--set today|10m] [--rates 2,5,10] [--modes seq,pool] [--blocks 30] [--interval-ms 6000] [--baseline-s 20]
+ *     [--set today|10m | --tables ROWSxCOLS,...] [--rates 2,5,10] [--modes seq,pool] [--blocks 30] [--interval-ms 6000] [--baseline-s 20]
  *     [--pool-threads N] [--answer gpu|cpu] [--cpu-server ipir/target/release/cpu_server] [--drain-s 30]
  *
  * Modes (`block_worker`): `seq`, the blocks one after another on all cores at normal priority; `pool`, all at once on
@@ -68,8 +68,17 @@ const opts = options(Deno.args);
 const out = opts.get("out");
 const workerPath = opts.get("worker");
 if (!out) throw new Error("--out FILE is required");
-const setName = opts.get("set") ?? "today";
-const tables = SETS[setName];
+// `--tables 4096x12288,4096x8192,...`: the tables' shapes given outright (rows x columns each), for sizes between
+// the two sets; `--set` is then only the name in the results.
+const custom = opts.get("tables");
+const setName = opts.get("set") ?? (custom ? "custom" : "today");
+const tables = custom
+  ? custom.split(",").map((x, i) => {
+    const [rows, cols] = x.toLowerCase().split("x").map(Number);
+    if (!rows || !cols) throw new Error(`bad table ${x} (expected ROWSxCOLS)`);
+    return { name: `table ${i + 1}`, rows, cols };
+  })
+  : SETS[setName];
 if (!tables) throw new Error(`unknown set ${setName}`);
 const rates = (opts.get("rates") ?? "2,5,10").split(",").map(Number);
 const modes = (opts.get("modes") ?? "seq,pool").split(",");
