@@ -367,6 +367,7 @@
    }
   ]
  },
+ "gpuCompile": null,
  "budget": {
   "stock": [
    {
@@ -377,6 +378,10 @@
     "blockWorkP99S": 7.338,
     "compileP50S": 6.709,
     "uploadP50Ms": 212.15,
+    "windowPct": 115.5,
+    "compilePct": 111.8,
+    "uploadPct": 3.5,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -388,6 +393,10 @@
     "blockWorkP99S": 4.312,
     "compileP50S": 3.273,
     "uploadP50Ms": 189.54,
+    "windowPct": 57.7,
+    "compilePct": 54.5,
+    "uploadPct": 3.2,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -399,6 +408,10 @@
     "blockWorkP99S": 7.118,
     "compileP50S": 6.702,
     "uploadP50Ms": 182.35,
+    "windowPct": 114.9,
+    "compilePct": 111.7,
+    "uploadPct": 3,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -410,6 +423,10 @@
     "blockWorkP99S": 4.487,
     "compileP50S": 3.224,
     "uploadP50Ms": 178.14,
+    "windowPct": 56.7,
+    "compilePct": 53.7,
+    "uploadPct": 3,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -421,6 +438,10 @@
     "blockWorkP99S": 7.084,
     "compileP50S": 6.708,
     "uploadP50Ms": 174.77,
+    "windowPct": 115,
+    "compilePct": 111.8,
+    "uploadPct": 2.9,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -432,6 +453,10 @@
     "blockWorkP99S": 4.329,
     "compileP50S": 3.223,
     "uploadP50Ms": 190.29,
+    "windowPct": 57.7,
+    "compilePct": 53.7,
+    "uploadPct": 3.2,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -443,6 +468,10 @@
     "blockWorkP99S": 7.976,
     "compileP50S": 7.562,
     "uploadP50Ms": 207.44,
+    "windowPct": 129.9,
+    "compilePct": 126,
+    "uploadPct": 3.5,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -454,6 +483,10 @@
     "blockWorkP99S": 6.151,
     "compileP50S": 4.4,
     "uploadP50Ms": 202.47,
+    "windowPct": 76.6,
+    "compilePct": 73.3,
+    "uploadPct": 3.4,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -465,6 +498,10 @@
     "blockWorkP99S": 7.927,
     "compileP50S": 7.593,
     "uploadP50Ms": 214.55,
+    "windowPct": 130.1,
+    "compilePct": 126.6,
+    "uploadPct": 3.6,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -476,6 +513,10 @@
     "blockWorkP99S": 5.755,
     "compileP50S": 4.194,
     "uploadP50Ms": 215.13,
+    "windowPct": 73.1,
+    "compilePct": 69.9,
+    "uploadPct": 3.6,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -487,6 +528,10 @@
     "blockWorkP99S": 7.977,
     "compileP50S": 7.64,
     "uploadP50Ms": 176.47,
+    "windowPct": 130.3,
+    "compilePct": 127.3,
+    "uploadPct": 2.9,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    },
@@ -498,6 +543,10 @@
     "blockWorkP99S": 6.259,
     "compileP50S": 4.363,
     "uploadP50Ms": 221.22,
+    "windowPct": 76.2,
+    "compilePct": 72.7,
+    "uploadPct": 3.7,
+    "over1s": 30,
     "over3s": 30,
     "blocks": 30
    }
@@ -511,6 +560,10 @@
     "blockWorkP99S": 2.484,
     "compileP50S": 2.184,
     "uploadP50Ms": 174.49,
+    "windowPct": 39.3,
+    "compilePct": 36.4,
+    "uploadPct": 2.9,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -522,6 +575,10 @@
     "blockWorkP99S": 2.062,
     "compileP50S": 1.732,
     "uploadP50Ms": 184.39,
+    "windowPct": 32.2,
+    "compilePct": 28.9,
+    "uploadPct": 3.1,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -533,6 +590,10 @@
     "blockWorkP99S": 2.394,
     "compileP50S": 2.162,
     "uploadP50Ms": 165.51,
+    "windowPct": 38.8,
+    "compilePct": 36,
+    "uploadPct": 2.8,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -544,6 +605,10 @@
     "blockWorkP99S": 2.229,
     "compileP50S": 1.548,
     "uploadP50Ms": 187.51,
+    "windowPct": 28.8,
+    "compilePct": 25.8,
+    "uploadPct": 3.1,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -555,6 +620,10 @@
     "blockWorkP99S": 2.511,
     "compileP50S": 2.186,
     "uploadP50Ms": 166.6,
+    "windowPct": 39.4,
+    "compilePct": 36.4,
+    "uploadPct": 2.8,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -566,6 +635,10 @@
     "blockWorkP99S": 1.954,
     "compileP50S": 1.604,
     "uploadP50Ms": 181.02,
+    "windowPct": 29.6,
+    "compilePct": 26.7,
+    "uploadPct": 3,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -577,6 +650,10 @@
     "blockWorkP99S": 3.234,
     "compileP50S": 2.543,
     "uploadP50Ms": 387.09,
+    "windowPct": 49,
+    "compilePct": 42.4,
+    "uploadPct": 6.5,
+    "over1s": 30,
     "over3s": 6,
     "blocks": 30
    },
@@ -588,6 +665,10 @@
     "blockWorkP99S": 2.297,
     "compileP50S": 1.855,
     "uploadP50Ms": 204.3,
+    "windowPct": 34.3,
+    "compilePct": 30.9,
+    "uploadPct": 3.4,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -599,6 +680,10 @@
     "blockWorkP99S": 2.807,
     "compileP50S": 2.567,
     "uploadP50Ms": 202.78,
+    "windowPct": 46.2,
+    "compilePct": 42.8,
+    "uploadPct": 3.4,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -610,6 +695,10 @@
     "blockWorkP99S": 2.272,
     "compileP50S": 1.821,
     "uploadP50Ms": 187.48,
+    "windowPct": 33.4,
+    "compilePct": 30.4,
+    "uploadPct": 3.1,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -621,6 +710,10 @@
     "blockWorkP99S": 2.841,
     "compileP50S": 2.57,
     "uploadP50Ms": 201.05,
+    "windowPct": 46.2,
+    "compilePct": 42.8,
+    "uploadPct": 3.4,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    },
@@ -632,9 +725,14 @@
     "blockWorkP99S": 2.467,
     "compileP50S": 1.868,
     "uploadP50Ms": 226.36,
+    "windowPct": 34.8,
+    "compilePct": 31.1,
+    "uploadPct": 3.8,
+    "over1s": 30,
     "over3s": 0,
     "blocks": 30
    }
-  ]
+  ],
+  "gpu": []
  }
 }
