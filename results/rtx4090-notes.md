@@ -20,7 +20,7 @@ What limits it:
   shapes only (`--budget-sets today`): the 10-million-output tables need 4 GiB.
 - **Step 2b's times were measured again after the run**, with the same command line and `bench/gpu-compile.ts` at
   `9b14acd`, which adds the builds with the GPU idle before them; the report and the site file were regenerated from
-  the run's raw files with that one replaced. The first measurement's figures were the same within 1 ms.
+  the run's raw files with that one replaced. The first measurement's six-table figures were the same within 1 ms.
 
 What it shows:
 
