@@ -28,7 +28,18 @@
  *
  * Modes (`block_worker`): `seq`, the blocks one after another on all cores at normal priority; `pool`, all at once on
  * a pool of half the logical cores at the lowest priority; `pool-seq`, one after another on that pool.
+ *
+ * Mode `gpu` (needs `--gpu-prep PATH`, the `gpu_build_prep` program; GPU answers only): the six changed blocks are
+ * built on the GPU instead (`gpu/block-build.ts`), on the device that is answering the calls. A block's work is then:
+ *
+ * 1. compile: the six blocks' cells written to the GPU and built there in one submission, all chains side by side
+ *    (hint columns recomputed whole, as on the CPU);
+ * 2. upload: each block laid out for the answer as before, but from the build's GPU buffers (its cells and the matrix
+ *    it built), so nothing more crosses from the host.
+ *
+ * `--worker` is not needed when `gpu` is the only mode.
  */
+import { type BlockBuildPrep, GpuBlockBuildSet, parseBlockBuildPrep } from "../gpu/block-build.ts";
 import { GpuIpirTable } from "../gpu/ipir.ts";
 import { openBenchGpu, options, residentBytes, scoped, stats, syntheticCells, syntheticMatrix, syntheticRequests, syntheticSetupId, xorshift } from "./lib.ts";
 
@@ -54,12 +65,15 @@ const SETS: Record<string, { name: string; rows: number; cols: number }[]> = {
 const opts = options(Deno.args);
 const out = opts.get("out");
 const workerPath = opts.get("worker");
-if (!out || !workerPath) throw new Error("--out FILE and --worker PATH are required");
+if (!out) throw new Error("--out FILE is required");
 const setName = opts.get("set") ?? "today";
 const tables = SETS[setName];
 if (!tables) throw new Error(`unknown set ${setName}`);
 const rates = (opts.get("rates") ?? "2,5,10").split(",").map(Number);
 const modes = (opts.get("modes") ?? "seq,pool").split(",");
+const gpuPrepPath = opts.get("gpu-prep");
+if (modes.some((m) => m !== "gpu") && !workerPath) throw new Error("--worker PATH is required for the CPU modes");
+if (modes.includes("gpu") && !gpuPrepPath) throw new Error("mode gpu needs --gpu-prep PATH (gpu_build_prep)");
 const blocks = Number(opts.get("blocks") ?? 30);
 const intervalMs = Number(opts.get("interval-ms") ?? 6000);
 const baselineS = Number(opts.get("baseline-s") ?? 20);
@@ -67,6 +81,7 @@ const answerOn = opts.get("answer") ?? "gpu";
 if (answerOn !== "gpu" && answerOn !== "cpu") throw new Error(`--answer must be gpu or cpu: ${answerOn}`);
 const cpuServerPath = opts.get("cpu-server");
 if (answerOn === "cpu" && !cpuServerPath) throw new Error("--answer cpu needs --cpu-server PATH");
+if (answerOn === "cpu" && modes.includes("gpu")) throw new Error("mode gpu builds on the device that answers: it needs --answer gpu");
 const drainS = Number(opts.get("drain-s") ?? 30);
 const BUDGET_MS = 3000;
 const log = (s: string) => console.error(`budget ${setName}: ${s}`);
@@ -224,11 +239,46 @@ try {
   const tableCount = tables.length;
   const answer = (i: number): Promise<unknown> => (cpu ? cpu.respond(i) : resident[i]!.table.respond(resident[i]!.requests, 32));
 
-  stage = "starting block_worker";
-  const poolThreads = opts.get("pool-threads");
-  const worker = new Worker(workerPath, [tables.map((t) => t.rows).join(","), ...(poolThreads ? [poolThreads] : [])]);
-  result.worker = await worker.line();
-  log(`worker ready: ${JSON.stringify(result.worker)}`);
+  // The GPU build of one block of every table, on the device that answers.
+  let gpuBuild: GpuBlockBuildSet | null = null;
+  if (modes.includes("gpu")) {
+    stage = "making the GPU block build";
+    const tmp = await Deno.makeTempDir({ prefix: "ipir-budget-" });
+    try {
+      const preps: BlockBuildPrep[] = [];
+      for (const [i, t] of tables.entries()) {
+        const file = `${tmp}/prep-${i}.bin`;
+        const r = await new Deno.Command(gpuPrepPath!, { args: [String(t.rows), file], stdout: "piped", stderr: "piped" }).output();
+        if (!r.success) throw new Error(`gpu_build_prep ${t.rows} failed: ${new TextDecoder().decode(r.stderr).slice(-1000)}`);
+        preps.push(parseBlockBuildPrep(await Deno.readFile(file)));
+      }
+      const t0 = performance.now();
+      gpuBuild = await scoped(device!, stage, async () => {
+        // The hint masks are not read here, so the tables share one buffer for them.
+        const set = new GpuBlockBuildSet(device!, preps, { sharedMasks: true });
+        // One build before the clock: the kernels' first run.
+        uploads.forEach((u, i) => set.uploadCells(i, u.cells));
+        const enc = device!.createCommandEncoder();
+        set.encode(enc);
+        device!.queue.submit([enc.finish()]);
+        await device!.queue.onSubmittedWorkDone();
+        return set;
+      });
+      result.gpuBuild = { setupMs: performance.now() - t0, scratchBytes: gpuBuild.scratchBytes, cellsBytes: uploads.reduce((a, u) => a + u.cells.byteLength, 0) };
+      log(`GPU block build ready: ${JSON.stringify(result.gpuBuild)}`);
+    } finally {
+      await Deno.remove(tmp, { recursive: true }).catch(() => {});
+    }
+  }
+
+  let worker: Worker | null = null;
+  if (workerPath && modes.some((m) => m !== "gpu")) {
+    stage = "starting block_worker";
+    const poolThreads = opts.get("pool-threads");
+    worker = new Worker(workerPath, [tables.map((t) => t.rows).join(","), ...(poolThreads ? [poolThreads] : [])]);
+    result.worker = await worker.line();
+    log(`worker ready: ${JSON.stringify(result.worker)}`);
+  }
 
   /** Issues calls at `rate` per second, round robin over the tables, until `stop()`; returns the calls. */
   function calls(rate: number) {
@@ -294,13 +344,29 @@ try {
         const wait = due - performance.now();
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
         const start = performance.now();
-        await worker.send(`go ${mode}`);
-        const reply = await worker.line();
+        let reply: Record<string, unknown>;
+        if (mode === "gpu") {
+          await scoped(device!, "building the blocks on the GPU", async () => {
+            uploads.forEach((u, i) => gpuBuild!.uploadCells(i, u.cells));
+            const enc = device!.createCommandEncoder();
+            gpuBuild!.encode(enc);
+            device!.queue.submit([enc.finish()]);
+            await device!.queue.onSubmittedWorkDone();
+          });
+          reply = { mode: "gpu" };
+        } else {
+          await worker!.send(`go ${mode}`);
+          reply = await worker!.line();
+        }
         const compiled = performance.now();
         if (device) {
-          for (const u of uploads) {
-            const one = await scoped(device, "uploading a block", () =>
-              GpuIpirTable.create(device!, { rows: u.rows, cols: 2048, cells: u.cells, setupId: u.setupId, matrices: [matrix!] }));
+          for (const [i, u] of uploads.entries()) {
+            // After a GPU build: the cells it read and the matrix it built, both already on the GPU. Otherwise the
+            // cells and a synthetic matrix from the host.
+            const input = mode === "gpu"
+              ? { rows: u.rows, cols: 2048, cells: gpuBuild!.cells(i), setupId: u.setupId, matrices: [gpuBuild!.matrix(i)] }
+              : { rows: u.rows, cols: 2048, cells: u.cells, setupId: u.setupId, matrices: [matrix!] };
+            const one = await scoped(device, "uploading a block", () => GpuIpirTable.create(device!, input));
             one.release();
           }
         }
@@ -333,7 +399,8 @@ try {
       log(`  block work p50 ${row.blockWorkMs.p50} ms, p99 ${row.blockWorkMs.p99} ms (${row.overBudget}/${work.length} over 3 s); answers during work p50 ${row.answerLatencyMs.duringBlockWork.p50} ms, p99 ${row.answerLatencyMs.duringBlockWork.p99} ms${c.cancelled ? `; ${c.cancelled} of ${c.issued} calls dropped unanswered` : ""}`);
     }
   }
-  await worker.close();
+  await worker?.close();
+  gpuBuild?.destroy();
   for (const r of resident) r.table.release();
   await cpu?.close();
   result.ok = true;
@@ -344,6 +411,8 @@ try {
   result.ok = false;
   result.stage = stage;
   result.error = String((e as Error)?.message ?? e);
+  // The tables, or the GPU build's scratch next to them, exceed the GPU's memory: a result, not a fault.
+  result.doesNotFit = /out of memory|not enough memory|OutOfMemory/i.test(String(result.error));
   log(`FAILED at ${stage}: ${result.error}`);
   await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
   Deno.exit(1);
