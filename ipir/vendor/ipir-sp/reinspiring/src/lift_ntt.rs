@@ -98,7 +98,35 @@ impl PreparedLiftOperand {
     }
 }
 
+/// The auxiliary NTT primes (patch 0003, for a GPU build). Not part of the API.
+#[doc(hidden)]
+pub const AUX_PRIMES: [u64; 3] = PRIMES;
+
+impl PreparedPublicDot {
+    /// The NTT transforms and their Shoup quotients, indexed prime, operand,
+    /// coefficient, and the right bound (patch 0003, for a GPU build). Not part of the API.
+    #[doc(hidden)]
+    pub fn gpu_view(&self) -> (&[Vec<Vec<u64>>], &[Vec<Vec<u64>>], u64) {
+        (&self.transforms, &self.quotients, self.right_bound)
+    }
+}
+
 impl LiftContext {
+    /// Spiral's single-prime parameters, one per auxiliary prime, whose NTT
+    /// tables the transforms use (patch 0003, for a GPU build). Not part of the API.
+    #[doc(hidden)]
+    pub fn aux_params(&self) -> &[Params] {
+        &self.params
+    }
+    /// `public_dot_parallel_primes` (patch 0003, for profiling a chain step). Not part of the API.
+    #[doc(hidden)]
+    pub fn public_dot_parallel_primes_profiled(
+        &self,
+        a: &PreparedPublicDot,
+        b: &[Vec<u64>],
+    ) -> Result<Vec<u64>, ReinspiringError> {
+        self.public_dot_parallel_primes(a, b)
+    }
     // Only native decoder may use this: its sampled secret has the public
     // finite support bound supplied here. No secret-dependent capacity choice.
     pub(crate) fn prepare_decode_masks(

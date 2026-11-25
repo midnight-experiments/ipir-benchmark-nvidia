@@ -6,6 +6,7 @@
  * requests with the right magic and a fixed setup id and random words. `GpuIpirTable`'s time does not depend on the
  * content, only on the shape.
  */
+import { BLOCK_BUILD_LIMITS, blockBuildSupported } from "../gpu/block-build.ts";
 import { ipirRequestBytes } from "../ipir/sizes.ts";
 
 export const MIB = 2 ** 20;
@@ -23,6 +24,8 @@ export interface AdapterInfo {
   maxBufferSize: number;
   maxStorageBufferBindingSize: number;
   timestampQuery: boolean;
+  /** Whether the device was opened with the limits the GPU block build needs (`gpu/block-build.ts`). */
+  blockBuild: boolean;
   /** A software rasterizer (llvmpipe, lavapipe, SwiftShader, WARP, a fallback adapter): its numbers mean nothing. */
   software: boolean;
   softwareReason: string | null;
@@ -53,11 +56,14 @@ export async function openBenchGpu(): Promise<BenchGpu> {
   const fallback = info.isFallbackAdapter ?? null;
   const softwareMatch = text.match(SOFTWARE);
   const software = fallback === true || softwareMatch !== null;
+  const blockBuild = blockBuildSupported(adapter.limits);
   const device = await adapter.requestDevice({
     requiredFeatures: adapter.features.has("timestamp-query") ? ["timestamp-query"] : [],
     requiredLimits: {
       maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
       maxBufferSize: adapter.limits.maxBufferSize,
+      // The GPU block build's kernels: 1,024 invocations per workgroup and 32 KB of workgroup memory.
+      ...(blockBuild ? BLOCK_BUILD_LIMITS : {}),
     },
   });
   const description = [info.vendor, info.architecture, info.device, info.description]
@@ -77,6 +83,7 @@ export async function openBenchGpu(): Promise<BenchGpu> {
       maxBufferSize: adapter.limits.maxBufferSize,
       maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize,
       timestampQuery: device.features.has("timestamp-query"),
+      blockBuild,
       software,
       softwareReason: software ? (fallback ? "fallback adapter" : `adapter text matches "${softwareMatch![0]}"`) : null,
     },

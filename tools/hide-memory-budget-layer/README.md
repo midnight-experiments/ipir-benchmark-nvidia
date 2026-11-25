@@ -48,13 +48,17 @@ BAR in use by other programs, the two commands print:
 
 ## Run the benchmark with it
 
+`./bench.sh` does this by itself: it tries a 1 GiB buffer, and builds and loads the layer when wgpu refuses it. By
+hand:
+
 ```sh
 export VK_LAYER_PATH=$PWD/tools/hide-memory-budget-layer
 export VK_INSTANCE_LAYERS=VK_LAYER_IPIRBENCH_hide_memory_budget
-./run-all.sh --name <host>-<date>-hidebudget
+./run-all.sh
 ```
 
-The result files do not record the layer. Put it in the run's name, as the `*-hidebudget` runs in `results/` do.
+The results record whether the layer was loaded (`backend.memoryBudgetLayer`). The runs made before that field
+have it in their names (`*-hidebudget` in `results/`).
 
 ## Limits
 

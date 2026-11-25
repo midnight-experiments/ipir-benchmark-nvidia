@@ -21,10 +21,15 @@ pub fn ms(d: Duration) -> f64 {
 
 /// The production profile for a table of `rows` rows and one column block.
 pub fn profile(rows: usize) -> NativeProfile {
+    profile_cols(rows, BLOCK_COLS)
+}
+
+/// The production profile for a table of `rows` rows and `cols` columns (a multiple of 2,048).
+pub fn profile_cols(rows: usize, cols: usize) -> NativeProfile {
     let p = NativeProfile::new(
         NativeParams::new(2048, 54, 16, 19, 2, SecretDistribution::Gaussian).unwrap(),
         rows,
-        BLOCK_COLS,
+        cols,
     )
     .unwrap()
     .with_two_mask_output()
@@ -38,6 +43,50 @@ pub fn profile(rows: usize) -> NativeProfile {
 /// The setup this design uses: no column count in the identifier, zero seed and snapshot.
 pub fn setup(rows: usize) -> NativePublicSetup {
     NativePublicSetup::new_without_columns(profile(rows), [0; 32], [0; 32])
+}
+
+/// The setup of a table of `rows × cols`, as `setup`.
+pub fn setup_cols(rows: usize, cols: usize) -> NativePublicSetup {
+    NativePublicSetup::new_without_columns(profile_cols(rows, cols), [0; 32], [0; 32])
+}
+
+/// The xorshift32 generator of `bench/lib.ts`, so that a table here has the same cells as the Deno scripts make.
+pub struct Xorshift(u32);
+
+impl Xorshift {
+    pub fn new(seed: u32) -> Self {
+        Self(if seed == 0 { 1 } else { seed })
+    }
+    pub fn next(&mut self) -> u32 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        self.0 = x;
+        x
+    }
+}
+
+/// `rows × cols` column-major cells from `next() & 0xffff`, as `syntheticCells` in `bench/lib.ts`.
+pub fn xorshift_cells(rows: usize, cols: usize, rng: &mut Xorshift) -> Vec<u16> {
+    (0..rows * cols).map(|_| rng.next() as u16).collect()
+}
+
+/// `count` requests laid end to end: random bytes, then the magic "RNQ3" and `setup_id` at the start of each, as
+/// `syntheticRequests` in `bench/lib.ts`. Every random key word is below 2^54 and so a valid one.
+pub fn synthetic_requests(request_bytes: usize, count: usize, setup_id: &[u8; 32], rng: &mut Xorshift) -> Vec<u8> {
+    let mut out: Vec<u8> = (0..request_bytes * count).map(|_| rng.next() as u8).collect();
+    for r in out.chunks_exact_mut(request_bytes) {
+        r[..4].copy_from_slice(b"RNQ3");
+        r[4..36].copy_from_slice(setup_id);
+    }
+    out
+}
+
+/// Bytes of one request to a table of `rows` rows: magic, setup id, the key K_g (4,096 words of 54 bits), and one
+/// selection word of 49 bits per row (`ipir/sizes.ts`).
+pub fn request_bytes(rows: usize) -> usize {
+    36 + (4096 * 54) / 8 + (rows * 49).div_ceil(8)
 }
 
 /// `rows × 2,048` random 16-bit cells (the time does not depend on them).

@@ -46,12 +46,15 @@ const Q = 1n << BigInt(IPIR_Q_BITS);
 export interface GpuIpirTableInput {
   readonly rows: number;
   readonly cols: number;
-  /** `rows × cols` column-major cells (cell (r, c) at `c × rows + r`), as `buildIpirTable` takes them. */
-  readonly cells: Uint16Array;
+  /**
+   * `rows × cols` column-major cells (cell (r, c) at `c × rows + r`), as `buildIpirTable` takes them; or a GPU buffer
+   * that already holds them in that order (16 bits each, usage STORAGE), which is then laid out without a host copy.
+   */
+  readonly cells: Uint16Array | GPUBuffer;
   /** The table's setup id (32 bytes): every request must carry it. */
   readonly setupId: Uint8Array;
   /** Each output block's compiled packing matrix, 2,048 × 4,096 row-major (`IpirGpuReference.blocks[k].matrix`). */
-  readonly matrices: readonly Int32Array[];
+  readonly matrices: readonly (Int32Array | GPUBuffer)[];
 }
 
 export interface GpuIpirOptions {
@@ -215,10 +218,14 @@ export class GpuIpirTable {
   static async create(device: GPUDevice, input: GpuIpirTableInput, options: GpuIpirOptions = {}): Promise<GpuIpirTable> {
     const { rows, cols, cells, setupId, matrices } = input;
     checkIpirShape(rows, cols);
-    if (cells.length !== rows * cols) throw new Error(`a ${rows} × ${cols} table has ${rows * cols} cells, got ${cells.length}`);
+    const cellCount = cells instanceof GPUBuffer ? cells.size / 2 : cells.length;
+    if (cellCount !== rows * cols) throw new Error(`a ${rows} × ${cols} table has ${rows * cols} cells, got ${cellCount}`);
     if (setupId.length !== 32) throw new Error(`a setup id is 32 bytes, got ${setupId.length}`);
     if (matrices.length !== cols / D) throw new Error(`a table of ${cols} columns has ${cols / D} packing matrices, got ${matrices.length}`);
-    for (const m of matrices) if (m.length !== D * MATRIX_COLS) throw new Error(`a packing matrix has ${D * MATRIX_COLS} entries, got ${m.length}`);
+    for (const m of matrices) {
+      const entries = m instanceof GPUBuffer ? m.size / 4 : m.length;
+      if (entries !== D * MATRIX_COLS) throw new Error(`a packing matrix has ${D * MATRIX_COLS} entries, got ${entries}`);
+    }
     const variant = GpuIpirTable.#variant(options);
     if (options.packSegments !== undefined && ![1, 2, 4, 8, 16].includes(options.packSegments)) {
       throw new Error(`key-word segments must be 1, 2, 4, 8 or 16: ${options.packSegments}`);
@@ -250,13 +257,14 @@ export class GpuIpirTable {
     const made: GPUBuffer[] = [];
     try {
       // Cells: slabs of whole columns (each contiguous in the column-major input), laid out row-major per chunk.
+      // Cells already on the GPU are one slab of every column.
       const colBytes = rows * 2;
-      const slabCols = Math.max(2, Math.floor((32 * 2 ** 20) / colBytes / 2) * 2);
-      const slab = device.createBuffer({ size: Math.min(slabCols, cols) * colBytes, usage: U.STORAGE | U.COPY_DST });
-      made.push(slab);
+      const slabCols = cells instanceof GPUBuffer ? cols : Math.max(2, Math.floor((32 * 2 ** 20) / colBytes / 2) * 2);
+      const slab = cells instanceof GPUBuffer ? cells : device.createBuffer({ size: Math.min(slabCols, cols) * colBytes, usage: U.STORAGE | U.COPY_DST });
+      if (!(cells instanceof GPUBuffer)) made.push(slab);
       for (let c0 = 0; c0 < cols; c0 += slabCols) {
         const n = Math.min(slabCols, cols - c0);
-        writeView(device, slab, 0, cells.subarray(c0 * rows, (c0 + n) * rows));
+        if (!(cells instanceof GPUBuffer)) writeView(device, slab, 0, cells.subarray(c0 * rows, (c0 + n) * rows));
         const enc = device.createCommandEncoder();
         for (const chunk of chunks) {
           const params = GpuIpirTable.#params(device, made, [rows, c0, n, chunk.row0, chunk.rows, cols / 2]);
@@ -265,14 +273,18 @@ export class GpuIpirTable {
         device.queue.submit([enc.finish()]);
       }
       // Matrices: one block at a time, row-major in, column-major out.
-      const source = device.createBuffer({ size: MATRIX_BYTES, usage: U.STORAGE | U.COPY_DST });
-      made.push(source);
+      const fromHost = matrices.some((m) => !(m instanceof GPUBuffer));
+      const source = fromHost ? device.createBuffer({ size: MATRIX_BYTES, usage: U.STORAGE | U.COPY_DST }) : null;
+      if (source) made.push(source);
       for (const mc of matrixChunks) {
         for (let k = 0; k < mc.blocks; k++) {
-          writeView(device, source, 0, matrices[mc.block0 + k]!);
+          // A matrix already on the GPU (built there, `gpu/block-build.ts`) is laid out from its own buffer: nothing
+          // crosses from the host.
+          const m = matrices[mc.block0 + k]!;
+          if (!(m instanceof GPUBuffer)) writeView(device, source!, 0, m);
           const enc = device.createCommandEncoder();
           const params = GpuIpirTable.#params(device, made, [D, MATRIX_COLS, k * D * MATRIX_COLS]);
-          GpuIpirTable.#dispatch(device, enc, pipelines.uploadMatrix, [source, mc.buffer, params], D * MATRIX_COLS);
+          GpuIpirTable.#dispatch(device, enc, pipelines.uploadMatrix, [m instanceof GPUBuffer ? m : source!, mc.buffer, params], D * MATRIX_COLS);
           device.queue.submit([enc.finish()]);
         }
       }
