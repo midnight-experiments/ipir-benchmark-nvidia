@@ -82,7 +82,7 @@ Vulkan layer by itself. It is the run behind `site/pop-os-2026-11-25-nvidia-no-b
 figures.
 
 - The desktop was in use: the load average was 6.3 at the start (the build just before the run) and 2.9 at the end,
-  and a chain node runs on the machine. Its CPU compile times are 1 to 8 % above those of the quiet runs above
+  and a chain node runs on the machine. Its CPU figures are 1 to 10 % above those of the quiet runs above
   (`hidebudget-quiet`, `hidebudget-opt`): for example a block's work with patch 0002 compiled one after another,
   2.51 s here against 2.36 s there.
 - The GPU build's output equals the CPU's in 24 of 24 blocks.
