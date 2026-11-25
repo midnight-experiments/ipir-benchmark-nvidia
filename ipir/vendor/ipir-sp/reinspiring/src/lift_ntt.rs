@@ -654,11 +654,7 @@ impl LiftContext {
         let (q, half) = (self.q, self.q / 2);
         for poly in b {
             self.validate(poly)?;
-            // |centered(x, q)| > right_bound, for canonical x.
-            if poly
-                .iter()
-                .any(|&x| std::hint::select_unpredictable(x > half, q - x, x) > a.right_bound)
-            {
+            if poly.iter().any(|&x| centered_abs(x, q) > a.right_bound) {
                 return Err(ReinspiringError::LweShape(
                     "public dot coefficient exceeds bound".into(),
                 ));
@@ -673,7 +669,11 @@ impl LiftContext {
                 if a.right_bound < p {
                     // centered(x, q) + p when negative; |centered| <= right_bound < p.
                     for (dst, &x) in operand.iter_mut().zip(rhs) {
-                        *dst = std::hint::select_unpredictable(x > half, p.wrapping_sub(q - x), x);
+                        *dst = std::hint::select_unpredictable(
+                            x > half,
+                            p.wrapping_sub(centered_abs(x, q)),
+                            x,
+                        );
                     }
                 } else {
                     for (dst, &x) in operand.iter_mut().zip(rhs) {
@@ -774,6 +774,12 @@ pub(crate) fn centered(x: u64, q: u64) -> i128 {
     } else {
         x as i128
     }
+}
+
+// |centered(x, q)| for a canonical x, in u64 and without a branch.
+#[inline(always)]
+fn centered_abs(x: u64, q: u64) -> u64 {
+    std::hint::select_unpredictable(x > q / 2, q - x, x)
 }
 
 /// Exact modular product using a checked auxiliary context.
