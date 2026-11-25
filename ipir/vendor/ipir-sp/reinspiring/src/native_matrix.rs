@@ -89,33 +89,30 @@ impl NativeMatrix {
                 .checked_add(block.cols)
                 .filter(|&x| x <= 32768)
                 .ok_or_else(|| ReinspiringError::InvalidParams("native matrix too wide".into()))?;
-            // (noncanonical, narrow, fits27, packed28) over the block, in parallel.
-            let flags = block
+            // One parallel scan: any noncanonical word, and the range of the
+            // centered words (canonical words fit i64 because q <= 2^56).
+            let (noncanonical, lo, hi) = block
                 .data
                 .par_chunks(1 << 16)
                 .map(|chunk| {
-                    chunk.iter().fold((false, true, true, true), |f, &x| {
-                        let signed = centered(x, q);
-                        (
-                            f.0 | (x >= q),
-                            f.1 & i32::try_from(signed).is_ok(),
-                            f.2 & (-(1i128 << 26)..(1i128 << 26)).contains(&signed),
-                            f.3 & (-(1i128 << 27)..(1i128 << 27)).contains(&signed),
-                        )
+                    chunk.iter().fold((false, 0i64, 0i64), |(bad, lo, hi), &x| {
+                        let signed = centered(x, q) as i64;
+                        (bad | (x >= q), lo.min(signed), hi.max(signed))
                     })
                 })
                 .reduce(
-                    || (false, true, true, true),
-                    |a, b| (a.0 | b.0, a.1 & b.1, a.2 & b.2, a.3 & b.3),
+                    || (false, 0, 0),
+                    |a, b| (a.0 | b.0, a.1.min(b.1), a.2.max(b.2)),
                 );
-            if flags.0 {
+            if noncanonical {
                 return Err(ReinspiringError::InvalidParams(
                     "noncanonical native matrix".into(),
                 ));
             }
-            narrow &= flags.1;
-            fits27 &= flags.2;
-            packed28 &= flags.3;
+            let width = signed_width(lo, hi);
+            narrow &= width <= 32;
+            fits27 &= width <= 27;
+            packed28 &= width <= 28;
         }
         let count = rows
             .checked_mul(cols)
