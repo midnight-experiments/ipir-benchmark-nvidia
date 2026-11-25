@@ -1136,6 +1136,27 @@ impl NativePreprocessed {
     pub fn other_mask(&self) -> Option<&[u64]> {
         self.a_other.as_deref()
     }
+    /// Feeds every retained output word (setup id, both masks, the compiled matrix
+    /// and any leftover transforms) to `sink`, so a program can compare builds bit
+    /// for bit. Read only.
+    #[doc(hidden)]
+    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
+        sink(&self.id);
+        sink(bytemuck::cast_slice(&self.a));
+        match &self.a_other {
+            Some(other) => {
+                sink(b"other");
+                sink(bytemuck::cast_slice(other));
+            }
+            None => sink(b"none"),
+        }
+        self.h.digest_words(sink);
+        if let Some(leftover) = &self.leftover {
+            for poly in leftover.transforms.iter().flatten() {
+                sink(bytemuck::cast_slice(poly));
+            }
+        }
+    }
 }
 
 /// Signed approximate gadget digits, least significant retained limb first.
