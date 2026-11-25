@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Runs the whole benchmark for one backend and writes results/<host>-<date>-<backend>.json and .md.
+# ./bench.sh is the one command around this script: setup, a quick check, this run, and the overview page's file.
 #
 #   ./run-all.sh                 # this host's GPU: metal on macOS, nvidia or nvidia-no-bar on Linux (about 1.5 hours)
 #   ./run-all.sh --backend cpu   # the answers on the CPU instead of the GPU
@@ -36,7 +37,7 @@ while [[ $# -gt 0 ]]; do
     --skip-budget) SKIP_BUDGET=1 ;;
     --allow-non-nvidia) ALLOW_NON_NVIDIA=1 ;;
     --name) NAME="$2"; shift ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -76,6 +77,7 @@ if [[ -z "$NAME" ]]; then
 fi
 RAW="results/raw/$NAME"
 mkdir -p "$RAW"
+echo "$NAME" > results/raw/last-run   # bench.sh reads the name of the run from here
 mv "$SYSTMP" "$RAW/sysinfo-start.json"
 exec > >(tee -a "$RAW/log.txt") 2>&1
 START=$(date +%s)
@@ -183,9 +185,8 @@ cat "results/$NAME.md"
 echo
 echo "== done in $(( (END-START)/60 )) min: results/$NAME.json and results/$NAME.md (raw files in $RAW)"
 if [[ $QUICK == 0 ]]; then
-  echo "== next: commit the results, then make the overview page's file (see the README, 'Backends'):"
-  echo "  git add results/$NAME.json results/$NAME.md && git commit -m \"Results from $HOST\""
-  echo "  $DENO run --allow-read --allow-write --allow-run bench/export-site.ts --label \"<GPU> + <CPU>\" results/$NAME.json"
+  echo "== next: the overview page's file, site/$NAME-site.json (./bench.sh does this itself; see the README, 'Backends'):"
+  echo "  $DENO run --allow-read --allow-write --allow-run bench/export-site.ts --commit none --label \"<GPU> + <CPU>\" results/$NAME.json"
   [[ $BACKEND == nvidia-unknown-bar ]] && echo "  (resizable BAR was not detected either way: add --backend nvidia or --backend nvidia-no-bar after checking nvidia-smi -q -d MEMORY)"
 fi
 true
