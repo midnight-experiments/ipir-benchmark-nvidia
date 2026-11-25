@@ -157,7 +157,7 @@ if (gpuFile) {
   const t = g.timing?.ok ? g.timing : null;
   gpuCompile = {
     check: { blocks: checks.length, equal: checks.filter((c) => c.equal === true).length },
-    one: (t?.shapes ?? []).map((s: Any) => ({
+    one: (t?.shapes ?? []).filter((s: Any) => !s.failed).map((s: Any) => ({
       rows: s.rows,
       wallMs: round(s.wallMs?.median, 2),
       execMs: round(s.execMs?.median, 2),
@@ -166,8 +166,8 @@ if (gpuFile) {
       chainsMs: round(s.stagesExecMedianMs?.chains, 2),
       compileMs: round(s.stagesExecMedianMs?.compile, 2),
     })),
-    atOnce: (t?.shapes ?? []).flatMap((s: Any) => (s.atOnce ?? []).map((m: Any) => ({ rows: s.rows, tables: m.tables, wallMs: round(m.wallMs?.median, 2), execMs: round(m.execMs?.median, 2) }))),
-    sets: (t?.sets ?? []).map((s: Any) => ({ shapes: s.set, wallMs: round(s.wallMs?.median, 2), execMs: round(s.execMs?.median, 2), gpuMemoryMiB: round(s.scratchBytes / 2 ** 20, 0) })),
+    atOnce: (t?.shapes ?? []).flatMap((s: Any) => (s.atOnce ?? []).filter((m: Any) => !m.failed).map((m: Any) => ({ rows: s.rows, tables: m.tables, wallMs: round(m.wallMs?.median, 2), execMs: round(m.execMs?.median, 2) }))),
+    sets: (t?.sets ?? []).filter((s: Any) => !s.failed).map((s: Any) => ({ shapes: s.set, wallMs: round(s.wallMs?.median, 2), execMs: round(s.execMs?.median, 2), gpuMemoryMiB: round(s.scratchBytes / 2 ** 20, 0) })),
   };
   for (const set of ["today", "10m"] as const) {
     const s = gpuFile.r.budget?.gpu?.[set];

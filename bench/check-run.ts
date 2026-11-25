@@ -39,6 +39,17 @@ if (r.meta?.gpuCompile && String(r.meta?.gpuCompileSteps ?? "compile").includes(
   say(checks.length > 0 && equal === checks.length, `compile on the GPU against the CPU's output: ${equal} of ${checks.length} block(s) equal`);
   const t = r.gpuCompile?.timing;
   say(t?.ok === true, `compile on the GPU, time: ${t?.ok ? `${t.shapes?.length ?? 0} row count(s), ${t.sets?.length ?? 0} set(s)` : `failed${t?.error ? ` (${String(t.error).slice(0, 300)})` : " or missing"}`}`);
+  // A case that did not fit in the GPU's memory is a result in a full run; any other failed case is a problem.
+  const cases: [string, Any][] = [
+    ...(t?.shapes ?? []).flatMap((s: Any) => [[`${s.rows} rows`, s], ...(s.atOnce ?? []).map((m: Any) => [`${s.rows} rows, ${m.tables} tables`, m])]),
+    ...(t?.sets ?? []).map((s: Any) => [`set ${s.set}`, s]),
+  ] as [string, Any][];
+  for (const [name, c] of cases) {
+    if (!c.failed) continue;
+    const text = `compile on the GPU, ${name}: ${c.doesNotFit ? "does not fit" : "failed"} (${String(c.error ?? "").slice(0, 200)})`;
+    if (c.doesNotFit && !quick) console.log(`note    ${text}`);
+    else say(false, text);
+  }
 }
 
 // fetch.

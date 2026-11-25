@@ -13,6 +13,9 @@
  * - N tables of that shape at once (`--at-once`), all their chains in one dispatch: wall and GPU time.
  * Per set (`--sets`): one block of each of the block budget's six tables at once, one chain block's whole compile.
  *
+ * A case that fails (most often: its buffers do not fit in the GPU's free memory) is recorded with its error and the
+ * run goes on with the next; the run is `ok` when at least one case was measured.
+ *
  * Kernels, tables and scratch are made before the clock starts (`setupMs`), and one build per set is not reported.
  * The cells are random; the time does not depend on them. Correctness is `bench/check-gpu-build.ts`'s job.
  */
@@ -82,15 +85,33 @@ try {
     return Object.fromEntries(BLOCK_BUILD_STAGES.map((s, i) => [s, spans[i] ? spans[i]!.ms() : null]));
   }
 
-  async function time(what: string, rows: number[], n: number) {
-    stage = `${what}: making the kernels and tables`;
-    const t0 = performance.now();
-    const set = await scoped(device, stage, async () => {
-      const s = new GpuBlockBuildSet(device, await Promise.all(rows.map(prep)));
-      await device.queue.onSubmittedWorkDone();
-      return s;
-    });
-    const setupMs = performance.now() - t0;
+  let measured = 0;
+  /** `measure`, or the case's failure: recorded, and the run goes on (unless the device is lost). */
+  async function time(what: string, rows: number[], n: number): Promise<Record<string, unknown>> {
+    let set: GpuBlockBuildSet | null = null;
+    try {
+      stage = `${what}: making the kernels and tables`;
+      const t0 = performance.now();
+      set = await scoped(device, stage, async () => {
+        const s = new GpuBlockBuildSet(device, await Promise.all(rows.map(prep)));
+        await device.queue.onSubmittedWorkDone();
+        return s;
+      });
+      const r = await measure(what, set, rows, n, performance.now() - t0);
+      measured++;
+      return r;
+    } catch (e) {
+      if (lost) throw e;
+      const error = String((e as Error)?.message ?? e);
+      console.error(`gpu compile ${what}: FAILED at ${stage}: ${error}`);
+      return { tables: rows.length, failed: true, doesNotFit: /out of memory|not enough memory|OutOfMemory/i.test(error), stage, error };
+    } finally {
+      set?.destroy();
+      await device.queue.onSubmittedWorkDone().catch(() => {});
+    }
+  }
+
+  async function measure(what: string, set: GpuBlockBuildSet, rows: number[], n: number, setupMs: number) {
     const next = xorshift(0x9b1d ^ rows.reduce((a, r) => a * 31 + r, rows.length));
     const cells = rows.map((r) => syntheticCells(r, 2048, next));
     stage = `${what}: building`;
@@ -117,8 +138,6 @@ try {
       execMs: summary(exec),
       stagesExecMedianMs: rows.length === 1 ? Object.fromEntries(Object.entries(stages).map(([k, v]) => [k, median(v)])) : null,
     };
-    set.destroy();
-    await device.queue.onSubmittedWorkDone();
     console.error(`gpu compile ${what}: wall ${r.wallMs?.median?.toFixed(1)} ms, GPU ${r.execMs?.median?.toFixed(1) ?? "n/a"} ms`);
     return r;
   }
@@ -138,6 +157,7 @@ try {
     if (!rows) throw new Error(`--sets takes today and 10m: ${name}`);
     setResults.push({ set: name, rows, ...(await time(`set ${name}`, rows, setReps)) });
   }
+  if (measured === 0) throw new Error("no case could be measured");
   result.ok = true;
   device.destroy();
 } catch (e) {

@@ -193,16 +193,25 @@ if (gpuCompile) {
   if (t?.ok) {
     lines.push("Wall: from writing the block's cells to the build's end. GPU: the GPU's own time (timestamp queries), all stages and each alone. Median of the repetitions.", "");
     lines.push("| rows | at once | wall | GPU | hints | aggregation | chains | compile | GPU memory besides the cells |", "|---|---|---|---|---|---|---|---|---|");
+    const bad = (x: any) => `${x.doesNotFit ? "does not fit" : "failed"}: ${String(x.error ?? "").slice(0, 80)}`;
     for (const s of t.shapes ?? []) {
       const st = s.stagesExecMedianMs ?? {};
-      lines.push(`| ${s.rows} | 1 | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(st.hints, 2)} ms | ${f(st.aggregation, 2)} ms | ${f(st.chains, 2)} ms | ${f(st.compile, 2)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
-      for (const m of s.atOnce ?? []) lines.push(`| ${s.rows} | ${m.tables} | ${f(m.wallMs?.median)} ms | ${f(m.execMs?.median)} ms | | | | | ${f(m.scratchBytes / 2 ** 20, 0)} MiB |`);
+      if (s.failed) lines.push(`| ${s.rows} | 1 | ${bad(s)} | | | | | | |`);
+      else lines.push(`| ${s.rows} | 1 | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(st.hints, 2)} ms | ${f(st.aggregation, 2)} ms | ${f(st.chains, 2)} ms | ${f(st.compile, 2)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+      for (const m of s.atOnce ?? []) {
+        if (m.failed) lines.push(`| ${s.rows} | ${m.tables} | ${bad(m)} | | | | | | |`);
+        else lines.push(`| ${s.rows} | ${m.tables} | ${f(m.wallMs?.median)} ms | ${f(m.execMs?.median)} ms | | | | | ${f(m.scratchBytes / 2 ** 20, 0)} MiB |`);
+      }
     }
     lines.push("");
     if (t.sets?.length) {
       lines.push("One chain block: one column block of each of the six tables, built at once (all chains in one dispatch).", "");
       lines.push("| shapes | rows of the six tables | wall | GPU | GPU memory besides the cells |", "|---|---|---|---|---|");
-      for (const s of t.sets) lines.push(`| ${s.set === "today" ? "today's starting shapes" : "10 million outputs"} | ${s.rows.join(", ")} | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+      for (const s of t.sets) {
+        const name = s.set === "today" ? "today's starting shapes" : "10 million outputs";
+        if (s.failed) lines.push(`| ${name} | ${s.rows.join(", ")} | ${bad(s)} | | |`);
+        else lines.push(`| ${name} | ${s.rows.join(", ")} | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+      }
       lines.push("");
     }
   } else lines.push(`Timing not run or failed${t?.error ? `: ${String(t.error).slice(0, 300)}` : ""}.`, "");
