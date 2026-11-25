@@ -1,0 +1,11 @@
+{
+  "file_format_version": "1.0.0",
+  "layer": {
+    "name": "VK_LAYER_IPIRBENCH_hide_memory_budget",
+    "type": "GLOBAL",
+    "library_path": "./libhide_budget.so",
+    "api_version": "1.3.0",
+    "implementation_version": "1",
+    "description": "Hides VK_EXT_memory_budget so wgpu skips its budget checks (NVIDIA BAR heap reports global usage)"
+  }
+}
