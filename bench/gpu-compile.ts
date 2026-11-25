@@ -49,14 +49,18 @@ try {
   const watch = (d: GPUDevice) => d.lost.then((i) => d === device && (lost = `device lost (${i.reason}): ${i.message}`));
   watch(device);
 
-  const preps = new Map<number, BlockBuildPrep>();
-  async function prep(rows: number): Promise<BlockBuildPrep> {
+  // One preparation per row count, shared by the tables of a set that have the same rows (also while it runs).
+  const preps = new Map<number, Promise<BlockBuildPrep>>();
+  function prep(rows: number): Promise<BlockBuildPrep> {
     let p = preps.get(rows);
     if (!p) {
-      const file = `${tmp}/prep-${rows}.bin`;
-      const r = await new Deno.Command(`${bin}/gpu_build_prep`, { args: [String(rows), file], stdout: "piped", stderr: "piped" }).output();
-      if (!r.success) throw new Error(`gpu_build_prep ${rows} failed: ${new TextDecoder().decode(r.stderr).slice(-1000)}`);
-      preps.set(rows, p = parseBlockBuildPrep(await Deno.readFile(file)));
+      p = (async () => {
+        const file = `${tmp}/prep-${rows}.bin`;
+        const r = await new Deno.Command(`${bin}/gpu_build_prep`, { args: [String(rows), file], stdout: "piped", stderr: "piped" }).output();
+        if (!r.success) throw new Error(`gpu_build_prep ${rows} failed: ${new TextDecoder().decode(r.stderr).slice(-1000)}`);
+        return parseBlockBuildPrep(await Deno.readFile(file));
+      })();
+      preps.set(rows, p);
     }
     return p;
   }
