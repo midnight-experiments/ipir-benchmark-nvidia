@@ -303,11 +303,12 @@ The GPU build of the blocks (step 2b) was written against an RTX 2060 through Vu
 `results/pop-os-notes.md`, with the Vulkan layer): 12 of 12 digests equal the CPU's at 2,048 to 32,768 rows and seeds
 1 to 3, and 12 of 12 for the two six-table sets; each stage's output was also compared with the CPU's on its own
 (hint masks, slots before and after the chains, digits, matrix). `./bench.sh --quick` ran there from start to end,
-which is the first run of the backends' code on Linux. On macOS its kernels compile on Metal; they have not been run
-there yet.
+which is the first run of the backends' code on Linux. It was then run on an RTX 4090 with resizable BAR
+(`results/rtx4090-notes.md`): the backend is detected as `nvidia`, the Vulkan layer is not needed, the quick check
+passes, and 24 of 24 blocks equal the CPU's. On macOS its kernels compile on Metal; they have not been run there yet.
 
-Not run yet anywhere: a full run with the GPU build, the `nvidia` path on a card with resizable BAR, the container
-check in `setup.sh`, and `cuda_bench`. Checked on macOS without a benchmark run:
+Not run yet anywhere: a full run with the GPU build (the RTX 4090 run is partial: another process held most of the
+card's memory), the container check in `setup.sh`, and `cuda_bench`. Checked on macOS without a benchmark run:
 `bench/check-run.ts` and the export against the committed Metal run and against copies of it renamed to `nvidia`,
 `nvidia-no-bar` and `nvidia-unknown-bar`; resizable BAR detection against `nvidia-smi -q -d MEMORY` reports with
 BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of steps, with stand-ins for `setup.sh`,
