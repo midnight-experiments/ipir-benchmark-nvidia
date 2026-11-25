@@ -8,6 +8,11 @@
  * `--largest`: candidates tried in order after the shapes; the first that runs is kept as "the largest that fits"
  * and the rest are not tried. `--vram-mib`: the GPU's memory (from nvidia-smi); a shape whose resident bytes alone
  * exceed it is skipped without trying. Any other shape is tried, and an out-of-memory error is recorded as a skip.
+ *
+ * `--backend cpu --cpu-fetch ipir/target/release/cpu_fetch`: the CPU backend. Each shape runs `cpu_fetch` instead
+ * (the vendored crates' server path on the CPU, same shapes, same calls of 1 and 32). `--ram-mib N`: a shape whose
+ * resident bytes exceed half of it is skipped. `--check-gpu`: once per shape, the CPU's answers to 32 requests are
+ * compared byte for byte with `GpuIpirTable`'s on this host's GPU (`check-cpu-answer.ts`), recorded as `gpuCheck`.
  */
 import { MIB, options, parseShapes, residentBytes } from "./lib.ts";
 
@@ -22,10 +27,49 @@ const largest = parseShapes(opts.get("largest") ?? "32768x32768,32768x30720,3276
 const runs = Number(opts.get("runs") ?? 9);
 const vramMib = opts.has("vram-mib") ? Number(opts.get("vram-mib")) : null;
 const timeoutS = Number(opts.get("timeout-s") ?? 900);
+const backend = opts.get("backend") ?? "gpu";
+if (backend !== "gpu" && backend !== "cpu") throw new Error(`--backend must be gpu or cpu: ${backend}`);
+const cpuFetch = opts.get("cpu-fetch");
+if (backend === "cpu" && !cpuFetch) throw new Error("--backend cpu needs --cpu-fetch PATH");
+const ramMib = opts.has("ram-mib") ? Number(opts.get("ram-mib")) : null;
+const checkGpu = opts.get("check-gpu") === "true";
 const here = new URL(".", import.meta.url).pathname;
+
+/** Runs a command with the time limit; its last stdout line parsed as JSON. */
+async function child(cmd: string, args: string[]) {
+  const proc = new Deno.Command(cmd, { args, stdout: "piped", stderr: "piped" }).spawn();
+  const timer = setTimeout(() => {
+    try {
+      proc.kill("SIGKILL");
+    } catch { /* gone */ }
+  }, timeoutS * 1000);
+  const res = await proc.output();
+  clearTimeout(timer);
+  const stdout = new TextDecoder().decode(res.stdout).trim().split("\n");
+  const stderr = new TextDecoder().decode(res.stderr).trim();
+  let parsed: Record<string, unknown> | null = null;
+  try {
+    parsed = JSON.parse(stdout[stdout.length - 1] ?? "");
+  } catch { /* no JSON */ }
+  return { res, parsed, stderr };
+}
+
+/** The GPU check of the CPU's answers for one shape (`check-cpu-answer.ts`). */
+async function gpuCheck(rows: number, cols: number): Promise<Record<string, unknown>> {
+  const dir = await Deno.makeTempDir({ prefix: "ipir-cpu-check-" });
+  try {
+    const dumped = await child(cpuFetch!, [String(rows), String(cols), "1", "--dump", dir]);
+    if (!dumped.res.success) return { equal: null, error: `cpu_fetch --dump failed: ${dumped.parsed?.error ?? dumped.stderr.slice(-500)}` };
+    const checked = await child(Deno.execPath(), ["run", "--allow-read", "--allow-env", `${here}check-cpu-answer.ts`, dir, String(rows), String(cols)]);
+    return checked.parsed ?? { equal: null, error: `check failed: ${checked.stderr.slice(-500)}` };
+  } finally {
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
+  }
+}
 
 async function one(rows: number, cols: number): Promise<Record<string, unknown>> {
   const need = residentBytes(rows, cols);
+  if (backend === "cpu") return await oneCpu(rows, cols, need);
   if (vramMib !== null && need > vramMib * MIB) {
     const r = { ok: false, skipped: true, rows, cols, residentBytes: need, reason: `resident bytes ${(need / MIB).toFixed(0)} MiB exceed the GPU's ${vramMib} MiB` };
     console.error(`fetch ${rows}x${cols}: skipped, ${r.reason}`);
@@ -62,6 +106,29 @@ async function one(rows: number, cols: number): Promise<Record<string, unknown>>
   return { ok: false, skipped: oom, rows, cols, residentBytes: need, stage: parsed?.stage ?? null, reason: error, stderrTail: stderr.slice(-2000), processSeconds: seconds };
 }
 
+async function oneCpu(rows: number, cols: number, need: number): Promise<Record<string, unknown>> {
+  if (ramMib !== null && need > (ramMib * MIB) / 2) {
+    const reason = `resident bytes ${(need / MIB).toFixed(0)} MiB exceed half the host's ${ramMib} MiB of RAM`;
+    console.error(`fetch ${rows}x${cols}: skipped, ${reason}`);
+    return { ok: false, skipped: true, backend: "cpu", rows, cols, residentBytes: need, reason };
+  }
+  const t = performance.now();
+  const { res, parsed, stderr } = await child(cpuFetch!, [String(rows), String(cols), String(runs)]);
+  const seconds = (performance.now() - t) / 1000;
+  if (res.success && parsed?.ok) {
+    const t32 = (parsed.timing as Record<string, { wallMs: { median: number } }>)["32"]!;
+    const check = checkGpu ? await gpuCheck(rows, cols) : null;
+    console.error(
+      `fetch ${rows}x${cols} (cpu): call of 32 wall ${t32.wallMs.median.toFixed(1)} ms, build ${(parsed.buildMs as number).toFixed(0)} ms (${seconds.toFixed(0)} s)` +
+        (check ? `; GPU check: ${check.equal === true ? "equal" : check.equal === false ? "DIFFERENT" : "not run"}` : ""),
+    );
+    return { ...parsed, residentBytes: need, gpuCheck: check, processSeconds: seconds };
+  }
+  const error = (parsed?.error as string | undefined) ?? (res.signal ? `killed by ${res.signal} (time limit ${timeoutS} s?)` : `exit code ${res.code}`);
+  console.error(`fetch ${rows}x${cols} (cpu): FAILED: ${error}`);
+  return { ok: false, skipped: false, backend: "cpu", rows, cols, residentBytes: need, reason: error, stderrTail: stderr.slice(-2000), processSeconds: seconds };
+}
+
 const results: Record<string, unknown>[] = [];
 for (const [r, c] of shapes) results.push(await one(r, c));
 let largestFit: Record<string, unknown> | null = null;
@@ -74,4 +141,4 @@ for (const [r, c] of largest) {
     break;
   }
 }
-await Deno.writeTextFile(out, JSON.stringify({ runs, vramMib, results, largest: { fit: largestFit, tried: largestTried } }, null, 1));
+await Deno.writeTextFile(out, JSON.stringify({ backend, runs, vramMib, ramMib, results, largest: { fit: largestFit, tried: largestTried } }, null, 1));
