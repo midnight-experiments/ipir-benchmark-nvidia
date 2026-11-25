@@ -73,3 +73,23 @@ of it. The quiet run is the reference for this host. The GPU fetch times of the 
 Patch 0002 makes the CPU compile about three times faster with the same output words. With it, 354 of the 360 blocks
 finish within 3 s. `ipir/patches/0002-faster-block-compile.md` explains the patch and compares the two 2026-11-25
 runs.
+
+## The full run of 2026-11-25 with the blocks built on the GPU
+
+`pop-os-2026-11-25-nvidia-no-bar` is one run of every step at `9e820f3`: `./bench.sh --skip-quick --host pop-os
+--label "RTX 2060 + Ryzen 7 2700X"`, 99 minutes. `bench.sh` found that wgpu refused a 1 GiB buffer and loaded the
+Vulkan layer by itself. It is the run behind `site/pop-os-2026-11-25-nvidia-no-bar-site.json` and the README's
+figures.
+
+- The desktop was in use: the load average was 6.3 at the start (the build just before the run) and 2.9 at the end,
+  and a chain node runs on the machine. Its CPU compile times are 1 to 8 % above those of the quiet runs above
+  (`hidebudget-quiet`, `hidebudget-opt`): for example a block's work with patch 0002 compiled one after another,
+  2.51 s here against 2.36 s there.
+- The GPU build's output equals the CPU's in 24 of 24 blocks.
+- With the 10-million-output tables resident, the block budget with the blocks built on the GPU does not fit in
+  the card's 6 GB (`GPU out of memory` when a built block is laid out for the answer); the run records it as such.
+- Step 2b's times were measured again after the run with `bench/gpu-compile.ts` at `dcad312`, which adds the builds
+  with the GPU idle before them, and the report was regenerated at that commit from the run's raw files: one chain
+  block's build takes 87 ms of GPU time right after another one and 341 ms after 6 s of idle (104 and 320 ms at the
+  10-million-output shapes).
+
