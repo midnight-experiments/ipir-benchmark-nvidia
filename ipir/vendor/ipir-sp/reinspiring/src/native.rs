@@ -176,6 +176,11 @@ pub struct NativeSetup {
     v: Vec<Vec<u64>>,
 }
 impl NativeSetup {
+    /// The public gadget masks w (patch 0003, for a GPU build). Not part of the API.
+    #[doc(hidden)]
+    pub fn gadget_masks(&self) -> &[Vec<u64>] {
+        &self.w
+    }
     /// Expand canonical uniform masks using pinned ChaCha20 and low-bit sampling.
     pub fn new(params: NativeParams, seed: [u8; 32]) -> Self {
         let mut h = Sha256::new();
@@ -776,6 +781,14 @@ impl NativePreprocessed {
     ) -> Result<Self, ReinspiringError> {
         Self::build_internal(setup, masks, false, true, None).map(|(pre, _, _)| pre)
     }
+    /// `build_two_mask` with its stage durations (patch 0003, for profiling). Not part of the API.
+    #[doc(hidden)]
+    pub fn build_two_mask_timed(
+        setup: &NativeSetup,
+        masks: &[Vec<u64>],
+    ) -> Result<(Self, NativeBuildTiming), ReinspiringError> {
+        Self::build_internal(setup, masks, false, true, None).map(|(pre, t, _)| (pre, t))
+    }
     /// Compile the two-mask mode and collect its original-sample noise weights.
     /// Rounded public-mask screens cover the recorded 27..=32-bit range.
     pub fn build_two_mask_analyzed(
@@ -1191,6 +1204,11 @@ pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, Reinspiri
 // D.2 transposed ring FFT over *integers*. Intermediate coefficients need more
 // than u64: d*q is 2^65 at the paper parameters. Integer lifts preserve the
 // exact D.1 floor division; reducing mod q before dividing would be incorrect.
+/// `aggregate_masks` (patch 0003, for checking a GPU build stage by stage). Not part of the API.
+#[doc(hidden)]
+pub fn aggregate_masks_reference(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
+    aggregate_masks(masks, q)
+}
 fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
     let d = masks.len();
     // Each destination gets exactly one input here. Row-wise filling avoids

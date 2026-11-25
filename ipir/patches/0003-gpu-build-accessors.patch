@@ -1,0 +1,81 @@
+diff -ru a/reinspiring/src/lift_ntt.rs b/reinspiring/src/lift_ntt.rs
+--- a/reinspiring/src/lift_ntt.rs	2026-11-25 12:15:04
++++ b/reinspiring/src/lift_ntt.rs	2026-11-25 12:15:04
+@@ -98,7 +98,35 @@
+     }
+ }
+ 
++/// The auxiliary NTT primes (patch 0003, for a GPU build). Not part of the API.
++#[doc(hidden)]
++pub const AUX_PRIMES: [u64; 3] = PRIMES;
++
++impl PreparedPublicDot {
++    /// The NTT transforms and their Shoup quotients, indexed prime, operand,
++    /// coefficient, and the right bound (patch 0003, for a GPU build). Not part of the API.
++    #[doc(hidden)]
++    pub fn gpu_view(&self) -> (&[Vec<Vec<u64>>], &[Vec<Vec<u64>>], u64) {
++        (&self.transforms, &self.quotients, self.right_bound)
++    }
++}
++
+ impl LiftContext {
++    /// Spiral's single-prime parameters, one per auxiliary prime, whose NTT
++    /// tables the transforms use (patch 0003, for a GPU build). Not part of the API.
++    #[doc(hidden)]
++    pub fn aux_params(&self) -> &[Params] {
++        &self.params
++    }
++    /// `public_dot_parallel_primes` (patch 0003, for profiling a chain step). Not part of the API.
++    #[doc(hidden)]
++    pub fn public_dot_parallel_primes_profiled(
++        &self,
++        a: &PreparedPublicDot,
++        b: &[Vec<u64>],
++    ) -> Result<Vec<u64>, ReinspiringError> {
++        self.public_dot_parallel_primes(a, b)
++    }
+     // Only native decoder may use this: its sampled secret has the public
+     // finite support bound supplied here. No secret-dependent capacity choice.
+     pub(crate) fn prepare_decode_masks(
+diff -ru a/reinspiring/src/native.rs b/reinspiring/src/native.rs
+--- a/reinspiring/src/native.rs	2026-11-25 12:15:04
++++ b/reinspiring/src/native.rs	2026-11-25 12:15:04
+@@ -176,6 +176,11 @@
+     v: Vec<Vec<u64>>,
+ }
+ impl NativeSetup {
++    /// The public gadget masks w (patch 0003, for a GPU build). Not part of the API.
++    #[doc(hidden)]
++    pub fn gadget_masks(&self) -> &[Vec<u64>] {
++        &self.w
++    }
+     /// Expand canonical uniform masks using pinned ChaCha20 and low-bit sampling.
+     pub fn new(params: NativeParams, seed: [u8; 32]) -> Self {
+         let mut h = Sha256::new();
+@@ -776,6 +781,14 @@
+     ) -> Result<Self, ReinspiringError> {
+         Self::build_internal(setup, masks, false, true, None).map(|(pre, _, _)| pre)
+     }
++    /// `build_two_mask` with its stage durations (patch 0003, for profiling). Not part of the API.
++    #[doc(hidden)]
++    pub fn build_two_mask_timed(
++        setup: &NativeSetup,
++        masks: &[Vec<u64>],
++    ) -> Result<(Self, NativeBuildTiming), ReinspiringError> {
++        Self::build_internal(setup, masks, false, true, None).map(|(pre, t, _)| (pre, t))
++    }
+     /// Compile the two-mask mode and collect its original-sample noise weights.
+     /// Rounded public-mask screens cover the recorded 27..=32-bit range.
+     pub fn build_two_mask_analyzed(
+@@ -1191,6 +1204,11 @@
+ // D.2 transposed ring FFT over *integers*. Intermediate coefficients need more
+ // than u64: d*q is 2^65 at the paper parameters. Integer lifts preserve the
+ // exact D.1 floor division; reducing mod q before dividing would be incorrect.
++/// `aggregate_masks` (patch 0003, for checking a GPU build stage by stage). Not part of the API.
++#[doc(hidden)]
++pub fn aggregate_masks_reference(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
++    aggregate_masks(masks, q)
++}
+ fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
+     let d = masks.len();
+     // Each destination gets exactly one input here. Row-wise filling avoids
