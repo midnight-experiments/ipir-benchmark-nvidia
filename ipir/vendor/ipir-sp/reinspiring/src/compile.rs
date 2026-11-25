@@ -396,16 +396,22 @@ fn ring_fft_inplace(a: &mut [Vec<u64>], q: u64) {
                             let (low, high) = scratch.split_at_mut(r);
                             let (u_low, u_high) = u.split_at_mut(r);
                             for ((dst, u), &x) in low.iter_mut().zip(u_low).zip(&v[d - r..]) {
-                                let t = (x ^ !sign).wrapping_sub(!sign);
+                                let t = negate_if(x, !sign);
                                 *dst = u.wrapping_sub(t) & mask;
                                 *u = u.wrapping_add(t) & mask;
                             }
                             for ((dst, u), &x) in high.iter_mut().zip(u_high).zip(&v[..d - r]) {
-                                let t = (x ^ sign).wrapping_sub(sign);
+                                let t = negate_if(x, sign);
                                 *dst = u.wrapping_sub(t) & mask;
                                 *u = u.wrapping_add(t) & mask;
                             }
                             std::mem::swap(v, scratch);
+                            // The transform covers the first d coefficients;
+                            // a longer row keeps the rest, and scratch stays d long.
+                            if scratch.len() > d {
+                                v.extend_from_slice(&scratch[d..]);
+                                scratch.truncate(d);
+                            }
                         },
                     );
             });
@@ -432,6 +438,12 @@ fn ring_fft_inplace(a: &mut [Vec<u64>], q: u64) {
         }
         len *= 2;
     }
+}
+
+// -x (wrapping) when mask is all ones, x when it is zero.
+#[inline(always)]
+fn negate_if(x: u64, mask: u64) -> u64 {
+    (x ^ mask).wrapping_sub(mask)
 }
 
 fn rotate_by_x_power(p: &[u64], exp_mod_2d: usize, q: u64) -> Vec<u64> {
