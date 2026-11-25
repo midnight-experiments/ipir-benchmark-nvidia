@@ -52,7 +52,7 @@ load it. A full run takes over an hour, so start it inside `tmux` or `screen`, o
 Other options: `--install-deps` installs what is missing (the apt packages `build-essential curl unzip git patch
 ca-certificates libvulkan1 vulkan-tools`, as root or with `sudo`, and Rust with rustup into `$HOME`); without it,
 `bench.sh` prints the command and stops. It never installs a GPU driver. `--skip-quick` goes straight to the full
-run. `--host NAME` sets the host's name in file names and results (rented machines have random names). `--label TEXT`
+run. `--budget-sets today` keeps the 10-million-output tables (about 4 GiB of GPU memory) out of the block budget. `--host NAME` sets the host's name in file names and results (rented machines have random names). `--label TEXT`
 sets the machine's name on the overview page, for example `--label "RTX 4090 + EPYC 7B13"`.
 
 What a run leaves, for a host named `box` on an NVIDIA GPU with resizable BAR:
@@ -147,7 +147,7 @@ the result over. `./setup.sh --cpu` is for the CPU backend alone: a missing or u
 backend) and `results/<host>-<date>-<backend>.md` (a short summary, also printed at the end). It also writes raw files
 and a log in `results/raw/<host>-<date>-<backend>/`, which git ignores. Options: `--backend cpu`, `--builds
 stock,patch0002`, `--quick`, `--skip-build`, `--skip-compile`, `--skip-fetch`, `--skip-budget`, `--no-gpu-check`,
-`--skip-gpu-compile`, `--allow-non-nvidia`, `--name NAME`. `IPIR_BENCH_HOST=<name>` sets the host name used in the file names and results.
+`--budget-sets today`, `--skip-gpu-compile`, `--allow-non-nvidia`, `--name NAME`. `IPIR_BENCH_HOST=<name>` sets the host name used in the file names and results.
 `run-all.sh` does not load the Vulkan layer: on a GPU without resizable BAR, load it first
 (`tools/hide-memory-budget-layer/README.md`), or use `bench.sh`.
 

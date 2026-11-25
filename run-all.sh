@@ -10,7 +10,8 @@
 # backend they also run with the blocks built on the GPU (gpu/block-build.ts), after a check that the GPU's output
 # equals the CPU's.
 # Other options: --builds stock,patch0002 (which of the two), --skip-build, --skip-compile, --skip-fetch,
-# --skip-budget, --skip-gpu-compile (no GPU build of the blocks), --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
+# --skip-budget, --budget-sets today (which shape sets step 3 runs: today, 10m; the 10M tables need about 4 GiB of
+# GPU memory), --skip-gpu-compile (no GPU build of the blocks), --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
 # a GPU that is not NVIDIA's), --name NAME (results file name instead of <host>-<date>-<backend>).
 # Environment: DENO (the deno binary), DENO_WEBGPU_BACKEND (default "vulkan" on Linux), CARGO_BUILD_JOBS,
 # IPIR_BENCH_HOST (the host name in file names and results, instead of `hostname -s`), IPIR_BENCH_PREFLIGHT (a JSON
@@ -26,7 +27,7 @@ if [[ "$(uname)" == Darwin && -z "${IPIR_BENCH_CAFFEINATED:-}" ]] && command -v 
 fi
 
 QUICK=0 SKIP_BUILD=0 SKIP_COMPILE=0 SKIP_FETCH=0 SKIP_BUDGET=0 SKIP_GPU_COMPILE=0 ALLOW_NON_NVIDIA=0 NAME="" BACKEND_OPT=gpu
-BUILDS=stock,patch0002 GPU_CHECK=1
+BUILDS=stock,patch0002 GPU_CHECK=1 BUDGET_SETS_OPT=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) QUICK=1 ;;
@@ -37,10 +38,11 @@ while [[ $# -gt 0 ]]; do
     --skip-compile) SKIP_COMPILE=1 ;;
     --skip-fetch) SKIP_FETCH=1 ;;
     --skip-budget) SKIP_BUDGET=1 ;;
+    --budget-sets) BUDGET_SETS_OPT="$2"; shift ;;
     --skip-gpu-compile) SKIP_GPU_COMPILE=1 ;;
     --allow-non-nvidia) ALLOW_NON_NVIDIA=1 ;;
     --name) NAME="$2"; shift ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -103,6 +105,11 @@ else
   GPU_COMPILE_ARGS=(--rows 2048,8192,16384,32768 --reps 5 --at-once 4,6 --sets today,10m --set-reps 10)
 fi
 
+if [[ -n "$BUDGET_SETS_OPT" ]]; then
+  IFS=, read -r -a BUDGET_SETS <<<"$BUDGET_SETS_OPT"
+  for s in "${BUDGET_SETS[@]}"; do [[ "$s" == today || "$s" == 10m ]] || { echo "--budget-sets takes today and 10m" >&2; exit 2; }; done
+fi
+
 # 1. Build the CPU side: with patch 0002 (ipir/target/release/) and without (ipir/target/stock/release/).
 if [[ $SKIP_BUILD == 0 ]]; then
   echo "== building ipir/ (cargo, release)"
@@ -154,7 +161,7 @@ VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/
 RAM_MIB=$("$DENO" eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));console.log(s.memTotalKiB?Math.floor(s.memTotalKiB/1024):"")' "$RAW/sysinfo-start.json")
 
 cat > "$RAW/meta.json" <<JSON
-{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"gpuCompile":$([[ $GPU_COMPILE == 1 ]] && echo true || echo false),"gpuCompileSteps":"$([[ $SKIP_COMPILE == 0 ]] && echo -n compile)$([[ $SKIP_BUDGET == 0 ]] && echo -n ,budget)","repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
+{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"gpuCompile":$([[ $GPU_COMPILE == 1 ]] && echo true || echo false),"budgetSets":"$([[ $SKIP_BUDGET == 0 ]] && (IFS=,; echo -n "${BUDGET_SETS[*]}"))","gpuCompileSteps":"$([[ $SKIP_COMPILE == 0 ]] && echo -n compile)$([[ $SKIP_BUDGET == 0 ]] && echo -n ,budget)","repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
 JSON
 
 # 3. compile (task 2), for each build.

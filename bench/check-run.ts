@@ -82,7 +82,8 @@ else {
 }
 
 // budget, per build and shape set.
-const sets = quick ? ["today"] : ["today", "10m"];
+// The shape sets the run was asked for (`--budget-sets`; none with `--skip-budget`).
+const sets: string[] = typeof r.meta?.budgetSets === "string" ? r.meta.budgetSets.split(",").filter(Boolean) : quick ? ["today"] : ["today", "10m"];
 for (const b of builds) {
   for (const set of sets) {
     const s: Any = r.budget?.[b]?.[set] ?? null;

@@ -10,6 +10,8 @@
 #   --cpu-only     no GPU run: the CPU backend alone (also for a host with no GPU)
 #   --cuda         also upstream's CUDA first-pass benchmark (NVIDIA, with the CUDA driver library and NVRTC)
 #   --skip-quick   go straight to the full run
+#   --budget-sets today   only today's shapes in the block budget: the 10-million-output tables need about 4 GiB of
+#                  GPU memory (default: today,10m)
 #   --host NAME    the host's name in file names and results, instead of `hostname -s` (rented machines have random
 #                  names); the same as IPIR_BENCH_HOST=NAME
 #   --label TEXT   the machine's name on the overview page, for example "RTX 4090 + EPYC 7B13" (default: the GPU's and
@@ -31,7 +33,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$PWD
 
-QUICK_ONLY=0 SKIP_QUICK=0 INSTALL=0 WITH_CPU=0 CPU_ONLY=0 CUDA=0 LABEL=""
+QUICK_ONLY=0 SKIP_QUICK=0 INSTALL=0 WITH_CPU=0 CPU_ONLY=0 CUDA=0 LABEL="" FULL_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) QUICK_ONLY=1 ;;
@@ -40,9 +42,10 @@ while [[ $# -gt 0 ]]; do
     --cpu) WITH_CPU=1 ;;
     --cpu-only) CPU_ONLY=1 ;;
     --cuda) CUDA=1 ;;
+    --budget-sets) FULL_ARGS+=(--budget-sets "$2"); shift ;;
     --host) export IPIR_BENCH_HOST="$2"; shift ;;
     --label) LABEL="$2"; shift ;;
-    -h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (./bench.sh --help)" >&2; exit 2 ;;
   esac
   shift
@@ -172,11 +175,11 @@ fi
 
 if [[ $QUICK_ONLY == 0 ]]; then
   if [[ $CPU_ONLY == 0 ]]; then
-    run "full run, this host's GPU (about 100 minutes)" || PROBLEMS=1
+    run "full run, this host's GPU (about 100 minutes)" ${FULL_ARGS[@]+"${FULL_ARGS[@]}"} || PROBLEMS=1
     if [[ -n "$NAME" ]]; then export_site "$NAME" label; fi
   fi
   if [[ $CPU_ONLY == 1 || $WITH_CPU == 1 ]]; then
-    run "full run, CPU backend (about 1.5 hours)" --backend cpu || PROBLEMS=1
+    run "full run, CPU backend (about 1.5 hours)" --backend cpu ${FULL_ARGS[@]+"${FULL_ARGS[@]}"} || PROBLEMS=1
     if [[ -n "$NAME" ]]; then export_site "$NAME" nolabel; fi
   fi
 fi
