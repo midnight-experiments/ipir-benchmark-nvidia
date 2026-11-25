@@ -46,6 +46,16 @@ device.addEventListener("uncapturederror", (e) => {
 });
 console.error(`GPU: ${gpu.description}`);
 
+/**
+ * The CPU build's digests of the block `pack_digest` builds for (rows, seed), and the name of its matrix storage on
+ * this CPU, which is hashed with the words.
+ */
+async function cpuDigest(rows: number, seed: number): Promise<{ all: string; hints: string; packing: string; storage: string }> {
+  const out = (await run(`${bin}/pack_digest`, ["--parts", String(rows), String(seed)])).trim().split(/\s+/);
+  const part = (name: string) => out.find((x) => x.startsWith(`${name}=`))?.slice(name.length + 1) ?? "";
+  return { all: out[2] ?? "", hints: part("hints"), packing: part("packing"), storage: part("storage") || "i32" };
+}
+
 /** Indices of the first differing 64-bit words (as pairs of u32), and their count. */
 function diff64(a: Uint8Array, b: Uint8Array): { count: number; first: number[] } {
   const x = new Uint32Array(a.buffer, a.byteOffset, a.byteLength / 4), y = new Uint32Array(b.buffer, b.byteOffset, b.byteLength / 4);
@@ -83,9 +93,9 @@ try {
     device.queue.submit([enc.finish()]);
     await device.queue.onSubmittedWorkDone();
     for (const [i, r] of rows.entries()) {
-      const got = await blockBuildDigest(set, i);
-      const want = (await run(`${bin}/pack_digest`, [String(r), String(100 + i)])).trim().split(/\s+/)[2];
-      const line: Record<string, unknown> = { set: name, table: i, rows: r, seed: 100 + i, equal: got.all === want, digest: got.all, expected: want };
+      const want = await cpuDigest(r, 100 + i);
+      const got = await blockBuildDigest(set, i, want.storage);
+      const line: Record<string, unknown> = { set: name, table: i, rows: r, seed: 100 + i, equal: got.all === want.all, digest: got.all, expected: want.all, cpuStorage: want.storage };
       if (errors.length) Object.assign(line, { equal: false, gpuErrors: errors.splice(0).map((e) => e.slice(0, 300)) });
       if (!line.equal) failed = true;
       lines.push(line);
@@ -151,10 +161,9 @@ try {
         device.queue.submit([enc.finish()]);
         await device.queue.onSubmittedWorkDone();
         const wallMs = performance.now() - t;
-        const got = await blockBuildDigest(build);
-        const want = (await run(`${bin}/pack_digest`, ["--parts", String(rows), String(seed)])).trim().split(/\s+/);
-        const expected = { all: want[2], hints: want[3]?.replace("hints=", ""), packing: want[4]?.replace("packing=", "") };
-        Object.assign(line, { equal: got.all === expected.all, hintsEqual: got.hints === expected.hints, packingEqual: got.packing === expected.packing, digest: got.all, expected: expected.all, wallMs: Math.round(wallMs * 10) / 10 });
+        const expected = await cpuDigest(rows, seed);
+        const got = await blockBuildDigest(build, 0, expected.storage);
+        Object.assign(line, { equal: got.all === expected.all, hintsEqual: got.hints === expected.hints, packingEqual: got.packing === expected.packing, digest: got.all, expected: expected.all, cpuStorage: expected.storage, wallMs: Math.round(wallMs * 10) / 10 });
       }
       if (errors.length) Object.assign(line, { equal: false, gpuErrors: errors.splice(0).map((e) => e.slice(0, 300)) });
       Object.assign(line, { setupMs: Math.round(setupMs) });

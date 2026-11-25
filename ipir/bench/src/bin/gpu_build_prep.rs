@@ -53,8 +53,8 @@ fn main() {
         std::fs::write(format!("{dir}/slots-before.u64"), flat(&r.slots_before)).unwrap();
         std::fs::write(format!("{dir}/slots-after.u64"), flat(&r.slots_after)).unwrap();
         std::fs::write(format!("{dir}/digits.i32"), bytes(&r.digits, i32::to_le_bytes)).unwrap();
+        // The canonical words, however this CPU stores the matrix (`r.storage_label`: i32, packed27, ...).
         if !r.matrix.is_empty() {
-            assert_eq!(r.storage_label, "i32", "the GPU build writes i32 words");
             std::fs::write(format!("{dir}/matrix.u64"), bytes(&r.matrix, u64::to_le_bytes)).unwrap();
         }
         eprintln!("gpu_build_prep {rows}: reference for seed {seed}, {steps} chain steps, in {dir}");

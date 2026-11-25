@@ -6,7 +6,8 @@
 //! `build_with_concurrency(setup(rows), cells(rows, seed), 1)` computes, through the same public calls, and prints
 //! `rows seed digest`. The digest is SHA-256 over two part digests: one over the hint masks of every output block, one
 //! over each block's packing state (both public masks, and the compiled matrix with its storage width). `--parts` also
-//! prints the two part digests.
+//! prints the two part digests and the matrix's storage (`storage=i32`, `storage=packed27`, ...). The storage is the
+//! CPU build's choice and depends on the CPU it runs on, so the digest of the same words can differ between machines.
 use ipir_bench::*;
 use rayon::prelude::*;
 use reinspiring::{lift_ntt::LiftContext, native::NativePreprocessed};
@@ -43,6 +44,7 @@ fn main() {
         for &seed in &seeds {
             let cells = cells(rows, seed);
             let (mut hints, mut packing) = (Sha256::new(), Sha256::new());
+            let mut storage = "";
             for block in 0..p.cols() / d {
                 // One hint mask per column: its rows/d polynomials dotted with the query masks.
                 let masks: Vec<Vec<u64>> = (block * d..(block + 1) * d)
@@ -61,7 +63,8 @@ fn main() {
                 let pre = NativePreprocessed::build_two_mask(setup.packing_setup(), &masks).unwrap();
                 update(&mut packing, pre.mask());
                 update(&mut packing, pre.other_mask().unwrap());
-                packing.update(pre.matrix().storage().label());
+                storage = pre.matrix().storage().label();
+                packing.update(storage);
                 let matrix = pre.matrix().to_compiled();
                 update(&mut packing, &[matrix.rows as u64, matrix.cols as u64, matrix.q]);
                 update(&mut packing, &matrix.data);
@@ -71,7 +74,7 @@ fn main() {
             all.update(hints);
             all.update(packing);
             if parts {
-                println!("{rows} {seed} {} hints={} packing={}", hex(all.finalize()), hex(hints), hex(packing));
+                println!("{rows} {seed} {} hints={} packing={} storage={storage}", hex(all.finalize()), hex(hints), hex(packing));
             } else {
                 println!("{rows} {seed} {}", hex(all.finalize()));
             }

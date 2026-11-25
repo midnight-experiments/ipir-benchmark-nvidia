@@ -935,13 +935,17 @@ const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16)
  * `pack_digest`'s digest of one table's output words (`ipir/bench/src/bin/pack_digest.rs`): SHA-256 over two part
  * digests, one over the hint masks of every column, one over both public masks, the storage label, the dimensions
  * and q, and the compiled matrix's canonical words. Equal digests: every output word equals the CPU build's.
+ *
+ * `storageLabel`: the name of the CPU build's matrix storage, which `pack_digest` hashes with the words and prints
+ * (`storage=`). It is the CPU's choice of layout (i32 words, or packed in 27 bits where the CPU has the instructions
+ * for it), not part of the output: the GPU writes i32 words, and the canonical words compared are the same.
  */
-export async function blockBuildDigest(set: GpuBlockBuildSet, table = 0): Promise<{ all: string; hints: string; packing: string }> {
+export async function blockBuildDigest(set: GpuBlockBuildSet, table = 0, storageLabel = "i32"): Promise<{ all: string; hints: string; packing: string }> {
   const h = set.headers[table]!;
   const d = h.d;
   const [masks, slots, matrixBytes] = await Promise.all([set.readMasks(table), set.readSlots(table), set.readMatrix(table)]);
   const matrix = canonicalWords(new Int32Array(matrixBytes.buffer), h.qBits);
-  const label = new TextEncoder().encode("i32");
+  const label = new TextEncoder().encode(storageLabel);
   const dims = new Uint32Array([d, 0, 2 * d, 0, 0, 2 ** (h.qBits - 32)]);
   const row = (slot: number) => slots.subarray(slot * d * 8, (slot + 1) * d * 8);
   const packing = new Uint8Array(2 * d * 8 + label.length + dims.byteLength + matrix.byteLength);
