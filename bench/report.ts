@@ -222,7 +222,8 @@ if (gpuCompile) {
   } else lines.push(`Timing not run or failed${t?.error ? `: ${String(t.error).slice(0, 300)}` : ""}.`, "");
 }
 
-lines.push("## 3. The 3 s block budget, simulated", "");
+lines.push("## 3. The block budget, simulated: a block's work in the 6 s between blocks", "");
+lines.push("The goal is a block's work under 1 s; 3 s is the ceiling. \"Of the 6 s\": the share of the time between two blocks that the work takes (p50).", "");
 lines.push(
   (backend.answer === "cpu"
     ? "Per chain block: compile one changed column block of each of six tables on the CPU while the CPU also answers calls of 32 at a steady rate (no upload: block work is the compile). "
@@ -247,14 +248,16 @@ for (const [build, name, b] of [...BUILDS, "gpu"].flatMap((x) => Object.entries(
     "",
   );
   lines.push(
-    "| calls/s | mode | block work p50 / p99 | compile p50 / p99 | upload p50 | over 3 s | answer p50 / p99 during work | answer p50 / p99 no block work | calls dropped |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| calls/s | mode | block work p50 / p99 | of the 6 s | compile p50 / p99 | upload p50 | over 1 s | over 3 s | answer p50 / p99 during work | answer p50 / p99 no block work | calls dropped |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
   );
   const base = new Map<number, any>(b.runs.filter((r: any) => r.mode === "none").map((r: any) => [r.rate, r]));
   for (const r of b.runs.filter((r: any) => r.mode !== "none")) {
     const bl = base.get(r.rate)?.answerLatencyMs;
     lines.push(
-      `| ${r.rate} | ${r.mode} | ${f(r.blockWorkMs.p50 / 1000, 2)} / ${f(r.blockWorkMs.p99 / 1000, 2)} s | ${f(r.compileMs.p50 / 1000, 2)} / ${f(r.compileMs.p99 / 1000, 2)} s | ${r.uploadMs ? f(r.uploadMs.p50) + " ms" : "—"} | ${r.overBudget}/${r.blocks} | ` +
+      `| ${r.rate} | ${r.mode} | ${f(r.blockWorkMs.p50 / 1000, 2)} / ${f(r.blockWorkMs.p99 / 1000, 2)} s | ${f((r.blockWorkMs.p50 / b.intervalMs) * 100)} % | ${f(r.compileMs.p50 / 1000, 2)} / ${f(r.compileMs.p99 / 1000, 2)} s | ${r.uploadMs ? f(r.uploadMs.p50) + " ms" : "—"} | ` +
+        // Runs made before the 1 s goal keep every block's time: count from those.
+        `${r.overGoal ?? (r.work ?? []).filter((w: any) => w.workMs > 1000).length}/${r.blocks} | ${r.overBudget}/${r.blocks} | ` +
         `${f(r.answerLatencyMs.duringBlockWork.p50)} / ${f(r.answerLatencyMs.duringBlockWork.p99)} ms | ${f(bl?.p50)} / ${f(bl?.p99)} ms | ${r.cancelled ?? 0} of ${r.issued ?? "?"} |`,
     );
   }

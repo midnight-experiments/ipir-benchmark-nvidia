@@ -1,5 +1,7 @@
 /**
- * Task 3: the 3 s block budget, simulated. Six tables stay resident on the GPU and answer calls of 32 requests at a
+ * Task 3: the block budget, simulated: how much of the 6 s between two chain blocks a block's table work takes, the
+ * time the server does not have for answering at full speed. The goal is under 1 s (`GOAL_MS`); 3 s is the ceiling
+ * (`BUDGET_MS`), the most that is tolerable and far from good. Six tables stay resident on the GPU and answer calls of 32 requests at a
  * steady rate (open loop: call k is due at k / rate seconds, whatever happened to the calls before it). Every
  * `--interval-ms` (6 s, the chain's block time) a chain block arrives and changes one column block of each table;
  * its work is:
@@ -12,7 +14,7 @@
  *    one-block `GpuIpirTable` of each table's rows (the same copies and layout kernels as a table's `create`) and
  *    releasing it. The matrices uploaded are synthetic (the content does not change the time).
  *
- * The block's work time (compile + upload) is compared with 3 s, and the calls' latency (from the moment a call is
+ * The block's work time (compile + upload) is compared with the 1 s goal and the 3 s ceiling, and the calls' latency (from the moment a call is
  * due to its answer in host memory) with and without block work running.
  *
  * With `--answer cpu`, the CPU backend: the six tables stay resident in a `cpu_server` process instead
@@ -84,6 +86,7 @@ if (answerOn === "cpu" && !cpuServerPath) throw new Error("--answer cpu needs --
 if (answerOn === "cpu" && modes.includes("gpu")) throw new Error("mode gpu builds on the device that answers: it needs --answer gpu");
 const drainS = Number(opts.get("drain-s") ?? 30);
 const BUDGET_MS = 3000;
+const GOAL_MS = 1000;
 const log = (s: string) => console.error(`budget ${setName}: ${s}`);
 
 /** Lines from a child process's stdout, one at a time (`block_worker`, `cpu_server`). */
@@ -192,6 +195,7 @@ const result: Record<string, unknown> = {
   intervalMs,
   baselineS,
   budgetMs: BUDGET_MS,
+  goalMs: GOAL_MS,
   residentBytes: tables.reduce((a, t) => a + residentBytes(t.rows, t.cols), 0),
   answer: answerOn,
   note: "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
@@ -388,6 +392,7 @@ try {
         compileMs: stats(work.map((w) => w.compileMs)),
         uploadMs: device ? stats(work.map((w) => w.uploadMs!)) : null,
         overBudget: workMs.filter((x) => x > BUDGET_MS).length,
+        overGoal: workMs.filter((x) => x > GOAL_MS).length,
         issued: c.issued,
         calls: c.done.length,
         cancelled: c.cancelled,
@@ -396,7 +401,7 @@ try {
         work: work.map((w) => ({ compileMs: w.compileMs, uploadMs: w.uploadMs, workMs: w.workMs, worker: w.worker })),
       };
       runs.push(row);
-      log(`  block work p50 ${row.blockWorkMs.p50} ms, p99 ${row.blockWorkMs.p99} ms (${row.overBudget}/${work.length} over 3 s); answers during work p50 ${row.answerLatencyMs.duringBlockWork.p50} ms, p99 ${row.answerLatencyMs.duringBlockWork.p99} ms${c.cancelled ? `; ${c.cancelled} of ${c.issued} calls dropped unanswered` : ""}`);
+      log(`  block work p50 ${row.blockWorkMs.p50} ms (${((row.blockWorkMs.p50 ?? 0) / intervalMs * 100).toFixed(1)} % of the ${intervalMs / 1000} s between blocks), p99 ${row.blockWorkMs.p99} ms (${row.overGoal}/${work.length} over 1 s, ${row.overBudget}/${work.length} over 3 s); answers during work p50 ${row.answerLatencyMs.duringBlockWork.p50} ms, p99 ${row.answerLatencyMs.duringBlockWork.p99} ms${c.cancelled ? `; ${c.cancelled} of ${c.issued} calls dropped unanswered` : ""}`);
     }
   }
   await worker?.close();

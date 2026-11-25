@@ -17,11 +17,11 @@ Metal on macOS. The CPU answer code is the add-on's: `NativeServer::respond` of 
 preparation code is the Zcash IPIR+SP crates, in Rust, on the CPU, for every backend.
 
 It exists for the design of UmbraDB's private sync modules (spec 00065). There, every table follows the chain block by
-block (one block every 6 s), and the server must finish a block's table work in under 3 s while it keeps answering
-wallets. The production target is NVIDIA through CUDA, with WebGPU for Apple's Metal and other GPUs, and a CPU
+block (one block every 6 s), and a block's table work takes time away from answering wallets: the goal is under 1 s
+of each 6 s, and 3 s is the ceiling. The production target is NVIDIA through CUDA, with WebGPU for Apple's Metal and other GPUs, and a CPU
 fallback. The numbers here say how long a call of 32 requests takes for each table shape on each backend, how long
-it takes to compile one changed column block, on the CPU and on the GPU, and whether a block's work stays under 3 s
-while the server is answering calls. What a block's work leaves of the 6 s is the time the server has to answer. `bench/export-site.ts` turns a run into the file the overview page reads
+it takes to compile one changed column block, on the CPU and on the GPU, and how much of the 6 s between two blocks a
+block's work takes while the server is answering calls. What it leaves is the time the server has to answer. `bench/export-site.ts` turns a run into the file the overview page reads
 (https://umbradb-private-sync.pages.dev/, the server timings per backend).
 
 ## Run it
@@ -108,30 +108,45 @@ answer). The GPU build's output equals the CPU's in 24 of 24 checked blocks on t
 RTX 2060.
 
 **One chain block: one column block of each of six tables** (steps 2b and 3), at today's shapes and at the
-10-million-output shapes, in seconds. A block arrives every 6 s; what its work leaves is the time to answer.
+10-million-output shapes. A block arrives every 6 s, and its work is time the server does not have for answering at
+full speed. The goal is a block's work under 1 s; 3 s is the ceiling, the most that is tolerable.
+
+The compile of the six column blocks alone, in seconds:
 
 | | RTX 2060 host | M4 Max | RTX 4090 host |
 |---|---|---|---|
-| Compile on the CPU, stock crates (one after another, p50) | 6.71 / 7.56 | 2.05 / 2.25 | 3.45 / not run |
-| Compile on the CPU, patch 0002 (one after another, p50) | 2.18 / 2.54 | 0.63 / 0.68 | 1.35 / not run |
-| Compile on the GPU, one build right after another (wall; GPU time in brackets) | not in a full run yet | not run yet | 0.05 (0.033) / 0.07 (0.036) |
-| Compile on the GPU, 6 s after the last build (wall; GPU time in brackets) | not in a full run yet | not run yet | 0.25 (0.21) / 0.32 (0.22) |
-| Block work, CPU compile with patch 0002 on a low-priority pool, plus upload (p50, 2 calls/s) | 1.94 / 2.06 | 0.54 / 0.68 | 1.43 / not run |
-| Block work, blocks built on the GPU that is answering (p50, 2 calls/s) | not in a full run yet | not run yet | 0.36 / not run |
+| On the CPU, stock crates (one after another, p50) | 6.71 / 7.56 | 2.05 / 2.25 | 3.45 / not run |
+| On the CPU, patch 0002 (one after another, p50) | 2.18 / 2.54 | 0.63 / 0.68 | 1.35 / not run |
+| On the GPU, one build right after another (wall; GPU time in brackets) | not in a full run yet | not run yet | 0.05 (0.033) / 0.07 (0.036) |
+| On the GPU, 6 s after the last build (wall; GPU time in brackets) | not in a full run yet | not run yet | 0.25 (0.21) / 0.32 (0.22) |
 
-- With the stock crates the RTX 2060 host goes over the 3 s budget in every block; with patch 0002 it stays under it
-  except in 6 of 30 blocks at the 10-million-output shapes when the blocks are compiled one after another. The RTX
-  4090 host with the stock crates is over it in every block when they are compiled one after another (3.67 s), and
-  under it on the pool (2.12 s).
+A block's whole work (the compile of the six column blocks, then their upload and layout for the answer) while the
+GPU answers 2 calls a second: seconds at p50, and in brackets its share of the 6 s between two blocks.
+
+| Block work | RTX 2060 host | M4 Max | RTX 4090 host |
+|---|---|---|---|
+| CPU compile, stock crates, one after another | 6.93 (116 %) / 7.79 (130 %) | 2.18 (36 %) / 2.39 (40 %) | 3.67 (61 %) / not run |
+| CPU compile, stock crates, low-priority pool | 3.46 (58 %) / 4.60 (77 %) | 1.13 (19 %) / 1.64 (27 %) | 2.12 (35 %) / not run |
+| CPU compile, patch 0002, one after another | 2.36 (39 %) / 2.94 (49 %) | 0.76 (13 %) / 0.83 (14 %) | 1.61 (27 %) / not run |
+| CPU compile, patch 0002, low-priority pool | 1.94 (32 %) / 2.06 (34 %) | 0.54 (9 %) / 0.68 (11 %) | 1.43 (24 %) / not run |
+| Blocks built on the GPU that is answering | not in a full run yet | not run yet | 0.36 (6 %) / not run |
+
+- **Under the 1 s goal:** the M4 Max with patch 0002 (9 to 14 % of the 6 s; 0 to 4 of 30 blocks over 1 s), and the
+  RTX 4090 with the blocks built on the GPU (6 %; no block over 1 s). **Not under it:** every CPU compile on the RTX
+  2060 host and on the RTX 4090 host (24 % of the 6 s at best), and the M4 Max with the stock crates.
+- **Almost all of it is the compile of the column blocks.** The upload and layout are 2 to 4 % of the 6 s on every
+  machine (0.12 to 0.26 s; 6.5 % in one cell of the RTX 2060); with the blocks built on the GPU they are 1.7 %
+  (0.10 s), since the matrix does not cross from the host.
+- With the stock crates the RTX 2060 host's work does not fit in the 6 s at all when the blocks are compiled one
+  after another (116 and 130 %).
 - **A GPU that has been idle builds more slowly.** On the RTX 4090 the same six-table build takes 33 ms of GPU time
   right after another one and 210 ms when the GPU was idle for the 6 s between two chain blocks: the card lowers its
   clocks when idle. A small dispatch every 20 ms during the idle time brings it to 114 ms, not to 33 ms. In the block
-  budget, where blocks are 6 s apart, the build takes 0.23 to 0.26 s for that reason, and the block's work 0.33 to
-  0.37 s. The driver's power setting (maximum performance) is the likely remedy; it was not tried, as it needs
-  rights this run did not have.
+  budget, where blocks are 6 s apart, the build takes 0.23 to 0.26 s for that reason; without it the block's work
+  would be about 0.15 s, 2.5 % of the 6 s. The driver's power setting (maximum performance) is the likely remedy; it
+  was not tried, as it needs rights this run did not have.
 - While the GPU builds a block, the calls that arrive wait for it: at 2 calls/s the calls that overlap a block's
-  work are answered in 252 ms (p50) on the RTX 4090, against 18 ms otherwise; none is dropped, and the work takes 6 %
-  of the time between blocks.
+  work are answered in 252 ms (p50) on the RTX 4090, against 18 ms otherwise; none is dropped.
 - The RTX 4090 run has no 10-million-output budget: another process held 20.7 of the card's 24.5 GiB.
 
 **Memory.** On the GPU, a table keeps 2 bytes a cell and 32 MiB a column block (its compiled matrix). The six
@@ -175,7 +190,7 @@ Not measured: the memory of a whole server process, and of the CPU backend's res
 | 1. `fetch` on the CPU (backend `cpu`) | `bench/fetch-all.ts --backend cpu` → `ipir/bench/src/bin/cpu_fetch.rs` | The same shapes and calls, answered by `NativeServer::respond` on the CPU: the requests of a call one after another, each in parallel over the columns on all cores, as the add-on answers a call. Wall time only (there is no GPU time). Also the table's CPU build. Once per shape, the CPU's answers to 32 requests are compared byte for byte with `GpuIpirTable`'s on the host's GPU, for the same cells and compiled matrices (`bench/check-cpu-answer.ts`). |
 | 2. `compile` one column block | `ipir/bench/src/bin/compile_block.rs` | The CPU build of a table that is one column block (2,048 columns) at 2048, 8192, 16384 and 32768 rows, median of 3. Hint columns and packing matrix are timed separately. Then 4 at once in one process, sharing Rayon's pool, as the Node add-on would. |
 | 2b. `compile` on the GPU (GPU backends) | `bench/check-gpu-build.ts`, `bench/gpu-compile.ts` → `gpu/block-build.ts` | The same build on the GPU, in WebGPU: hint columns, mask aggregation, the two collapse chains and the matrix compilation, from the block's cells to the same output words as the CPU. First the check: for 2048, 8192, 16384 and 32768 rows and seeds 1 to 3, and for one block of each table of the two six-table sets, `pack_digest`'s SHA-256 over every output word must equal the CPU's. Then the time, median of 5: one table (wall from writing the cells to the build's end, the GPU's own time, and each stage's), 4 and 6 tables of a row count at once, and one chain block of each six-table set (median of 10), measured one build right after another and again with the GPU left idle for 6 s before each build, as it is between chain blocks (median of 5). The tables of a set are built in one submission with all their chains in one dispatch, side by side. |
-| 3. The 3 s block budget | `bench/budget.ts` + `ipir/bench/src/bin/block_worker.rs` | Six tables stay resident on the GPU. The GPU answers calls of 32 against them, round robin, at a steady 2, 5 and 10 calls/s; calls are issued open loop, so a slow call does not delay the next. Every 6 s a chain block changes one column block of every table. The CPU compiles the six blocks, either one after another on all cores (`seq`) or all at once on a pool of half the cores at the lowest priority (`pool`). Then the six new blocks (cells and matrix) are uploaded to the GPU. Reported: the block's work time (p50, p99 over 30 blocks) against 3 s, and the answer latency p50/p99 during block work and with no block work. On the `cpu` backend, the six tables stay in a `cpu_server` process (`ipir/bench/src/bin/cpu_server.rs`) that answers the calls on the CPU, all cores, while `block_worker` compiles; there is no upload, so a block's work is its compile. Calls the CPU cannot keep up with queue; those still waiting 30 s after a run's last block are dropped and counted. On a GPU backend the step runs a third time with the six blocks built on the GPU that is answering (mode `gpu`): a block's work is then writing the six blocks' cells, building them on the GPU in one submission, and laying each out for the answer from the build's GPU buffers, so no matrix crosses from the host. Run at today's starting shapes (2048×2048 read, 2048×2048 nullifier, 2048×4096 shielded groups, 6144×28672 Dust groups, 2048×2048 first coins, 2048×4096 generation groups) and at the 10-million-output shapes (14336×34816 read, 16384×18432 nullifier, 8192×20480 groups, and the same three Dust tables). |
+| 3. The block budget: a block's work in the 6 s between blocks | `bench/budget.ts` + `ipir/bench/src/bin/block_worker.rs` | Six tables stay resident on the GPU. The GPU answers calls of 32 against them, round robin, at a steady 2, 5 and 10 calls/s; calls are issued open loop, so a slow call does not delay the next. Every 6 s a chain block changes one column block of every table. The CPU compiles the six blocks, either one after another on all cores (`seq`) or all at once on a pool of half the cores at the lowest priority (`pool`). Then the six new blocks (cells and matrix) are uploaded to the GPU. Reported: the block's work time (p50, p99 over 30 blocks) against the 1 s goal and the 3 s ceiling and as a share of the 6 s between blocks, and the answer latency p50/p99 during block work and with no block work. On the `cpu` backend, the six tables stay in a `cpu_server` process (`ipir/bench/src/bin/cpu_server.rs`) that answers the calls on the CPU, all cores, while `block_worker` compiles; there is no upload, so a block's work is its compile. Calls the CPU cannot keep up with queue; those still waiting 30 s after a run's last block are dropped and counted. On a GPU backend the step runs a third time with the six blocks built on the GPU that is answering (mode `gpu`): a block's work is then writing the six blocks' cells, building them on the GPU in one submission, and laying each out for the answer from the build's GPU buffers, so no matrix crosses from the host. Run at today's starting shapes (2048×2048 read, 2048×2048 nullifier, 2048×4096 shielded groups, 6144×28672 Dust groups, 2048×2048 first coins, 2048×4096 generation groups) and at the 10-million-output shapes (14336×34816 read, 16384×18432 nullifier, 8192×20480 groups, and the same three Dust tables). |
 
 Notes on what the numbers mean:
 
@@ -279,7 +294,7 @@ machine description):
 
 It writes `site/<host>-<date>-<backend>-site.json` (schema `ipir-benchmark-site/1`): the machine, the `fetch` time
 of each shape that ran (wall time, and the GPU's own time, null on the CPU), the `compile` of one column block, and
-the 3 s budget cells, the last two for `stock` and `patch0002`. A run on a GPU backend also has `gpuCompile` (how many
+the block budget's cells (each with the share of the 6 s its work takes, and the blocks over the 1 s goal and over the 3 s ceiling), the last two for `stock` and `patch0002`. A run on a GPU backend also has `gpuCompile` (how many
 checked blocks equal the CPU's output, the GPU build's time per row count with its stages, several tables at once, and
 one chain block of each six-table set) and `budget.gpu` (the budget cells with the blocks built on the GPU); both are
 additions to `ipir-benchmark-site/1`, absent from the files exported before them. Shapes that did not fit and sections
