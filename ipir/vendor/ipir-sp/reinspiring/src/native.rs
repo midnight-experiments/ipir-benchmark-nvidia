@@ -5,7 +5,7 @@
 //! odd-modulus InspiRING profile. Ciphertext convention is b + a*s = Delta*m+e.
 use crate::native_gaussian::gaussian;
 use crate::{
-    compile::{collapse_kg_exponents, compile_fast, tau_coeffs},
+    compile::{collapse_kg_exponents, compile_fast_owned, tau_coeffs},
     error::ReinspiringError,
     lift_ntt::{centered, LiftContext, PreparedLiftOperand, PreparedLiftRight},
     matrix::PackingMatrix,
@@ -983,14 +983,22 @@ impl NativePreprocessed {
         };
         let trace = trace_start.elapsed();
         let compilation_start = Instant::now();
-        let blocks: Result<Vec<_>, _> = (0..p.ell)
+        // Each limb's digit polynomials, in chain order, move to its compilation.
+        let mut limbs: Vec<Vec<Vec<u64>>> = (0..p.ell)
+            .map(|_| Vec::with_capacity(digits.len()))
+            .collect();
+        for ds in digits {
+            for (limb, x) in limbs.iter_mut().zip(ds) {
+                limb.push(x);
+            }
+        }
+        let blocks: Result<Vec<_>, _> = limbs
             .into_par_iter()
-            .map(|j| {
-                let ts: Vec<_> = digits.iter().map(|x| x[j].clone()).collect();
+            .map(|ts| {
                 if d == 2 {
                     Ok(PackingMatrix::zero(d, d, q))
                 } else {
-                    compile_fast(&ts, &exponents, q)
+                    compile_fast_owned(ts, &exponents, q)
                 }
             })
             .collect();

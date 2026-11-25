@@ -234,6 +234,16 @@ pub fn compile_fast(
     exponents: &[u64],
     q: u64,
 ) -> Result<PackingMatrix, ReinspiringError> {
+    compile_fast_owned(ts.to_vec(), exponents, q)
+}
+
+/// [`compile_fast`] taking ownership of `ts`: its polynomials become rows of
+/// the generating polynomial without a copy.
+pub(crate) fn compile_fast_owned(
+    ts: Vec<Vec<u64>>,
+    exponents: &[u64],
+    q: u64,
+) -> Result<PackingMatrix, ReinspiringError> {
     if ts.is_empty() || ts.len() != exponents.len() || !(2..=(1 << 62)).contains(&q) {
         return Err(ReinspiringError::InvalidParams(
             "invalid Compile inputs".into(),
@@ -251,10 +261,25 @@ pub fn compile_fast(
     }
     // tau_g(X^j) = X^j (X^(2j))^((g-1)/2). Missing exponents
     // have zero coefficients; repeated exponents add in the generating polynomial.
-    let mut p_hat = vec![vec![0; d]; d];
-    for (t, &g) in ts.iter().zip(exponents) {
-        for (dst, &x) in p_hat[((g - 1) / 2) as usize].iter_mut().zip(t) {
-            *dst = (*dst + x) % q;
+    let mut p_hat: Vec<Vec<u64>> = (0..d).map(|_| Vec::new()).collect();
+    for (t, &g) in ts.into_iter().zip(exponents) {
+        let row = &mut p_hat[((g - 1) / 2) as usize];
+        if row.is_empty() {
+            // (0 + x) % q = x: the coefficients are canonical.
+            *row = t;
+        } else if q.is_power_of_two() {
+            for (dst, &x) in row.iter_mut().zip(&t) {
+                *dst = (*dst + x) & (q - 1);
+            }
+        } else {
+            for (dst, &x) in row.iter_mut().zip(&t) {
+                *dst = (*dst + x) % q;
+            }
+        }
+    }
+    for row in &mut p_hat {
+        if row.is_empty() {
+            *row = vec![0; d];
         }
     }
     compile_validated_fft(p_hat, q)
@@ -360,20 +385,30 @@ fn ring_fft_inplace(a: &mut [Vec<u64>], q: u64) {
                     .zip(right.par_iter_mut())
                     .enumerate()
                     .with_min_len(16)
-                    .for_each(|(k, (u, v))| {
-                        let rot = (2 * step * k) & (2 * d - 1);
-                        let old = v.clone();
-                        for i in 0..d {
-                            let src = (i + 2 * d - rot) & (2 * d - 1);
-                            let t = if src >= d {
-                                old[src - d].wrapping_neg()
-                            } else {
-                                old[src]
-                            };
-                            v[i] = u[i].wrapping_sub(t) & mask;
-                            u[i] = u[i].wrapping_add(t) & mask;
-                        }
-                    });
+                    .for_each_init(
+                        || vec![0u64; d],
+                        |scratch, (k, (u, v))| {
+                            // t = X^rot v, negacyclic: t[i] = v[i - r] for i >= r and
+                            // -v[i + d - r] below, negated once more when rot >= d. The
+                            // new v goes to `scratch`, which then swaps with v.
+                            let rot = (2 * step * k) & (2 * d - 1);
+                            let r = rot & (d - 1);
+                            let sign = if rot >= d { u64::MAX } else { 0 };
+                            let (low, high) = scratch.split_at_mut(r);
+                            let (u_low, u_high) = u.split_at_mut(r);
+                            for ((dst, u), &x) in low.iter_mut().zip(u_low).zip(&v[d - r..]) {
+                                let t = (x ^ !sign).wrapping_sub(!sign);
+                                *dst = u.wrapping_sub(t) & mask;
+                                *u = u.wrapping_add(t) & mask;
+                            }
+                            for ((dst, u), &x) in high.iter_mut().zip(u_high).zip(&v[..d - r]) {
+                                let t = (x ^ sign).wrapping_sub(sign);
+                                *dst = u.wrapping_sub(t) & mask;
+                                *u = u.wrapping_add(t) & mask;
+                            }
+                            std::mem::swap(v, scratch);
+                        },
+                    );
             });
             len *= 2;
         }

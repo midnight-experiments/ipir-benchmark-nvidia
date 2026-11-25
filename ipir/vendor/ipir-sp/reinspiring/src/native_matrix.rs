@@ -89,17 +89,33 @@ impl NativeMatrix {
                 .checked_add(block.cols)
                 .filter(|&x| x <= 32768)
                 .ok_or_else(|| ReinspiringError::InvalidParams("native matrix too wide".into()))?;
-            for &x in &block.data {
-                if x >= q {
-                    return Err(ReinspiringError::InvalidParams(
-                        "noncanonical native matrix".into(),
-                    ));
-                }
-                let signed = centered(x, q);
-                narrow &= i32::try_from(signed).is_ok();
-                fits27 &= (-(1i128 << 26)..(1i128 << 26)).contains(&signed);
-                packed28 &= (-(1i128 << 27)..(1i128 << 27)).contains(&signed);
+            // (noncanonical, narrow, fits27, packed28) over the block, in parallel.
+            let flags = block
+                .data
+                .par_chunks(1 << 16)
+                .map(|chunk| {
+                    chunk.iter().fold((false, true, true, true), |f, &x| {
+                        let signed = centered(x, q);
+                        (
+                            f.0 | (x >= q),
+                            f.1 & i32::try_from(signed).is_ok(),
+                            f.2 & (-(1i128 << 26)..(1i128 << 26)).contains(&signed),
+                            f.3 & (-(1i128 << 27)..(1i128 << 27)).contains(&signed),
+                        )
+                    })
+                })
+                .reduce(
+                    || (false, true, true, true),
+                    |a, b| (a.0 | b.0, a.1 & b.1, a.2 & b.2, a.3 & b.3),
+                );
+            if flags.0 {
+                return Err(ReinspiringError::InvalidParams(
+                    "noncanonical native matrix".into(),
+                ));
             }
+            narrow &= flags.1;
+            fits27 &= flags.2;
+            packed28 &= flags.3;
         }
         let count = rows
             .checked_mul(cols)
