@@ -2,22 +2,26 @@
  * Checks the GPU block build (`gpu/block-build.ts`) against the CPU build, for one column block.
  *
  *   deno run --allow-read --allow-write --allow-run --allow-env bench/check-gpu-build.ts [--rows 2048,8192]
- *     [--seeds 1,2,3] [--stages] [--steps N] [--bin ipir/target/release] [--out FILE]
+ *     [--seeds 1,2,3] [--stages] [--steps N] [--sets today,10m] [--bin ipir/target/release] [--out FILE]
  *
  * Default: for each row count and seed, builds the block `pack_digest` builds (`cells(rows, seed)`) on the GPU and
  * compares `pack_digest`'s SHA-256 over every output word (hint masks, both public masks, the compiled matrix) with
  * the CPU's. `--stages`: instead compares each stage's output with the CPU's (`gpu_build_prep --expect`), and names
  * the first words that differ; with `--steps N`, only the first N steps of each chain are checked (the kernel always
- * runs them all, so this is for a chain kernel changed to stop early).
+ * runs them all, so this is for a chain kernel changed to stop early). `--sets`: also builds one block of each of the
+ * six tables of the block budget's sets at once (their chains in one dispatch) and compares each table's digest
+ * (table i has the cells of seed 100 + i). `--rows none` checks the sets only.
  *
  * Prints one JSON line per block: `{"rows","seed","equal",...}`. Exits 1 when any block differs. `--out FILE` also
  * writes the lines as a JSON array.
  */
-import { blockBuildDigest, GpuBlockBuild, parseBlockBuildPrep } from "../gpu/block-build.ts";
+import { blockBuildDigest, GpuBlockBuildSet, parseBlockBuildPrep } from "../gpu/block-build.ts";
+import { SET_ROWS } from "./gpu-build-sets.ts";
 import { openBenchGpu, options } from "./lib.ts";
 
 const opts = options(Deno.args);
-const rowsList = (opts.get("rows") ?? "2048,8192,16384,32768").split(",").map(Number);
+const rowsList = opts.get("rows") === "none" ? [] : (opts.get("rows") ?? "2048,8192,16384,32768").split(",").map(Number);
+const sets = (opts.get("sets") ?? "").split(",").filter(Boolean);
 const seeds = (opts.get("seeds") ?? "1,2,3").split(",").map(Number);
 const stages = opts.get("stages") === "true";
 const bin = opts.get("bin") ?? "ipir/target/release";
@@ -61,11 +65,40 @@ const tmp = await Deno.makeTempDir({ prefix: "ipir-gpu-build-" });
 const lines: Record<string, unknown>[] = [];
 let failed = false;
 try {
+  for (const name of sets) {
+    const rows = SET_ROWS[name];
+    if (!rows) throw new Error(`--sets takes today and 10m: ${name}`);
+    const preps = [];
+    for (const [i, r] of rows.entries()) {
+      await run(`${bin}/gpu_build_prep`, [String(r), `${tmp}/prep-${i}.bin`, "--cells", String(100 + i), `${tmp}/cells-${i}.u16`]);
+      preps.push(parseBlockBuildPrep(await Deno.readFile(`${tmp}/prep-${i}.bin`)));
+    }
+    const set = new GpuBlockBuildSet(device, preps);
+    for (const i of rows.keys()) {
+      const cells = await Deno.readFile(`${tmp}/cells-${i}.u16`);
+      set.uploadCells(i, new Uint16Array(cells.buffer, cells.byteOffset, cells.byteLength / 2));
+    }
+    const enc = device.createCommandEncoder();
+    set.encode(enc);
+    device.queue.submit([enc.finish()]);
+    await device.queue.onSubmittedWorkDone();
+    for (const [i, r] of rows.entries()) {
+      const got = await blockBuildDigest(set, i);
+      const want = (await run(`${bin}/pack_digest`, [String(r), String(100 + i)])).trim().split(/\s+/)[2];
+      const line: Record<string, unknown> = { set: name, table: i, rows: r, seed: 100 + i, equal: got.all === want, digest: got.all, expected: want };
+      if (errors.length) Object.assign(line, { equal: false, gpuErrors: errors.splice(0).map((e) => e.slice(0, 300)) });
+      if (!line.equal) failed = true;
+      lines.push(line);
+      console.log(JSON.stringify(line));
+    }
+    console.error(`set ${name}: ${Math.round(set.scratchBytes / 2 ** 20)} MiB besides the cells`);
+    set.destroy();
+  }
   for (const rows of rowsList) {
     await run(`${bin}/gpu_build_prep`, [String(rows), `${tmp}/prep.bin`]);
     const prep = parseBlockBuildPrep(await Deno.readFile(`${tmp}/prep.bin`));
     const t0 = performance.now();
-    const build = new GpuBlockBuild(device, prep);
+    const build = new GpuBlockBuildSet(device, [prep]);
     await device.queue.onSubmittedWorkDone();
     const setupMs = performance.now() - t0;
     const d = prep.header.d;
@@ -76,7 +109,7 @@ try {
         await run(`${bin}/gpu_build_prep`, [String(rows), `${tmp}/prep.bin`, "--expect", String(seed), `${tmp}/ref`, ...steps]);
         const ref = (name: string) => Deno.readFile(`${tmp}/ref/${name}`);
         const cells = await ref("cells.u16");
-        build.uploadCells(new Uint16Array(cells.buffer, cells.byteOffset, cells.byteLength / 2));
+        build.uploadCells(0, new Uint16Array(cells.buffer, cells.byteOffset, cells.byteLength / 2));
         const stage = async (names: ("hints" | "aggregation" | "chains" | "compile")[]) => {
           const enc = device.createCommandEncoder();
           for (const n of names) build.encodeStage(enc, n);
@@ -84,12 +117,12 @@ try {
           await device.queue.onSubmittedWorkDone();
         };
         await stage(["hints"]);
-        const masks = diff64(await build.read(build.masks), await ref("masks.u64"));
+        const masks = diff64(await build.readMasks(0), await ref("masks.u64"));
         await stage(["aggregation"]);
-        const before = diff64(await build.read(build.slots), await ref("slots-before.u64"));
+        const before = diff64(await build.readSlots(0), await ref("slots-before.u64"));
         await stage(["chains"]);
-        const after = diff64(await build.read(build.slots), await ref("slots-after.u64"));
-        const gd = new Int32Array((await build.read(build.digits)).buffer), rd = await ref("digits.i32");
+        const after = diff64(await build.readSlots(0), await ref("slots-after.u64"));
+        const gd = new Int32Array((await build.readDigits(0)).buffer), rd = await ref("digits.i32");
         const rdi = new Int32Array(rd.buffer, rd.byteOffset, rd.byteLength / 4);
         let digits = 0;
         // Only the rows the reference's steps wrote (all of them without --steps); unwritten rows are zero there.
@@ -98,7 +131,7 @@ try {
         let equal = masks.count === 0 && before.count === 0 && after.count === 0 && digits === 0;
         if (!opts.has("steps")) {
           await stage(["compile"]);
-          const m = new Int32Array((await build.read(build.matrix)).buffer);
+          const m = new Int32Array((await build.readMatrix(0)).buffer);
           const want = await ref("matrix.u64");
           const w = new Uint32Array(want.buffer, want.byteOffset, want.byteLength / 4);
           let matrix = 0;
@@ -111,7 +144,7 @@ try {
       } else {
         await run(`${bin}/gpu_build_prep`, [String(rows), `${tmp}/prep.bin`, "--cells", String(seed), `${tmp}/cells.u16`]);
         const cells = await Deno.readFile(`${tmp}/cells.u16`);
-        build.uploadCells(new Uint16Array(cells.buffer, cells.byteOffset, cells.byteLength / 2));
+        build.uploadCells(0, new Uint16Array(cells.buffer, cells.byteOffset, cells.byteLength / 2));
         const t = performance.now();
         const enc = device.createCommandEncoder();
         build.encode(enc);

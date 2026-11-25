@@ -26,6 +26,11 @@
  * 4. compile: per limb, eleven ring-FFT stages in i32, then the negacyclic shift into the matrix through a 32 × 32
  *    tile in workgroup memory. Row-major i32 words (2,048 rows of 4,096), the layout the CPU build stores.
  *
+ * A set builds one block of each of several tables at once (`GpuBlockBuildSet`): a chain block changes one column
+ * block of every table. The chains of all its tables run in one dispatch, two workgroups per table, side by side;
+ * a chain is 1,023 dependent steps on one workgroup, so run one after another six tables would take six times as
+ * long. The other stages already fill the GPU and run table after table, sharing their scratch buffers.
+ *
  * The device needs 1,024 invocations per workgroup and 32 KB of workgroup memory (`BLOCK_BUILD_LIMITS`); WebGPU's
  * defaults are 256 and 16 KB. Apple GPUs and NVIDIA GPUs through Vulkan have them.
  */
@@ -101,14 +106,34 @@ export function parseBlockBuildPrep(bytes: Uint8Array): BlockBuildPrep {
 
 const u = (x: number) => `${x >>> 0}u`;
 
+/** Sections of the constants every kernel but the hints' product reads, in the order they are laid out (KC). */
+const KC_SECTIONS = ["tables", "gadgetT", "gadgetQ", "exps", "invExps", "phatRows", "slotOfRow", "missingRows"] as const;
+
+/** One table's KC: each section's first word, and the length in words, padded so that tables can follow each other. */
+function kcLayout(prep: BlockBuildPrep): { offsets: Record<string, number>; words: number } {
+  const offsets: Record<string, number> = {};
+  let at = 0;
+  for (const name of KC_SECTIONS) {
+    const section = prep.header.sections.find((x) => x.name === name);
+    if (!section) throw new Error(`gpu_build_prep file: no section ${name}`);
+    offsets[name] = at;
+    at += section.words;
+  }
+  return { offsets, words: Math.ceil(at / 64) * 64 };
+}
+
+function section(prep: BlockBuildPrep, name: string): Uint32Array {
+  const at = prep.offsets[name];
+  const words = prep.header.sections.find((x) => x.name === name)?.words;
+  if (at === undefined || words === undefined) throw new Error(`gpu_build_prep file: no section ${name}`);
+  return prep.words.subarray(at, at + words);
+}
+
 /** Constants and scalar helpers shared by the kernels. */
 function commonWgsl(prep: BlockBuildPrep): string {
   const h = prep.header;
-  const o = (name: string): number => {
-    const at = prep.offsets[name];
-    if (at === undefined) throw new Error(`gpu_build_prep file: no section ${name}`);
-    return at;
-  };
+  const layout = kcLayout(prep);
+  const o = (name: string): number => layout.offsets[name]!;
   return /* wgsl */ `
 const D = ${u(h.d)};
 const LOGD = ${u(h.logd)};
@@ -135,10 +160,10 @@ const PROD1 = ${u(h.product[1])};
 const HALF0 = ${u(h.half[0])};
 const HALF1 = ${u(h.half[1])};
 const HALF2 = ${u(h.half[2])};
-// First words of the sections of K. Per prime, the transform tables are fwd, fwdq, inv, invq (D words each).
+// First words of the sections of one table's constants in K, and their length. Per prime, the transform tables are
+// fwd, fwdq, inv, invq (D words each).
+const KC_WORDS = ${u(layout.words)};
 const K_TABLES = ${u(o("tables"))};
-const K_HINT_T = ${u(o("hintT"))};
-const K_HINT_Q = ${u(o("hintQ"))};
 const K_GADGET_T = ${u(o("gadgetT"))};
 const K_GADGET_Q = ${u(o("gadgetQ"))};
 const K_EXPS = ${u(o("exps"))};
@@ -253,8 +278,9 @@ fn prime(j: u32) -> u32 {
 function hintsWgsl(prep: BlockBuildPrep): string {
   return /* wgsl */ `${commonWgsl(prep)}
 @group(0) @binding(0) var<storage, read> cells: array<u32>;        // 16-bit cells, column-major, two per word
-@group(0) @binding(1) var<storage, read> K: array<u32>;
-@group(0) @binding(2) var<storage, read_write> masks: array<u32>;  // [col][D] words of 54 bits, (low, high)
+@group(0) @binding(1) var<storage, read> K: array<u32>;            // this table's constants
+@group(0) @binding(2) var<storage, read> KH: array<u32>;           // the prepared query masks: [prime][poly][D], then their quotients
+@group(0) @binding(3) var<storage, read_write> masks: array<u32>;  // [col][D] words of 54 bits, (low, high)
 var<workgroup> buf: array<u32, ${3 * prep.header.d}>;               // three primes
 ${NTT_WGSL}
 ${CRT_WGSL}
@@ -285,12 +311,12 @@ fn hint_columns(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_
     }
     for (var j = 0u; j < 3u; j++) {
       let p = prime(j);
-      let w = K_HINT_T + (j * POLYS + poly) * D;
-      let wq = K_HINT_Q + (j * POLYS + poly) * D;
+      let w = (j * POLYS + poly) * D;
+      let wq = (3u * POLYS + j * POLYS + poly) * D;
       let v0 = red32(red32(buf[j * D + e0], 2u * p), p);
       let v1 = red32(red32(buf[j * D + e1], 2u * p), p);
-      acc[2u * j] = red32(acc[2u * j] + red32(mul_shoup32(v0, K[w + e0], K[wq + e0], p), p), p);
-      acc[2u * j + 1u] = red32(acc[2u * j + 1u] + red32(mul_shoup32(v1, K[w + e1], K[wq + e1], p), p), p);
+      acc[2u * j] = red32(acc[2u * j] + red32(mul_shoup32(v0, KH[w + e0], KH[wq + e0], p), p), p);
+      acc[2u * j + 1u] = red32(acc[2u * j + 1u] + red32(mul_shoup32(v1, KH[w + e1], KH[wq + e1], p), p), p);
     }
   }
   for (var j = 0u; j < 3u; j++) {
@@ -464,18 +490,15 @@ fn agg_last(@builtin(global_invocation_id) gid: vec3<u32>) {
 function chainsWgsl(prep: BlockBuildPrep): string {
   const h = prep.header;
   return /* wgsl */ `${commonWgsl(prep)}
-@group(0) @binding(0) var<storage, read_write> slots: array<u32>;   // [slot][D] (low, high)
-@group(0) @binding(1) var<storage, read_write> phat: array<i32>;    // the compile input, [limb][row][D]
-@group(0) @binding(2) var<storage, read> K: array<u32>;
+@group(0) @binding(0) var<storage, read_write> slots: array<u32>;   // [table][slot][D] (low, high)
+@group(0) @binding(1) var<storage, read_write> phat: array<i32>;    // the compile input, [table][limb][row][D]
+@group(0) @binding(2) var<storage, read> K: array<u32>;             // [table][KC_WORDS]
 var<workgroup> buf: array<u32, ${4 * h.d}>;
 ${NTT_WGSL}
 ${CRT_WGSL}
 const Z_MASK = ${u(2 ** h.gadgetBits - 1)};
 const HALF_Z = ${u(2 ** (h.gadgetBits - 1))};
 const ROUNDING = ${u(2 ** (h.droppedBits - 1))};
-const TAB0 = K_TABLES;
-const TAB1 = K_TABLES + 4u * D;
-const TAB2 = K_TABLES + 8u * D;
 // A centered digit modulo p.
 fn lift(v: i32, p: u32) -> u32 {
   return select(u32(v), u32(i32(p) + v), v < 0);
@@ -483,18 +506,27 @@ fn lift(v: i32, p: u32) -> u32 {
 
 @compute @workgroup_size(1024)
 fn trace_chains(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) tid: u32) {
-  let chain = wg.x;
-  let base = chain * HALF_D;
+  // Two workgroups per table: its two chains.
+  let table = wg.x >> 1u;
+  let chain = wg.x & 1u;
+  let kb = table * KC_WORDS;
+  let TAB0 = kb + K_TABLES;
+  let TAB1 = TAB0 + 4u * D;
+  let TAB2 = TAB0 + 8u * D;
+  let GT = kb + K_GADGET_T;
+  let GQ = kb + K_GADGET_Q;
+  let slot0 = table * D + chain * HALF_D;
+  let pb = table * 2u * D * D;
   let e0 = 2u * tid;
   let e1 = e0 + 1u;
   for (var step = 0u; step < STEPS; step++) {
     let idx = HALF_D - 1u - step;
     let gstep = chain * STEPS + step;
-    let g = K[K_EXPS + gstep];
-    let ginv = K[K_INV_EXPS + gstep];
-    let prow = K[K_PHAT_ROWS + gstep];
-    let src = (base + idx) * D;
-    let dst = (base + idx - 1u) * D;
+    let g = K[kb + K_EXPS + gstep];
+    let ginv = K[kb + K_INV_EXPS + gstep];
+    let prow = K[kb + K_PHAT_ROWS + gstep];
+    let src = (slot0 + idx) * D;
+    let dst = (slot0 + idx - 1u) * D;
     var dig: array<i32, 4>;     // [limb][k]
     var pos: array<u32, 2>;
     var neg: array<bool, 2>;
@@ -516,8 +548,8 @@ fn trace_chains(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_
       let d1 = i32((x1 + HALF_Z) & Z_MASK) - i32(HALF_Z);
       dig[k] = d0;
       dig[2u + k] = d1;
-      phat[prow * D + i] = d0;
-      phat[(D + prow) * D + i] = d1;
+      phat[pb + prow * D + i] = d0;
+      phat[pb + (D + prow) * D + i] = d1;
       let e = (i * ginv) & (2u * D - 1u);
       pos[k] = e & (D - 1u);
       neg[k] = e >= D;
@@ -543,12 +575,12 @@ fn trace_chains(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_
       let e = e0 + k;
       let a0 = red32(red32(buf[e], 2u * P0), P0);
       let a1 = red32(red32(buf[D + e], 2u * P0), P0);
-      var s = red32(mul_shoup32(a0, K[K_GADGET_T + e], K[K_GADGET_Q + e], P0), P0);
-      s = red32(s + red32(mul_shoup32(a1, K[K_GADGET_T + D + e], K[K_GADGET_Q + D + e], P0), P0), P0);
+      var s = red32(mul_shoup32(a0, K[GT + e], K[GQ + e], P0), P0);
+      s = red32(s + red32(mul_shoup32(a1, K[GT + D + e], K[GQ + D + e], P0), P0), P0);
       let b0 = red32(red32(buf[2u * D + e], 2u * P1), P1);
       let b1 = red32(red32(buf[3u * D + e], 2u * P1), P1);
-      var s1 = red32(mul_shoup32(b0, K[K_GADGET_T + 2u * D + e], K[K_GADGET_Q + 2u * D + e], P1), P1);
-      s1 = red32(s1 + red32(mul_shoup32(b1, K[K_GADGET_T + 3u * D + e], K[K_GADGET_Q + 3u * D + e], P1), P1), P1);
+      var s1 = red32(mul_shoup32(b0, K[GT + 2u * D + e], K[GQ + 2u * D + e], P1), P1);
+      s1 = red32(s1 + red32(mul_shoup32(b1, K[GT + 3u * D + e], K[GQ + 3u * D + e], P1), P1), P1);
       buf[e] = s;
       buf[2u * D + e] = s1;
     }
@@ -576,8 +608,8 @@ fn trace_chains(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_
       let e = e0 + k;
       let a0 = red32(red32(buf[D + e], 2u * P2), P2);
       let a1 = red32(red32(buf[3u * D + e], 2u * P2), P2);
-      var s = red32(mul_shoup32(a0, K[K_GADGET_T + 4u * D + e], K[K_GADGET_Q + 4u * D + e], P2), P2);
-      s = red32(s + red32(mul_shoup32(a1, K[K_GADGET_T + 5u * D + e], K[K_GADGET_Q + 5u * D + e], P2), P2), P2);
+      var s = red32(mul_shoup32(a0, K[GT + 4u * D + e], K[GQ + 4u * D + e], P2), P2);
+      s = red32(s + red32(mul_shoup32(a1, K[GT + 5u * D + e], K[GQ + 5u * D + e], P2), P2), P2);
       buf[D + e] = s;
     }
     // C.
@@ -664,48 +696,87 @@ fn cmp_matrix(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_id
 export type BlockBuildStage = "hints" | "aggregation" | "chains" | "compile";
 export const BLOCK_BUILD_STAGES: readonly BlockBuildStage[] = ["hints", "aggregation", "chains", "compile"];
 
-/** The build of one table shape's column blocks: pipelines, constant tables and working buffers. */
-export class GpuBlockBuild {
+type Pass = { pipeline: GPUComputePipeline; group: GPUBindGroup; workgroups: [number, number, number] };
+type Slice = { buffer: GPUBuffer; offset?: number; size?: number };
+
+/**
+ * The build of one column block of each of several tables (one table: a set of one): pipelines, constant tables,
+ * outputs and scratch. Per table it keeps the cells, the hint masks, the slots, the compile input and the matrix;
+ * the aggregation's scratch and the compile's second buffer are shared, since those stages run table after table.
+ */
+export class GpuBlockBuildSet {
   readonly device: GPUDevice;
-  readonly header: BlockBuildHeader;
-  /** The block's cells, 16 bits each, column-major (`rows × 2,048`). */
-  readonly cells: GPUBuffer;
-  /** Output: the hint mask of each column, 2,048 words of 54 bits as (low, high) u32. */
-  readonly masks: GPUBuffer;
-  /** Output after the chains: slot 0 is the mask, slot 1,024 the other mask; words as (low, high) u32. */
-  readonly slots: GPUBuffer;
-  /** Output: the compiled matrix, 2,048 rows of 4,096 i32 words, row-major. */
-  readonly matrix: GPUBuffer;
-  /** The compile input the chains write (digits): `[limb][row][2,048]` i32. Kept for checks. */
-  readonly digits: GPUBuffer;
-  readonly #passes: Record<BlockBuildStage, { pipeline: GPUComputePipeline; group: GPUBindGroup; workgroups: [number, number, number] }[]>;
+  readonly headers: BlockBuildHeader[];
+  readonly #cells: GPUBuffer[] = [];
+  readonly #masks: GPUBuffer[] = [];
+  readonly #matrix: GPUBuffer[] = [];
+  /** `[table][slot][2,048]` words as (low, high) u32. */
+  readonly #slots: GPUBuffer;
+  /** The compile input the chains write (digits): `[table][limb][row][2,048]` i32. */
+  readonly #digits: GPUBuffer;
+  readonly #passes: Record<BlockBuildStage, Pass[]>;
   readonly #buffers: GPUBuffer[] = [];
 
-  constructor(device: GPUDevice, prep: BlockBuildPrep) {
+  /**
+   * `sharedMasks`: one hint-mask buffer for all tables instead of one each (32 MiB a table less). Each table's hints
+   * are then aggregated before the next table's are computed, so only the last table's masks can be read afterwards,
+   * and the hints' time is part of the aggregation stage's. For a caller that does not read the hint masks.
+   */
+  constructor(device: GPUDevice, preps: BlockBuildPrep[], options: { sharedMasks?: boolean } = {}) {
     for (const [k, v] of Object.entries(BLOCK_BUILD_LIMITS)) {
       const have = device.limits[k as keyof typeof BLOCK_BUILD_LIMITS];
       if (have < v) throw new Error(`the GPU block build needs ${k} >= ${v}; this device was opened with ${have}`);
     }
+    if (preps.length === 0) throw new Error("a set needs at least one table");
     this.device = device;
-    const h = this.header = prep.header;
+    this.headers = preps.map((p) => p.header);
+    const first = preps[0]!;
+    const h = first.header;
+    // Everything but the rows (and so the hint operands) must be the same for every table: one set of kernels.
+    const same = (x: BlockBuildHeader) => JSON.stringify({ ...x, rows: 0, polys: 0, sections: 0 });
+    for (const p of preps) if (same(p.header) !== same(h)) throw new Error("the tables of a set must share their parameters");
+    const n = preps.length;
     const d = h.d;
     const dd = d * d;
+    const layout = kcLayout(first);
     const STORAGE = GPUBufferUsage.STORAGE;
+    const READABLE = STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
     const buffer = (size: number, usage: number) => {
       const b = device.createBuffer({ size, usage });
       this.#buffers.push(b);
       return b;
     };
-    const k = buffer(prep.words.byteLength, STORAGE | GPUBufferUsage.COPY_DST);
-    writeView(device, k, 0, prep.words);
-    this.cells = buffer(h.rows * d * 2, STORAGE | GPUBufferUsage.COPY_DST);
-    this.masks = buffer(dd * 8, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
-    this.slots = buffer(dd * 8, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
-    this.matrix = buffer(2 * dd * 4, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
-    const agg64 = [buffer(dd * 8, STORAGE), buffer(dd * 8, STORAGE)];
+    // Constants: every table's KC one after another (the chains read them all), and each table's hint operands.
+    const kcWords = new Uint32Array(n * layout.words);
+    preps.forEach((p, t) => {
+      if (kcLayout(p).words !== layout.words) throw new Error("the tables of a set must share their constants' layout");
+      for (const name of KC_SECTIONS) kcWords.set(section(p, name), t * layout.words + layout.offsets[name]!);
+    });
+    const kc = buffer(kcWords.byteLength, STORAGE | GPUBufferUsage.COPY_DST);
+    writeView(device, kc, 0, kcWords);
+    const kcBytes = layout.words * 4;
+    const kh = preps.map((p) => {
+      const t = section(p, "hintT"), q = section(p, "hintQ");
+      const words = new Uint32Array(t.length + q.length);
+      words.set(t, 0);
+      words.set(q, t.length);
+      const b = buffer(words.byteLength, STORAGE | GPUBufferUsage.COPY_DST);
+      writeView(device, b, 0, words);
+      return b;
+    });
+    const oneMasks = options.sharedMasks ? buffer(dd * 8, READABLE) : null;
+    for (const p of preps) {
+      this.#cells.push(buffer(p.header.rows * d * 2, STORAGE | GPUBufferUsage.COPY_DST));
+      this.#masks.push(oneMasks ?? buffer(dd * 8, READABLE));
+      this.#matrix.push(buffer(2 * dd * 4, READABLE));
+    }
+    this.#slots = buffer(n * dd * 8, READABLE);
+    this.#digits = buffer(n * 2 * dd * 4, READABLE);
+    // The compile's second buffer doubles as one of the aggregation's (same size; a table's aggregation ends
+    // before any compile starts).
+    const phatB = buffer(2 * dd * 4, STORAGE);
+    const agg64 = [phatB, buffer(dd * 8, STORAGE)];
     const agg128 = buffer(dd * 16, STORAGE);
-    const phat = [buffer(2 * dd * 4, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST), buffer(2 * dd * 4, STORAGE)];
-    this.digits = phat[0]!;
     // One uniform word per ring-FFT stage: its length.
     const lens: GPUBuffer[] = [];
     for (let s = 0; s < h.logd; s++) {
@@ -715,47 +786,85 @@ export class GpuBlockBuild {
     }
     const pipeline = (code: string, entryPoint: string) =>
       device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint } });
-    const group = (p: GPUComputePipeline, buffers: GPUBuffer[]) =>
-      device.createBindGroup({ layout: p.getBindGroupLayout(0), entries: buffers.map((b, binding) => ({ binding, resource: { buffer: b } })) });
-    const pass = (p: GPUComputePipeline, buffers: GPUBuffer[], workgroups: [number, number, number]) => ({ pipeline: p, group: group(p, buffers), workgroups });
-
-    const hint = pipeline(hintsWgsl(prep), "hint_columns");
-    const zero = pipeline(compileWgsl(prep, "zero"), "zero_rows");
-    const gather = pipeline(aggregationWgsl(prep, "gather"), "agg_gather");
-    const stage64 = pipeline(aggregationWgsl(prep, "stage64"), "agg_stage64");
-    const widen = pipeline(aggregationWgsl(prep, "widen"), "agg_widen");
-    const last = pipeline(aggregationWgsl(prep, "last"), "agg_last");
-    const chains = pipeline(chainsWgsl(prep), "trace_chains");
-    const cmpStage = pipeline(compileWgsl(prep, "stage"), "cmp_stage");
-    const cmpMatrix = pipeline(compileWgsl(prep, "matrix"), "cmp_matrix");
+    const pass = (p: GPUComputePipeline, slices: Slice[], workgroups: [number, number, number]): Pass => ({
+      pipeline: p,
+      group: device.createBindGroup({ layout: p.getBindGroupLayout(0), entries: slices.map((resource, binding) => ({ binding, resource })) }),
+      workgroups,
+    });
+    // The hints' kernel has the table's rows in it: one per distinct row count.
+    const hintPipelines = new Map<number, GPUComputePipeline>();
+    const hint = (p: BlockBuildPrep) => {
+      let pl = hintPipelines.get(p.header.rows);
+      if (!pl) hintPipelines.set(p.header.rows, pl = pipeline(hintsWgsl(p), "hint_columns"));
+      return pl;
+    };
+    const zero = pipeline(compileWgsl(first, "zero"), "zero_rows");
+    const gather = pipeline(aggregationWgsl(first, "gather"), "agg_gather");
+    const stage64 = pipeline(aggregationWgsl(first, "stage64"), "agg_stage64");
+    const widen = pipeline(aggregationWgsl(first, "widen"), "agg_widen");
+    const last = pipeline(aggregationWgsl(first, "last"), "agg_last");
+    const chains = pipeline(chainsWgsl(first), "trace_chains");
+    const cmpStage = pipeline(compileWgsl(first, "stage"), "cmp_stage");
+    const cmpMatrix = pipeline(compileWgsl(first, "matrix"), "cmp_matrix");
 
     const x = d / 256;
-    const hints = [pass(hint, [this.cells, k, this.masks], [d, 1, 1])];
-    if (h.missingRows > 0) hints.push(pass(zero, [phat[0]!, k], [x, h.missingRows, 2]));
-    // Aggregation: the gather writes agg64[0]; i64 stage s reads agg64[s % 2].
-    const aggregation = [pass(gather, [this.masks, agg64[0]!], [x, d, 1])];
-    for (let s = 0; s < h.i64Stages; s++) aggregation.push(pass(stage64, [agg64[s % 2]!, agg64[(s + 1) % 2]!, lens[s]!], [x, d / 2, 1]));
-    aggregation.push(pass(widen, [agg64[h.i64Stages % 2]!, agg128, lens[h.i64Stages]!], [x, d / 2, 1]));
-    aggregation.push(pass(last, [agg128, this.slots, k], [x, d / 2, 1]));
-    // Compile: stage s reads phat[s % 2]; the matrix reads the last stage's output.
-    const compile: ReturnType<typeof pass>[] = [];
-    for (let s = 0; s < h.logd; s++) compile.push(pass(cmpStage, [phat[s % 2]!, phat[(s + 1) % 2]!, lens[s]!], [x, d / 2, 2]));
-    compile.push(pass(cmpMatrix, [phat[h.logd % 2]!, this.matrix], [d / 32, d / 32, 2]));
-    this.#passes = { hints, aggregation, chains: [pass(chains, [this.slots, phat[0]!, k], [2, 1, 1])], compile };
+    const hints: Pass[] = [], aggregation: Pass[] = [], compile: Pass[] = [];
+    preps.forEach((p, t) => {
+      const k: Slice = { buffer: kc, offset: t * kcBytes, size: kcBytes };
+      const slots: Slice = { buffer: this.#slots, offset: t * dd * 8, size: dd * 8 };
+      const phatA: Slice = { buffer: this.#digits, offset: t * 2 * dd * 4, size: 2 * dd * 4 };
+      const phat = [phatA, { buffer: phatB }];
+      // With one masks buffer, a table's hints go right before its aggregation.
+      const hintPasses = oneMasks ? aggregation : hints;
+      hintPasses.push(pass(hint(p), [{ buffer: this.#cells[t]! }, k, { buffer: kh[t]! }, { buffer: this.#masks[t]! }], [d, 1, 1]));
+      if (h.missingRows > 0) hintPasses.push(pass(zero, [phatA, k], [x, h.missingRows, 2]));
+      // Aggregation: the gather writes agg64[0]; i64 stage s reads agg64[s % 2].
+      aggregation.push(pass(gather, [{ buffer: this.#masks[t]! }, { buffer: agg64[0]! }], [x, d, 1]));
+      for (let s = 0; s < h.i64Stages; s++) {
+        aggregation.push(pass(stage64, [{ buffer: agg64[s % 2]! }, { buffer: agg64[(s + 1) % 2]! }, { buffer: lens[s]! }], [x, d / 2, 1]));
+      }
+      aggregation.push(pass(widen, [{ buffer: agg64[h.i64Stages % 2]! }, { buffer: agg128 }, { buffer: lens[h.i64Stages]! }], [x, d / 2, 1]));
+      aggregation.push(pass(last, [{ buffer: agg128 }, slots, k], [x, d / 2, 1]));
+      // Compile: stage s reads phat[s % 2]; the matrix reads the last stage's output.
+      for (let s = 0; s < h.logd; s++) compile.push(pass(cmpStage, [phat[s % 2]!, phat[(s + 1) % 2]!, { buffer: lens[s]! }], [x, d / 2, 2]));
+      compile.push(pass(cmpMatrix, [phat[h.logd % 2]!, { buffer: this.#matrix[t]! }], [d / 32, d / 32, 2]));
+    });
+    // The chains of every table in one dispatch: two workgroups per table.
+    this.#passes = { hints, aggregation, chains: [pass(chains, [{ buffer: this.#slots }, { buffer: this.#digits }, { buffer: kc }], [2 * n, 1, 1])], compile };
   }
 
-  /** Bytes of GPU memory the build holds besides the cells: tables, outputs and scratch. */
+  get tables(): number {
+    return this.headers.length;
+  }
+
+  /** Bytes of GPU memory the set holds besides the cells: tables, outputs and scratch. */
   get scratchBytes(): number {
-    return this.#buffers.reduce((n, b) => n + b.size, 0) - this.cells.size;
+    return this.#buffers.reduce((n, b) => n + b.size, 0) - this.#cells.reduce((n, b) => n + b.size, 0);
   }
 
-  /** Writes a block's cells (`rows × 2,048`, column-major). */
-  uploadCells(cells: Uint16Array): void {
-    if (cells.length !== this.header.rows * this.header.d) throw new Error("uploadCells: wrong number of cells");
-    writeView(this.device, this.cells, 0, cells);
+  /** Table `table`'s cells buffer: 16 bits each, column-major (`rows × 2,048`). */
+  cells(table: number): GPUBuffer {
+    return this.#cells[table]!;
   }
 
-  /** One stage as one compute pass. */
+  /** Output: the hint mask of each column of table `table`, 2,048 words of 54 bits as (low, high) u32. */
+  masks(table: number): GPUBuffer {
+    return this.#masks[table]!;
+  }
+
+  /** Output: table `table`'s compiled matrix, 2,048 rows of 4,096 i32 words, row-major. */
+  matrix(table: number): GPUBuffer {
+    return this.#matrix[table]!;
+  }
+
+  /** Writes one block's cells (`rows × 2,048`, column-major) for table `table`. */
+  uploadCells(table: number, cells: Uint16Array): void {
+    const h = this.headers[table]!;
+    if (cells.length !== h.rows * h.d) throw new Error("uploadCells: wrong number of cells");
+    writeView(this.device, this.#cells[table]!, 0, cells);
+  }
+
+  /** One stage of every table as one compute pass. */
   encodeStage(enc: GPUCommandEncoder, stage: BlockBuildStage, timestampWrites?: GPUComputePassTimestampWrites): void {
     const pass = enc.beginComputePass(timestampWrites ? { timestampWrites } : {});
     for (const p of this.#passes[stage]) {
@@ -774,11 +883,10 @@ export class GpuBlockBuild {
     });
   }
 
-  /** Reads a buffer back (for checks; not part of a build's time). */
-  async read(buffer: GPUBuffer, bytes = buffer.size): Promise<Uint8Array> {
+  async #read(buffer: GPUBuffer, offset: number, bytes: number): Promise<Uint8Array> {
     const staging = this.device.createBuffer({ size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     const enc = this.device.createCommandEncoder();
-    enc.copyBufferToBuffer(buffer, 0, staging, 0, bytes);
+    enc.copyBufferToBuffer(buffer, offset, staging, 0, bytes);
     this.device.queue.submit([enc.finish()]);
     await staging.mapAsync(GPUMapMode.READ);
     const out = new Uint8Array(staging.getMappedRange().slice(0));
@@ -787,12 +895,29 @@ export class GpuBlockBuild {
     return out;
   }
 
+  // Read-backs, for checks; not part of a build's time.
+  readMasks(table: number): Promise<Uint8Array> {
+    return this.#read(this.#masks[table]!, 0, this.#masks[table]!.size);
+  }
+  /** After the chains: slot 0 is the mask, slot 1,024 the other mask. */
+  readSlots(table: number): Promise<Uint8Array> {
+    const bytes = this.headers[0]!.d ** 2 * 8;
+    return this.#read(this.#slots, table * bytes, bytes);
+  }
+  readDigits(table: number): Promise<Uint8Array> {
+    const bytes = 2 * this.headers[0]!.d ** 2 * 4;
+    return this.#read(this.#digits, table * bytes, bytes);
+  }
+  readMatrix(table: number): Promise<Uint8Array> {
+    return this.#read(this.#matrix[table]!, 0, this.#matrix[table]!.size);
+  }
+
   destroy(): void {
     for (const b of this.#buffers) b.destroy();
   }
 }
 
-/** `2^54`-word helpers for the digest: i32 matrix words as canonical words modulo q, (low, high) u32. */
+/** i32 matrix words as canonical words modulo q = 2^qBits, (low, high) u32. */
 function canonicalWords(matrix: Int32Array, qBits: number): Uint32Array {
   const out = new Uint32Array(matrix.length * 2);
   const high = 2 ** (qBits - 32) - 1;
@@ -807,14 +932,14 @@ function canonicalWords(matrix: Int32Array, qBits: number): Uint32Array {
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 
 /**
- * `pack_digest`'s digest of a build's output words (`ipir/bench/src/bin/pack_digest.rs`): SHA-256 over two part
+ * `pack_digest`'s digest of one table's output words (`ipir/bench/src/bin/pack_digest.rs`): SHA-256 over two part
  * digests, one over the hint masks of every column, one over both public masks, the storage label, the dimensions
  * and q, and the compiled matrix's canonical words. Equal digests: every output word equals the CPU build's.
  */
-export async function blockBuildDigest(build: GpuBlockBuild): Promise<{ all: string; hints: string; packing: string }> {
-  const h = build.header;
+export async function blockBuildDigest(set: GpuBlockBuildSet, table = 0): Promise<{ all: string; hints: string; packing: string }> {
+  const h = set.headers[table]!;
   const d = h.d;
-  const [masks, slots, matrixBytes] = await Promise.all([build.read(build.masks), build.read(build.slots), build.read(build.matrix)]);
+  const [masks, slots, matrixBytes] = await Promise.all([set.readMasks(table), set.readSlots(table), set.readMatrix(table)]);
   const matrix = canonicalWords(new Int32Array(matrixBytes.buffer), h.qBits);
   const label = new TextEncoder().encode("i32");
   const dims = new Uint32Array([d, 0, 2 * d, 0, 0, 2 ** (h.qBits - 32)]);
