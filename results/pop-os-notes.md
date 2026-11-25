@@ -49,12 +49,12 @@ reports these failures as "does not fit", although each table uses a small part 
 
 ## The Vulkan layer
 
-The `*-hidebudget` runs load a Vulkan layer that removes `VK_EXT_memory_budget` from the list that
-`vkEnumerateDeviceExtensionProperties` returns. Without that extension, wgpu skips both budget checks. The shaders, the
-buffers, and the allocator stay the same. The layer needs no root:
-`VK_LAYER_PATH=<dir> VK_INSTANCE_LAYERS=VK_LAYER_IPIRBENCH_hide_memory_budget`.
+The `*-hidebudget` runs load the Vulkan layer in `tools/hide-memory-budget-layer/`. It removes `VK_EXT_memory_budget`
+from the list that `vkEnumerateDeviceExtensionProperties` returns. Without that extension, wgpu skips both budget
+checks. The shaders, the buffers, and the allocator stay the same. The folder's README shows how to build the layer and
+how to run the benchmark with it. The layer needs no root.
 
-With the layer, buffers from 4 KiB to 512 MiB allocate, and every fetch shape up to 32768 × 32768 (2.5 GiB resident)
+With the layer, buffers from 4 KiB to 1 GiB allocate, and every fetch shape up to 32768 × 32768 (2.5 GiB resident)
 runs.
 
 ## What the numbers show
@@ -68,7 +68,3 @@ The 2026-11-24 full run's block work p50 is 6 to 16 % higher in every budget cel
 last `today` cells and the `10m` set, and the first `today` cells differ by as much, so that test does not explain all
 of it. The quiet run is the reference for this host. The GPU fetch times of the two runs agree, for example 2.16 and
 2.15 ms of GPU time for a call of 32 at 2048 × 2048.
-
-Branch `cpu-compile-optimization` has a patch that makes the CPU compile about three times faster with the same
-output words, and a full run with it (`pop-os-2026-11-25-hidebudget-opt`). With the patch, 354 of the 360 blocks
-finish within 3 s.
