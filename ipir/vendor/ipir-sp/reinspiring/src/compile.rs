@@ -29,6 +29,19 @@ pub fn tau_coeffs(p: &[u64], g: u64, q: u64) -> Vec<u64> {
     let d = p.len();
     let two_d = 2 * d as u64;
     let mut out = vec![0u64; d];
+    if d.is_power_of_two() && q.is_power_of_two() && g % 2 == 1 {
+        // An odd g permutes the d slots, so each slot is written once from zero:
+        // the remainders below equal the general loop's, without division or
+        // a sign branch that mispredicts on the permutation's irregular pattern.
+        let mask = q - 1;
+        for (i, &c) in p.iter().enumerate() {
+            let e = (i as u64).wrapping_mul(g) & (two_d - 1);
+            let c = c & mask;
+            out[e as usize & (d - 1)] =
+                std::hint::select_unpredictable(e >= d as u64, c.wrapping_neg() & mask, c);
+        }
+        return out;
+    }
     for (i, &c) in p.iter().enumerate() {
         let e = (i as u64 * g) % two_d;
         if e < d as u64 {
@@ -416,4 +429,57 @@ pub fn ring_fft_eval_pow2(polys: &[Vec<u64>], q: u64) -> Vec<Vec<u64>> {
     }
     ring_fft_inplace(&mut a, q);
     a
+}
+
+#[cfg(test)]
+mod tau_fast_path_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+
+    // tau_coeffs before the power-of-two fast path, verbatim.
+    fn tau_coeffs_reference(p: &[u64], g: u64, q: u64) -> Vec<u64> {
+        let d = p.len();
+        let two_d = 2 * d as u64;
+        let mut out = vec![0u64; d];
+        for (i, &c) in p.iter().enumerate() {
+            let e = (i as u64 * g) % two_d;
+            if e < d as u64 {
+                let idx = e as usize;
+                out[idx] = (out[idx] + c) % q;
+            } else {
+                let idx = (e - d as u64) as usize;
+                out[idx] = (out[idx] + q - (c % q)) % q;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn fast_path_equals_general_loop() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0x7a0);
+        for d in [1usize, 2, 8, 64, 2048, 4096] {
+            for q in [2u64, 1 << 16, 1 << 54, 1 << 56, 1 << 62, 12289] {
+                let mut gs: Vec<u64> = (0..2 * d as u64).collect();
+                if d > 64 {
+                    gs = (0..64).map(|_| rng.gen_range(0..2 * d as u64)).collect();
+                    gs.extend([1, 2 * d as u64 - 1, 5, 4 * d as u64 + 3]);
+                }
+                for g in gs {
+                    // Canonical and non-canonical coefficients, including 0 and q.
+                    let p: Vec<u64> = (0..d)
+                        .map(|i| match i % 4 {
+                            0 => 0,
+                            1 => q,
+                            _ => rng.gen::<u64>() >> rng.gen_range(0..64),
+                        })
+                        .collect();
+                    assert_eq!(
+                        tau_coeffs(&p, g, q),
+                        tau_coeffs_reference(&p, g, q),
+                        "d={d} q={q} g={g}"
+                    );
+                }
+            }
+        }
+    }
 }

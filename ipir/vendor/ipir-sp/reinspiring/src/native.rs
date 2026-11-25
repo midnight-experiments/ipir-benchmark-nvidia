@@ -1165,17 +1165,21 @@ impl NativePreprocessed {
 pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, ReinspiringError> {
     validate_poly(a, p)?;
     let mut out = vec![vec![0; p.d]; p.ell];
-    let z = 1i128 << p.bits;
+    // NativeParams fixes q = 2^q_bits <= 2^56 and bits, dropped <= 27, and a < q,
+    // so every intermediate is a non-negative i64 (digits aside): masks equal the
+    // Euclidean remainders and shifts the exact divisions of the i128 definition.
+    let z = 1i64 << p.bits;
+    let rounding = if p.dropped == 0 {
+        0
+    } else {
+        1i64 << (p.dropped - 1)
+    };
     for (i, &a) in a.iter().enumerate() {
-        let mut x = if p.dropped == 0 {
-            a as i128
-        } else {
-            (a as i128 + (1i128 << (p.dropped - 1))) >> p.dropped
-        };
+        let mut x = (a as i64 + rounding) >> p.dropped;
         for limb in &mut out {
-            let digit = (x + z / 2).rem_euclid(z) - z / 2;
-            limb[i] = digit.rem_euclid(p.q as i128) as u64;
-            x = (x - digit) / z;
+            let digit = ((x + z / 2) & (z - 1)) - z / 2;
+            limb[i] = digit as u64 & (p.q - 1);
+            x = (x - digit) >> p.bits;
         }
     }
     Ok(out)
@@ -1307,6 +1311,70 @@ fn validate_poly(a: &[u64], p: &NativeParams) -> Result<(), ReinspiringError> {
         Err(invalid("wrong degree or noncanonical coefficient"))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod decompose_fast_path_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+
+    // decompose before the i64 rewrite, verbatim.
+    fn decompose_reference(a: &[u64], p: &NativeParams) -> Vec<Vec<u64>> {
+        let mut out = vec![vec![0; p.d]; p.ell];
+        let z = 1i128 << p.bits;
+        for (i, &a) in a.iter().enumerate() {
+            let mut x = if p.dropped == 0 {
+                a as i128
+            } else {
+                (a as i128 + (1i128 << (p.dropped - 1))) >> p.dropped
+            };
+            for limb in &mut out {
+                let digit = (x + z / 2).rem_euclid(z) - z / 2;
+                limb[i] = digit.rem_euclid(p.q as i128) as u64;
+                x = (x - digit) / z;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn i64_digits_equal_i128_definition_for_every_profile() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xdec0);
+        let mut profiles = 0;
+        for q_bits in 16..=56u32 {
+            for bits in 1..=MAX_GADGET_BITS {
+                for ell in 1..=8 {
+                    let Ok(p) =
+                        NativeParams::new(8, q_bits, 1, bits, ell, SecretDistribution::Gaussian)
+                    else {
+                        continue;
+                    };
+                    profiles += 1;
+                    let (q, step) = (p.q, 1u64 << p.dropped);
+                    let mut values = vec![0, 1, q - 1, q / 2, q / 2 - 1, q / 2 + 1];
+                    // Both sides of every rounding and digit boundary near random points.
+                    for _ in 0..8 {
+                        let base = rng.gen::<u64>() & (q - 1) & !(step - 1);
+                        for delta in [0, step / 2, step / 2 + 1, step - 1] {
+                            values.push(base.wrapping_add(delta).wrapping_sub(1) & (q - 1));
+                            values.push(base.wrapping_add(delta) & (q - 1));
+                        }
+                    }
+                    values.extend((0..16).map(|_| rng.gen::<u64>() & (q - 1)));
+                    for chunk in values.chunks(8) {
+                        let mut a = chunk.to_vec();
+                        a.resize(8, q - 1);
+                        assert_eq!(
+                            decompose(&a, &p).unwrap(),
+                            decompose_reference(&a, &p),
+                            "q_bits={q_bits} bits={bits} ell={ell} a={a:?}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(profiles > 1000, "only {profiles} profiles");
     }
 }
 
