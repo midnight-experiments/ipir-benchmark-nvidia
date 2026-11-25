@@ -6,7 +6,7 @@ pub use ipir_native_client::{
 };
 use rayon::prelude::*;
 use reinspiring::{
-    lift_ntt::{LiftContext, PreparedPublicDot},
+    lift_ntt::LiftContext,
     native::{NativeKeys, NativePreprocessed},
     ReinspiringError,
 };
@@ -233,7 +233,17 @@ impl NativeServer {
                 .into_par_iter()
                 .map(|block| {
                     let hint_start = Instant::now();
-                    let masks = hint_masks(&lift, &public_polys, &db, p.rows(), d, block)?;
+                    let masks: Result<Vec<_>, _> = (block * d..(block + 1) * d)
+                        .into_par_iter()
+                        .map(|col| {
+                            let coeffs: Vec<Vec<u64>> = db[col * p.rows()..(col + 1) * p.rows()]
+                                .chunks_exact(d)
+                                .map(|poly| poly.iter().map(|&x| x.into()).collect())
+                                .collect();
+                            lift.public_dot(&public_polys, &coeffs)
+                        })
+                        .collect();
+                    let masks = masks?;
                     let hint = hint_start.elapsed();
                     let pack_start = Instant::now();
                     let timed = |(pre, analysis)| (pre, analysis, hint, pack_start.elapsed());
@@ -306,24 +316,6 @@ impl NativeServer {
             },
             analyses,
         ))
-    }
-    /// Feeds the database layout and every retained output word of every block to
-    /// `sink`, so a program can compare builds bit for bit. Read only.
-    #[doc(hidden)]
-    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
-        sink(&[self.interleaved as u8]);
-        match &self.db {
-            NativeDatabase::U16(x) => {
-                for chunk in x.chunks(1 << 16) {
-                    let bytes: Vec<u8> = chunk.iter().flat_map(|v| v.to_le_bytes()).collect();
-                    sink(&bytes);
-                }
-            }
-            NativeDatabase::U8(x) => sink(x),
-        }
-        for block in &self.pre {
-            block.digest_words(sink);
-        }
     }
     /// Bytes retained for database entries (1 per entry for 8-bit storage, else 2).
     pub fn database_bytes(&self) -> usize {
@@ -479,46 +471,6 @@ impl NativeServer {
             },
         ))
     }
-}
-
-/// Database-by-query-mask hints of one output block: for each of its d columns, the
-/// public dot product of the column (as rows/d polynomials) with the query masks.
-fn hint_masks<T: DatabaseEntry>(
-    lift: &LiftContext,
-    public_polys: &PreparedPublicDot,
-    db: &[T],
-    rows: usize,
-    d: usize,
-    block: usize,
-) -> Result<Vec<Vec<u64>>, ReinspiringError> {
-    (block * d..(block + 1) * d)
-        .into_par_iter()
-        .map(|col| {
-            let coeffs: Vec<Vec<u64>> = db[col * rows..(col + 1) * rows]
-                .chunks_exact(d)
-                .map(|poly| poly.iter().map(|&x| x.into()).collect())
-                .collect();
-            lift.public_dot(public_polys, &coeffs)
-        })
-        .collect()
-}
-
-/// The hints `NativeServer::build_with_concurrency` computes for every output block,
-/// through the same code, for bit-for-bit comparison of builds. Not part of the API.
-#[doc(hidden)]
-pub fn digest_hint_masks(
-    setup: &NativePublicSetup,
-    db: &[u16],
-) -> Result<Vec<Vec<Vec<u64>>>, ReinspiringError> {
-    let p = setup.profile();
-    let d = p.packing().d();
-    let q = p.packing().q();
-    let lift = LiftContext::new(d, q)?;
-    let public_polys =
-        lift.prepare_public_dot(setup.query_masks(), (p.packing().p() - 1).min(q / 2))?;
-    (0..p.cols() / d)
-        .map(|block| hint_masks(&lift, &public_polys, db, p.rows(), d, block))
-        .collect()
 }
 
 fn err(s: &str) -> ReinspiringError {

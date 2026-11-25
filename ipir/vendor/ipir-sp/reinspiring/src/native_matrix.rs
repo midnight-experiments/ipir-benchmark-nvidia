@@ -232,23 +232,6 @@ impl NativeMatrix {
         };
         signed_width(lo, hi)
     }
-    /// Feeds the storage label, shape, modulus and every stored word to `sink`, so a
-    /// program can compare compiled matrices bit for bit. Read only.
-    #[doc(hidden)]
-    pub fn digest_words(&self, sink: &mut dyn FnMut(&[u8])) {
-        sink(self.storage().label().as_bytes());
-        for x in [self.rows as u64, self.cols as u64, self.q] {
-            sink(&x.to_le_bytes());
-        }
-        match &self.words {
-            Words::Narrow(x) => sink(bytemuck::cast_slice(&x[..])),
-            Words::Packed { bits, data } => {
-                sink(&(*bits as u64).to_le_bytes());
-                sink(&data[..]);
-            }
-            Words::Wide(x) => sink(bytemuck::cast_slice(&x[..])),
-        }
-    }
     /// Bytes retained for coefficient words (excluding the small object header).
     pub fn storage_bytes(&self) -> usize {
         match &self.words {
