@@ -106,8 +106,8 @@ impl LiftContext {
         masks: &[Vec<u64>],
         support: u64,
     ) -> Result<PreparedLiftOperand, ReinspiringError> {
-        let dot = self.prepare_public_dot(masks, support)?;
-        if dot.transforms.len() != 2 {
+        let transforms = self.public_dot_transforms(masks, support)?;
+        if transforms.len() != 2 {
             return Err(ReinspiringError::InvalidParams(
                 "decoder requires two-prime capacity".into(),
             ));
@@ -117,7 +117,7 @@ impl LiftContext {
             q: self.q,
             sum_fits_two: true,
             transforms: (0..masks.len())
-                .map(|i| dot.transforms.iter().map(|p| p[i].clone()).collect())
+                .map(|i| transforms.iter().map(|p| p[i].clone()).collect())
                 .collect(),
         })
     }
@@ -541,6 +541,37 @@ impl LiftContext {
         a: &[Vec<u64>],
         right_bound: u64,
     ) -> Result<PreparedPublicDot, ReinspiringError> {
+        let transforms = self.public_dot_transforms(a, right_bound)?;
+        let quotients = transforms
+            .iter()
+            .zip(&self.params)
+            .map(|(polys, params)| {
+                polys
+                    .iter()
+                    .map(|poly| {
+                        poly.iter()
+                            .map(|&w| shoup_quotient(w, params.modulus))
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        Ok(PreparedPublicDot {
+            d: self.d,
+            q: self.q,
+            right_bound,
+            transforms,
+            quotients,
+        })
+    }
+
+    // The capacity checks and transforms of `prepare_public_dot` (prime,
+    // operand, NTT coefficient), without the Shoup quotients `public_dot` uses.
+    fn public_dot_transforms(
+        &self,
+        a: &[Vec<u64>],
+        right_bound: u64,
+    ) -> Result<Vec<Vec<Vec<u64>>>, ReinspiringError> {
         if a.is_empty() || right_bound > self.q / 2 {
             return Err(ReinspiringError::LweShape(
                 "invalid public dot bound or shape".into(),
@@ -572,7 +603,7 @@ impl LiftContext {
                 "insufficient public dot CRT capacity".into(),
             ));
         };
-        let transforms: Vec<Vec<Vec<u64>>> = self.params[..count]
+        Ok(self.params[..count]
             .iter()
             .map(|params| {
                 a.iter()
@@ -585,28 +616,7 @@ impl LiftContext {
                     })
                     .collect()
             })
-            .collect();
-        let quotients = transforms
-            .iter()
-            .zip(&self.params)
-            .map(|(polys, params)| {
-                polys
-                    .iter()
-                    .map(|poly| {
-                        poly.iter()
-                            .map(|&w| shoup_quotient(w, params.modulus))
-                            .collect()
-                    })
-                    .collect()
-            })
-            .collect();
-        Ok(PreparedPublicDot {
-            d: self.d,
-            q: self.q,
-            right_bound,
-            transforms,
-            quotients,
-        })
+            .collect())
     }
 
     /// Evaluate a capacity-checked public dot product. Accumulate in the
