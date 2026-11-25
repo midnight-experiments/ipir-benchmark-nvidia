@@ -100,6 +100,9 @@ Either:
   `DENO_WEBGPU_BACKEND=vulkan ./run-all.sh` (the default on Linux). Disable the integrated GPU's Vulkan ICD for the
   run (`VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json`), or pass `--allow-non-nvidia` if that is really
   intended.
+- **"not enough memory left" for every shape, even small ones**: on an NVIDIA GPU without resizable BAR, wgpu's
+  memory-budget check counts the BAR heap, whose usage the driver sums over all processes, the desktop included. Load
+  the Vulkan layer in `tools/hide-memory-budget-layer/`. Its README shows how to check whether your host needs it.
 - **Shapes that do not fit in memory**: expected for the largest shapes on 6 GB. A shape whose resident bytes
   (2 bytes a cell plus 32 MiB a column block) exceed the VRAM is skipped without trying. Any other shape is tried, and
   an out-of-memory error, a lost device or a 15-minute timeout is recorded as a skip with its reason. The "largest"
@@ -116,14 +119,20 @@ Either:
 
 Developed and run on macOS (Apple M4 Max, Metal, Deno 2.7.5, Rust 1.92.0). There, the Rust programs build and run,
 patch 0001's test passes, every Deno script type-checks and runs, `./run-all.sh --quick` completes, the 10-million
-block-budget set runs, and the 32768×32768 shape and the skip logic work. **None of it has run on Linux or on an NVIDIA
-GPU yet.** Not verified there:
+block-budget set runs, and the 32768×32768 shape and the skip logic work.
 
-- Deno's WebGPU on Vulkan with the NVIDIA driver: adapter selection, the buffer limits, and timestamp queries.
-- How out-of-memory shows up on a 6 GB card (an error-scope error, a lost device, or a hang that the time limit
-  catches).
-- The per-thread nice 19 of the low-priority pool. On macOS the pool uses the utility QoS class instead.
-- `setup.sh`'s Deno download and `cargo fetch` on Linux.
+It has also run on Linux, on one desktop with an RTX 2060 (6 GB, driver 580.159.03, no resizable BAR) and a Ryzen 7
+2700X. `results/pop-os-notes.md` has the details. There:
+
+- `setup.sh`'s Deno download and `cargo fetch` work.
+- Deno's WebGPU on Vulkan picks the NVIDIA GPU, not llvmpipe, and has timestamp queries. The adapter reports a
+  `maxBufferSize` of 2^52, and the 2^30-byte chunks work.
+- wgpu's memory-budget check refuses every buffer unless the Vulkan layer in `tools/hide-memory-budget-layer/` is
+  loaded. With the layer, every shape up to 32768×32768 and the 10-million set fit in 6 GB, so how out-of-memory shows
+  up on a 6 GB card is still not verified.
+- The low-priority pool runs each thread at nice 19. On macOS the pool uses the utility QoS class instead.
+- `bench/sysinfo.ts` records the CPU model, the RAM and the CPU governor as unknown, because Deno refuses reads of
+  `/proc` and `/sys` without `--allow-all`.
 
 ## Layout and sources
 
@@ -135,6 +144,7 @@ GPU yet.** Not verified there:
 | `ipir/patches/` | Patches applied to `ipir/vendor/`: this design's 0001, and 0002 (a faster CPU block compile with the same output words) | 0001: UmbraDB research, spec 00065; 0002: new |
 | `ipir/bench/` | The compile benchmark programs | new, adapted from spec 00065's compile checks |
 | `bench/` | The Deno benchmark scripts | new, adapted from spec 00065's GPU answer-time harness |
+| `tools/hide-memory-budget-layer/` | A Vulkan layer that hides `VK_EXT_memory_budget` from wgpu, for NVIDIA GPUs without resizable BAR | new |
 
 UmbraDB is https://github.com/midnightntwrk/umbradb (Apache-2.0); its notice is in `NOTICE`. The IPIR+SP crates are
 MIT OR Apache-2.0 (`ipir/vendor/ORIGIN.md`, `ipir/vendor/LICENSE-MIT`, `ipir/vendor/LICENSE-APACHE`). This repository

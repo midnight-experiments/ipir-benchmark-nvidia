@@ -1,0 +1,1860 @@
+{
+ "schema": "ipir-benchmark-nvidia/1",
+ "meta": {
+  "name": "pop-os-2026-11-24-quick-hidebudget",
+  "date": "2026-11-24",
+  "quick": true,
+  "repoCommit": "32668eb",
+  "denoWebgpuBackend": "vulkan",
+  "started": "2026-11-24T21:02:16Z",
+  "seconds": 149
+ },
+ "machine": {
+  "hostname": "pop-os",
+  "gpu": "NVIDIA GeForce RTX 2060",
+  "driver": "580.159.03",
+  "vramMiB": 6144,
+  "vramUsedAtStartMiB": 688,
+  "vulkan": null,
+  "webgpuAdapter": {
+   "summary": "4318 7944 NVIDIA GeForce RTX 2060",
+   "vendor": "4318",
+   "architecture": "",
+   "device": "7944",
+   "description": "NVIDIA GeForce RTX 2060",
+   "isFallbackAdapter": false,
+   "features": [
+    "bgra8unorm-storage",
+    "depth-clip-control",
+    "depth32float-stencil8",
+    "dual-source-blending",
+    "float32-filterable",
+    "immediate-data",
+    "indirect-first-instance",
+    "rg11b10ufloat-renderable",
+    "shader-f16",
+    "texture-compression-bc",
+    "texture-compression-bc-sliced-3d",
+    "timestamp-query"
+   ],
+   "maxBufferSize": 4503599627370496,
+   "maxStorageBufferBindingSize": 2147483644,
+   "timestampQuery": true,
+   "software": false,
+   "softwareReason": null
+  },
+  "cpu": null,
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "ramGiB": null,
+  "os": "Pop!_OS 24.04 LTS",
+  "kernel": "7.0.11-76070011-generic",
+  "deno": "2.7.5",
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "loadavgStart": [
+   3.5673828125,
+   3.0615234375,
+   2.8203125
+  ],
+  "loadavgEnd": [
+   5.5595703125,
+   4.02685546875,
+   3.21484375
+  ]
+ },
+ "compile": [
+  {
+   "rows": 2048,
+   "tablesAtOnce": 1,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 1206.89,
+   "wallMsAll": [
+    1206.89
+   ],
+   "perTableMedianMs": {
+    "build": 1198.12,
+    "hints": 97.33,
+    "packing": 1092.55
+   }
+  },
+  {
+   "rows": 8192,
+   "tablesAtOnce": 1,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 1315.85,
+   "wallMsAll": [
+    1315.85
+   ],
+   "perTableMedianMs": {
+    "build": 1304.14,
+    "hints": 226.1,
+    "packing": 1067.67
+   }
+  },
+  {
+   "rows": 2048,
+   "tablesAtOnce": 4,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 4192.47,
+   "wallMsAll": [
+    4192.47
+   ],
+   "perTableMedianMs": {
+    "build": 2882.275,
+    "hints": 339.07,
+    "packing": 2539.25
+   }
+  },
+  {
+   "rows": 8192,
+   "tablesAtOnce": 4,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 3441.74,
+   "wallMsAll": [
+    3441.74
+   ],
+   "perTableMedianMs": {
+    "build": 3046.2700000000004,
+    "hints": 997.47,
+    "packing": 2040.99
+   }
+  }
+ ],
+ "fetch": {
+  "runs": 3,
+  "vramMib": 6144,
+  "results": [
+   {
+    "ok": true,
+    "rows": 2048,
+    "cols": 2048,
+    "cells": 4194304,
+    "colBlocks": 1,
+    "residentBytes": 41943040,
+    "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+    "uploadMs": 28.797765000000027,
+    "runs": 3,
+    "timing": {
+     "1": {
+      "wallMs": {
+       "min": 12.383654999999976,
+       "median": 12.464314999999942,
+       "max": 12.585055000000011
+      },
+      "execMedianMs": {
+       "unpack": 0.01248,
+       "scan": 0.126816,
+       "pack": 0.156736,
+       "finish": 0.105184,
+       "total": 0.40214400000000006
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 1,
+       "countPadded": 1,
+       "requestsPerInvocation": 1,
+       "segmentRows": 256,
+       "scanSegments": 8,
+       "packSegments": 16,
+       "scratchBytes": 543148
+      }
+     },
+     "32": {
+      "wallMs": {
+       "min": 16.91775999999993,
+       "median": 17.984757999999943,
+       "max": 18.06477899999993
+      },
+      "execMedianMs": {
+       "unpack": 0.031584,
+       "scan": 0.545408,
+       "pack": 1.376,
+       "finish": 0.215136,
+       "total": 2.168864
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 32,
+       "countPadded": 32,
+       "requestsPerInvocation": 2,
+       "segmentRows": 256,
+       "scanSegments": 8,
+       "packSegments": 8,
+       "scratchBytes": 13182216
+      }
+     }
+    },
+    "chunkRows": 2048,
+    "processSeconds": 1.1381384690000003
+   },
+   {
+    "ok": true,
+    "rows": 2048,
+    "cols": 4096,
+    "cells": 8388608,
+    "colBlocks": 2,
+    "residentBytes": 83886080,
+    "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+    "uploadMs": 68.173318,
+    "runs": 3,
+    "timing": {
+     "1": {
+      "wallMs": {
+       "min": 11.800426000000016,
+       "median": 12.660184999999956,
+       "max": 13.121243999999933
+      },
+      "execMedianMs": {
+       "unpack": 0.012896,
+       "scan": 0.14656,
+       "pack": 0.230464,
+       "finish": 0.109376,
+       "total": 0.498688
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 1,
+       "countPadded": 1,
+       "requestsPerInvocation": 1,
+       "segmentRows": 256,
+       "scanSegments": 8,
+       "packSegments": 16,
+       "scratchBytes": 947628
+      }
+     },
+     "32": {
+      "wallMs": {
+       "min": 17.30189900000005,
+       "median": 18.444138000000066,
+       "max": 19.25520700000004
+      },
+      "execMedianMs": {
+       "unpack": 0.032576,
+       "scan": 1.011744,
+       "pack": 2.759104,
+       "finish": 0.319456,
+       "total": 4.121248
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 32,
+       "countPadded": 32,
+       "requestsPerInvocation": 2,
+       "segmentRows": 256,
+       "scanSegments": 8,
+       "packSegments": 4,
+       "scratchBytes": 17736968
+      }
+     }
+    },
+    "chunkRows": 2048,
+    "processSeconds": 0.7845248819999999
+   },
+   {
+    "ok": true,
+    "rows": 4096,
+    "cols": 8192,
+    "cells": 33554432,
+    "colBlocks": 4,
+    "residentBytes": 201326592,
+    "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+    "uploadMs": 84.95068800000001,
+    "runs": 3,
+    "timing": {
+     "1": {
+      "wallMs": {
+       "min": 13.164444000000003,
+       "median": 13.212024999999926,
+       "max": 13.341323999999986
+      },
+      "execMedianMs": {
+       "unpack": 0.012928,
+       "scan": 0.23472,
+       "pack": 0.514496,
+       "finish": 0.14944,
+       "total": 0.91104
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 1,
+       "countPadded": 1,
+       "requestsPerInvocation": 1,
+       "segmentRows": 256,
+       "scanSegments": 16,
+       "packSegments": 16,
+       "scratchBytes": 2326188
+      }
+     },
+     "32": {
+      "wallMs": {
+       "min": 23.812010999999984,
+       "median": 26.76842799999997,
+       "max": 28.17288700000006
+      },
+      "execMedianMs": {
+       "unpack": 0.03888,
+       "scan": 3.813088,
+       "pack": 5.546944,
+       "finish": 0.322752,
+       "total": 9.728864000000002
+      },
+      "execMeasured": 3,
+      "call": {
+       "count": 32,
+       "countPadded": 32,
+       "requestsPerInvocation": 2,
+       "segmentRows": 1024,
+       "scanSegments": 4,
+       "packSegments": 2,
+       "scratchBytes": 19907848
+      }
+     }
+    },
+    "chunkRows": 4096,
+    "processSeconds": 1.2278567719999998
+   }
+  ],
+  "largest": {
+   "fit": null,
+   "tried": []
+  }
+ },
+ "budget": {
+  "today": {
+   "set": "today",
+   "tables": [
+    {
+     "name": "read",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "nullifier",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "shielded groups",
+     "rows": 2048,
+     "cols": 4096
+    },
+    {
+     "name": "Dust groups",
+     "rows": 6144,
+     "cols": 28672
+    },
+    {
+     "name": "first coins",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "generation groups",
+     "rows": 2048,
+     "cols": 4096
+    }
+   ],
+   "rates": [
+    2,
+    5
+   ],
+   "modes": [
+    "seq",
+    "pool"
+   ],
+   "blocks": 4,
+   "intervalMs": 6000,
+   "baselineS": 5,
+   "budgetMs": 3000,
+   "residentBytes": 1115684864,
+   "note": "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+   "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+   "worker": {
+    "ready": true,
+    "rows": [
+     2048,
+     2048,
+     2048,
+     6144,
+     2048,
+     2048
+    ],
+    "logical_cpus": 16,
+    "global_threads": 16,
+    "pool_threads": 8,
+    "pool_priority": "linux: thread nice 19"
+   },
+   "ok": true,
+   "runs": [
+    {
+     "rate": 2,
+     "mode": "none",
+     "calls": 11,
+     "failures": [],
+     "answerLatencyMs": {
+      "n": 11,
+      "min": 15.129,
+      "p50": 23.259,
+      "p90": 53.146,
+      "p99": 228.069,
+      "max": 228.069
+     }
+    },
+    {
+     "rate": 2,
+     "mode": "seq",
+     "blocks": 4,
+     "blockWorkMs": {
+      "n": 4,
+      "min": 6976.03,
+      "p50": 7075.212,
+      "p90": 7444.892,
+      "p99": 7444.892,
+      "max": 7444.892
+     },
+     "compileMs": {
+      "n": 4,
+      "min": 6804.173,
+      "p50": 6830.662,
+      "p90": 7049.013,
+      "p99": 7049.013,
+      "max": 7049.013
+     },
+     "uploadMs": {
+      "n": 4,
+      "min": 171.857,
+      "p50": 178.813,
+      "p90": 395.879,
+      "p99": 395.879,
+      "max": 395.879
+     },
+     "overBudget": 4,
+     "calls": 62,
+     "failures": [],
+     "answerLatencyMs": {
+      "all": {
+       "n": 62,
+       "min": 14.707,
+       "p50": 21.994,
+       "p90": 143.941,
+       "p99": 313.444,
+       "max": 313.444
+      },
+      "duringBlockWork": {
+       "n": 58,
+       "min": 14.707,
+       "p50": 23.12,
+       "p90": 155.854,
+       "p99": 313.444,
+       "max": 313.444
+      },
+      "outsideBlockWork": {
+       "n": 4,
+       "min": 15.578,
+       "p50": 16.161,
+       "p90": 24.209,
+       "p99": 24.209,
+       "max": 24.209
+      }
+     },
+     "work": [
+      {
+       "compileMs": 7049.013082000001,
+       "uploadMs": 395.87939699999697,
+       "workMs": 7444.892478999998,
+       "worker": {
+        "block": 0,
+        "mode": "seq",
+        "wall_ms": 7048.34,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 6.18,
+          "build_ms": 1202.55,
+          "hints_ms": 103.31,
+          "packing_ms": 1093.63,
+          "layout_ms": 0,
+          "prepare_ms": 1202.54
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.64,
+          "build_ms": 1152.73,
+          "hints_ms": 79.78,
+          "packing_ms": 1070.86,
+          "layout_ms": 0,
+          "prepare_ms": 1152.73
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.27,
+          "build_ms": 1129.71,
+          "hints_ms": 83.51,
+          "packing_ms": 1043.93,
+          "layout_ms": 0,
+          "prepare_ms": 1129.7
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 14.6,
+          "build_ms": 1244.91,
+          "hints_ms": 176.03,
+          "packing_ms": 1063.49,
+          "layout_ms": 0,
+          "prepare_ms": 1244.9
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.17,
+          "build_ms": 1140.91,
+          "hints_ms": 82.59,
+          "packing_ms": 1056.34,
+          "layout_ms": 0,
+          "prepare_ms": 1140.91
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.41,
+          "build_ms": 1123.47,
+          "hints_ms": 98.42,
+          "packing_ms": 1022.65,
+          "layout_ms": 0,
+          "prepare_ms": 1123.47
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6896.398684,
+       "uploadMs": 178.81328599999688,
+       "workMs": 7075.211969999997,
+       "worker": {
+        "block": 1,
+        "mode": "seq",
+        "wall_ms": 6895.67,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.41,
+          "build_ms": 1127.29,
+          "hints_ms": 90.86,
+          "packing_ms": 1033.62,
+          "layout_ms": 0,
+          "prepare_ms": 1127.28
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.22,
+          "build_ms": 1132.36,
+          "hints_ms": 85.28,
+          "packing_ms": 1045.13,
+          "layout_ms": 0,
+          "prepare_ms": 1132.36
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.27,
+          "build_ms": 1103.07,
+          "hints_ms": 89.01,
+          "packing_ms": 1012.04,
+          "layout_ms": 0,
+          "prepare_ms": 1103.07
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 13.47,
+          "build_ms": 1236.11,
+          "hints_ms": 177.96,
+          "packing_ms": 1053.46,
+          "layout_ms": 0,
+          "prepare_ms": 1236.1
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.21,
+          "build_ms": 1103.42,
+          "hints_ms": 83.26,
+          "packing_ms": 1018.21,
+          "layout_ms": 0,
+          "prepare_ms": 1103.41
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.22,
+          "build_ms": 1128.12,
+          "hints_ms": 82.87,
+          "packing_ms": 1043.14,
+          "layout_ms": 0,
+          "prepare_ms": 1128.11
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6804.172875000004,
+       "uploadMs": 171.8572839999979,
+       "workMs": 6976.030159000002,
+       "worker": {
+        "block": 2,
+        "mode": "seq",
+        "wall_ms": 6803.75,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.84,
+          "build_ms": 1103.36,
+          "hints_ms": 90.43,
+          "packing_ms": 1010.5,
+          "layout_ms": 0,
+          "prepare_ms": 1103.35
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.18,
+          "build_ms": 1120.71,
+          "hints_ms": 81.09,
+          "packing_ms": 1037.66,
+          "layout_ms": 0,
+          "prepare_ms": 1120.71
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.27,
+          "build_ms": 1081.97,
+          "hints_ms": 82.91,
+          "packing_ms": 996.76,
+          "layout_ms": 0,
+          "prepare_ms": 1081.96
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 16.18,
+          "build_ms": 1218.4,
+          "hints_ms": 209.41,
+          "packing_ms": 1003.49,
+          "layout_ms": 0,
+          "prepare_ms": 1218.39
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.15,
+          "build_ms": 1100.78,
+          "hints_ms": 83.68,
+          "packing_ms": 1014.95,
+          "layout_ms": 0,
+          "prepare_ms": 1100.78
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.2,
+          "build_ms": 1111.45,
+          "hints_ms": 85.4,
+          "packing_ms": 1023.97,
+          "layout_ms": 0,
+          "prepare_ms": 1111.45
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6830.662263000006,
+       "uploadMs": 296.5377459999945,
+       "workMs": 7127.200009,
+       "worker": {
+        "block": 3,
+        "mode": "seq",
+        "wall_ms": 6830.24,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.57,
+          "build_ms": 1117.17,
+          "hints_ms": 89.87,
+          "packing_ms": 1025.06,
+          "layout_ms": 0,
+          "prepare_ms": 1117.15
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.14,
+          "build_ms": 1096.27,
+          "hints_ms": 81.76,
+          "packing_ms": 1012.56,
+          "layout_ms": 0,
+          "prepare_ms": 1096.26
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.2,
+          "build_ms": 1144.79,
+          "hints_ms": 83.29,
+          "packing_ms": 1059.5,
+          "layout_ms": 0,
+          "prepare_ms": 1144.79
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 14.88,
+          "build_ms": 1214.63,
+          "hints_ms": 174.99,
+          "packing_ms": 1034.78,
+          "layout_ms": 0,
+          "prepare_ms": 1214.62
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.17,
+          "build_ms": 1109.29,
+          "hints_ms": 85.85,
+          "packing_ms": 1021.49,
+          "layout_ms": 0,
+          "prepare_ms": 1109.28
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.27,
+          "build_ms": 1084.93,
+          "hints_ms": 84.64,
+          "packing_ms": 997.85,
+          "layout_ms": 0,
+          "prepare_ms": 1084.92
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "rate": 2,
+     "mode": "pool",
+     "blocks": 4,
+     "blockWorkMs": {
+      "n": 4,
+      "min": 3484.335,
+      "p50": 3587.511,
+      "p90": 4365.036,
+      "p99": 4365.036,
+      "max": 4365.036
+     },
+     "compileMs": {
+      "n": 4,
+      "min": 3252.196,
+      "p50": 3420.887,
+      "p90": 4025.705,
+      "p99": 4025.705,
+      "max": 4025.705
+     },
+     "uploadMs": {
+      "n": 4,
+      "min": 166.624,
+      "p50": 230.509,
+      "p90": 339.331,
+      "p99": 339.331,
+      "max": 339.331
+     },
+     "overBudget": 4,
+     "calls": 49,
+     "failures": [],
+     "answerLatencyMs": {
+      "all": {
+       "n": 49,
+       "min": 15.158,
+       "p50": 24.518,
+       "p90": 199.723,
+       "p99": 330.06,
+       "max": 330.06
+      },
+      "duringBlockWork": {
+       "n": 32,
+       "min": 15.807,
+       "p50": 25.086,
+       "p90": 134.137,
+       "p99": 330.06,
+       "max": 330.06
+      },
+      "outsideBlockWork": {
+       "n": 17,
+       "min": 15.158,
+       "p50": 18.881,
+       "p90": 199.723,
+       "p99": 239.626,
+       "max": 239.626
+      }
+     },
+     "work": [
+      {
+       "compileMs": 3420.886907,
+       "uploadMs": 166.62431800000195,
+       "workMs": 3587.511225000002,
+       "worker": {
+        "block": 4,
+        "mode": "pool",
+        "wall_ms": 3420.45,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 8.88,
+          "build_ms": 3407.43,
+          "hints_ms": 826,
+          "packing_ms": 2578.32,
+          "layout_ms": 0,
+          "prepare_ms": 3407.42
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 12.43,
+          "build_ms": 3388.13,
+          "hints_ms": 819.78,
+          "packing_ms": 2562.53,
+          "layout_ms": 0,
+          "prepare_ms": 3388.13
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 12.33,
+          "build_ms": 3208.79,
+          "hints_ms": 818.8,
+          "packing_ms": 2383,
+          "layout_ms": 0,
+          "prepare_ms": 3208.77
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 31.37,
+          "build_ms": 3266.44,
+          "hints_ms": 814.28,
+          "packing_ms": 2443.32,
+          "layout_ms": 0,
+          "prepare_ms": 3266.43
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 12.33,
+          "build_ms": 2525.18,
+          "hints_ms": 819.46,
+          "packing_ms": 1699.58,
+          "layout_ms": 0,
+          "prepare_ms": 2525.18
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 7.67,
+          "build_ms": 2345.41,
+          "hints_ms": 827.13,
+          "packing_ms": 1515.08,
+          "layout_ms": 0,
+          "prepare_ms": 2345.4
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 3906.782333999996,
+       "uploadMs": 230.5088790000009,
+       "workMs": 4137.291212999997,
+       "worker": {
+        "block": 5,
+        "mode": "pool",
+        "wall_ms": 3906.3,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 4.65,
+          "build_ms": 3898.04,
+          "hints_ms": 780.65,
+          "packing_ms": 3113.88,
+          "layout_ms": 0,
+          "prepare_ms": 3898.03
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.78,
+          "build_ms": 2141,
+          "hints_ms": 590.05,
+          "packing_ms": 1547.83,
+          "layout_ms": 0,
+          "prepare_ms": 2140.99
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.68,
+          "build_ms": 3052.58,
+          "hints_ms": 780.69,
+          "packing_ms": 2268.4,
+          "layout_ms": 0,
+          "prepare_ms": 3052.57
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 6.79,
+          "build_ms": 3877.43,
+          "hints_ms": 774.08,
+          "packing_ms": 3095.36,
+          "layout_ms": 0,
+          "prepare_ms": 3877.43
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.18,
+          "build_ms": 2158.03,
+          "hints_ms": 781.49,
+          "packing_ms": 1373.27,
+          "layout_ms": 0,
+          "prepare_ms": 2158.02
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 3.74,
+          "build_ms": 3761.19,
+          "hints_ms": 782.2,
+          "packing_ms": 2976.02,
+          "layout_ms": 0,
+          "prepare_ms": 3761.18
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 3252.1959050000005,
+       "uploadMs": 232.13955700000224,
+       "workMs": 3484.3354620000027,
+       "worker": {
+        "block": 6,
+        "mode": "pool",
+        "wall_ms": 3251.75,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 4.78,
+          "build_ms": 3242.92,
+          "hints_ms": 760.75,
+          "packing_ms": 2478.62,
+          "layout_ms": 0,
+          "prepare_ms": 3242.91
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.78,
+          "build_ms": 3161.62,
+          "hints_ms": 760.79,
+          "packing_ms": 2396.73,
+          "layout_ms": 0,
+          "prepare_ms": 3161.6
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.35,
+          "build_ms": 3115.79,
+          "hints_ms": 761.84,
+          "packing_ms": 2350.71,
+          "layout_ms": 0,
+          "prepare_ms": 3115.78
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 6.82,
+          "build_ms": 3124.92,
+          "hints_ms": 761.13,
+          "packing_ms": 2358.87,
+          "layout_ms": 0,
+          "prepare_ms": 3124.91
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 3.48,
+          "build_ms": 2047.38,
+          "hints_ms": 762.46,
+          "packing_ms": 1281.75,
+          "layout_ms": 0,
+          "prepare_ms": 2047.38
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.49,
+          "build_ms": 3144.33,
+          "hints_ms": 761.7,
+          "packing_ms": 2379,
+          "layout_ms": 0,
+          "prepare_ms": 3144.29
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 4025.7052079999994,
+       "uploadMs": 339.3312780000124,
+       "workMs": 4365.036486000012,
+       "worker": {
+        "block": 7,
+        "mode": "pool",
+        "wall_ms": 4025,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 2.61,
+          "build_ms": 1583.32,
+          "hints_ms": 398.58,
+          "packing_ms": 1181.82,
+          "layout_ms": 0,
+          "prepare_ms": 1583.32
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 2.6,
+          "build_ms": 4022.26,
+          "hints_ms": 1697.02,
+          "packing_ms": 2321.63,
+          "layout_ms": 0,
+          "prepare_ms": 4022.26
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.06,
+          "build_ms": 3061.68,
+          "hints_ms": 1695.15,
+          "packing_ms": 1362.55,
+          "layout_ms": 0,
+          "prepare_ms": 3061.67
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 6.52,
+          "build_ms": 3933.08,
+          "hints_ms": 1894.84,
+          "packing_ms": 2032.63,
+          "layout_ms": 0,
+          "prepare_ms": 3933.07
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 5.07,
+          "build_ms": 3933.31,
+          "hints_ms": 1694.8,
+          "packing_ms": 2234.96,
+          "layout_ms": 0,
+          "prepare_ms": 3933.3
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.99,
+          "build_ms": 3120.13,
+          "hints_ms": 636.07,
+          "packing_ms": 2480.71,
+          "layout_ms": 0,
+          "prepare_ms": 3120.13
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "rate": 5,
+     "mode": "none",
+     "calls": 26,
+     "failures": [],
+     "answerLatencyMs": {
+      "n": 26,
+      "min": 15.521,
+      "p50": 22.347,
+      "p90": 109.314,
+      "p99": 217.864,
+      "max": 217.864
+     }
+    },
+    {
+     "rate": 5,
+     "mode": "seq",
+     "blocks": 4,
+     "blockWorkMs": {
+      "n": 4,
+      "min": 6984.538,
+      "p50": 7001.813,
+      "p90": 7142.324,
+      "p99": 7142.324,
+      "max": 7142.324
+     },
+     "compileMs": {
+      "n": 4,
+      "min": 6781.111,
+      "p50": 6815.703,
+      "p90": 6933.055,
+      "p99": 6933.055,
+      "max": 6933.055
+     },
+     "uploadMs": {
+      "n": 4,
+      "min": 175.848,
+      "p50": 186.11,
+      "p90": 209.269,
+      "p99": 209.269,
+      "max": 209.269
+     },
+     "overBudget": 4,
+     "calls": 151,
+     "failures": [],
+     "answerLatencyMs": {
+      "all": {
+       "n": 151,
+       "min": 14.633,
+       "p50": 21.173,
+       "p90": 103.838,
+       "p99": 244.181,
+       "max": 271.509
+      },
+      "duringBlockWork": {
+       "n": 141,
+       "min": 14.633,
+       "p50": 20.44,
+       "p90": 97.739,
+       "p99": 244.181,
+       "max": 271.509
+      },
+      "outsideBlockWork": {
+       "n": 10,
+       "min": 17.574,
+       "p50": 21.544,
+       "p90": 115.198,
+       "p99": 211.191,
+       "max": 211.191
+      }
+     },
+     "work": [
+      {
+       "compileMs": 6815.703156000003,
+       "uploadMs": 186.1097710000031,
+       "workMs": 7001.812927000006,
+       "worker": {
+        "block": 8,
+        "mode": "seq",
+        "wall_ms": 6814.83,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.2,
+          "build_ms": 1135.46,
+          "hints_ms": 87.63,
+          "packing_ms": 1044.32,
+          "layout_ms": 0,
+          "prepare_ms": 1135.45
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.23,
+          "build_ms": 1121.09,
+          "hints_ms": 86.66,
+          "packing_ms": 1032.37,
+          "layout_ms": 0,
+          "prepare_ms": 1121.08
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.16,
+          "build_ms": 1079.28,
+          "hints_ms": 81.98,
+          "packing_ms": 995.29,
+          "layout_ms": 0,
+          "prepare_ms": 1079.28
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 14.16,
+          "build_ms": 1189.27,
+          "hints_ms": 173.51,
+          "packing_ms": 1010.16,
+          "layout_ms": 0,
+          "prepare_ms": 1189.27
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.16,
+          "build_ms": 1115.04,
+          "hints_ms": 87.84,
+          "packing_ms": 1025.26,
+          "layout_ms": 0,
+          "prepare_ms": 1115.03
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.21,
+          "build_ms": 1113.82,
+          "hints_ms": 91.84,
+          "packing_ms": 1019.87,
+          "layout_ms": 0,
+          "prepare_ms": 1113.81
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6873.338615000001,
+       "uploadMs": 175.8484150000004,
+       "workMs": 7049.187030000001,
+       "worker": {
+        "block": 9,
+        "mode": "seq",
+        "wall_ms": 6871.88,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.68,
+          "build_ms": 1107.55,
+          "hints_ms": 92.13,
+          "packing_ms": 1012,
+          "layout_ms": 0,
+          "prepare_ms": 1107.54
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.15,
+          "build_ms": 1108.49,
+          "hints_ms": 83.44,
+          "packing_ms": 1023.03,
+          "layout_ms": 0,
+          "prepare_ms": 1108.48
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.32,
+          "build_ms": 1072.66,
+          "hints_ms": 88.41,
+          "packing_ms": 981.59,
+          "layout_ms": 0,
+          "prepare_ms": 1072.66
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 15.06,
+          "build_ms": 1246.35,
+          "hints_ms": 187.36,
+          "packing_ms": 1054.01,
+          "layout_ms": 0,
+          "prepare_ms": 1246.35
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.19,
+          "build_ms": 1119.64,
+          "hints_ms": 85.97,
+          "packing_ms": 1031.65,
+          "layout_ms": 0,
+          "prepare_ms": 1119.64
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.2,
+          "build_ms": 1152.96,
+          "hints_ms": 94.69,
+          "packing_ms": 1056.22,
+          "layout_ms": 0,
+          "prepare_ms": 1152.95
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6781.11112300001,
+       "uploadMs": 203.42674699999043,
+       "workMs": 6984.53787,
+       "worker": {
+        "block": 10,
+        "mode": "seq",
+        "wall_ms": 6780.4,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.7,
+          "build_ms": 1111.23,
+          "hints_ms": 91.03,
+          "packing_ms": 1016.78,
+          "layout_ms": 0,
+          "prepare_ms": 1111.22
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.2,
+          "build_ms": 1087.41,
+          "hints_ms": 82.11,
+          "packing_ms": 1003.15,
+          "layout_ms": 0,
+          "prepare_ms": 1087.4
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.18,
+          "build_ms": 1117.72,
+          "hints_ms": 88.85,
+          "packing_ms": 1026.89,
+          "layout_ms": 0,
+          "prepare_ms": 1117.71
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 13.33,
+          "build_ms": 1191.58,
+          "hints_ms": 170.65,
+          "packing_ms": 1016.24,
+          "layout_ms": 0,
+          "prepare_ms": 1191.58
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.18,
+          "build_ms": 1109.79,
+          "hints_ms": 83.93,
+          "packing_ms": 1023.83,
+          "layout_ms": 0,
+          "prepare_ms": 1109.78
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.19,
+          "build_ms": 1102.37,
+          "hints_ms": 84.58,
+          "packing_ms": 1015.78,
+          "layout_ms": 0,
+          "prepare_ms": 1102.36
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 6933.054541999998,
+       "uploadMs": 209.26899900000717,
+       "workMs": 7142.323541000005,
+       "worker": {
+        "block": 11,
+        "mode": "seq",
+        "wall_ms": 6931.87,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 1.65,
+          "build_ms": 1134.28,
+          "hints_ms": 84.53,
+          "packing_ms": 1046.38,
+          "layout_ms": 0,
+          "prepare_ms": 1134.28
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.28,
+          "build_ms": 1109.8,
+          "hints_ms": 83.84,
+          "packing_ms": 1023.67,
+          "layout_ms": 0,
+          "prepare_ms": 1109.79
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.21,
+          "build_ms": 1130.96,
+          "hints_ms": 84.86,
+          "packing_ms": 1043.96,
+          "layout_ms": 0,
+          "prepare_ms": 1130.95
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 14.14,
+          "build_ms": 1237.02,
+          "hints_ms": 183.45,
+          "packing_ms": 1048.89,
+          "layout_ms": 0,
+          "prepare_ms": 1237.01
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.25,
+          "build_ms": 1113.69,
+          "hints_ms": 84.2,
+          "packing_ms": 1027.18,
+          "layout_ms": 0,
+          "prepare_ms": 1113.68
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 1.3,
+          "build_ms": 1140.54,
+          "hints_ms": 84.58,
+          "packing_ms": 1053.63,
+          "layout_ms": 0,
+          "prepare_ms": 1140.54
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "rate": 5,
+     "mode": "pool",
+     "blocks": 4,
+     "blockWorkMs": {
+      "n": 4,
+      "min": 3378.241,
+      "p50": 3415.113,
+      "p90": 4160.221,
+      "p99": 4160.221,
+      "max": 4160.221
+     },
+     "compileMs": {
+      "n": 4,
+      "min": 3203.267,
+      "p50": 3224.986,
+      "p90": 3980.016,
+      "p99": 3980.016,
+      "max": 3980.016
+     },
+     "uploadMs": {
+      "n": 4,
+      "min": 174.973,
+      "p50": 180.205,
+      "p90": 224.313,
+      "p99": 224.313,
+      "max": 224.313
+     },
+     "overBudget": 4,
+     "calls": 121,
+     "failures": [],
+     "answerLatencyMs": {
+      "all": {
+       "n": 121,
+       "min": 14.65,
+       "p50": 18.632,
+       "p90": 68.804,
+       "p99": 225.044,
+       "max": 256.895
+      },
+      "duringBlockWork": {
+       "n": 77,
+       "min": 14.759,
+       "p50": 19.951,
+       "p90": 68.804,
+       "p99": 256.895,
+       "max": 256.895
+      },
+      "outsideBlockWork": {
+       "n": 44,
+       "min": 14.65,
+       "p50": 18.172,
+       "p90": 99.206,
+       "p99": 223.842,
+       "max": 223.842
+      }
+     },
+     "work": [
+      {
+       "compileMs": 3224.986472000004,
+       "uploadMs": 190.12671599999885,
+       "workMs": 3415.113188000003,
+       "worker": {
+        "block": 12,
+        "mode": "pool",
+        "wall_ms": 3221.1,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 3.53,
+          "build_ms": 2321.89,
+          "hints_ms": 772.48,
+          "packing_ms": 1544.66,
+          "layout_ms": 0,
+          "prepare_ms": 2321.89
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.24,
+          "build_ms": 3043.04,
+          "hints_ms": 772.54,
+          "packing_ms": 2266.26,
+          "layout_ms": 0,
+          "prepare_ms": 3043.03
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 5.14,
+          "build_ms": 3178.45,
+          "hints_ms": 771.97,
+          "packing_ms": 2403.13,
+          "layout_ms": 0,
+          "prepare_ms": 3178.45
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 7.26,
+          "build_ms": 2231,
+          "hints_ms": 765.24,
+          "packing_ms": 1457.31,
+          "layout_ms": 0,
+          "prepare_ms": 2230.99
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.59,
+          "build_ms": 3212.26,
+          "hints_ms": 769.85,
+          "packing_ms": 2436.2,
+          "layout_ms": 0,
+          "prepare_ms": 3212.25
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 3.99,
+          "build_ms": 3172.33,
+          "hints_ms": 773.23,
+          "packing_ms": 2395.61,
+          "layout_ms": 0,
+          "prepare_ms": 3172.33
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 3901.531759999998,
+       "uploadMs": 224.3125379999983,
+       "workMs": 4125.844297999996,
+       "worker": {
+        "block": 13,
+        "mode": "pool",
+        "wall_ms": 3900.86,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 4.78,
+          "build_ms": 2232.95,
+          "hints_ms": 802,
+          "packing_ms": 1426.19,
+          "layout_ms": 0,
+          "prepare_ms": 2232.94
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 3.63,
+          "build_ms": 3893.13,
+          "hints_ms": 804.03,
+          "packing_ms": 3085.29,
+          "layout_ms": 0,
+          "prepare_ms": 3893.13
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.82,
+          "build_ms": 3838.96,
+          "hints_ms": 801.4,
+          "packing_ms": 3032.35,
+          "layout_ms": 0,
+          "prepare_ms": 3838.96
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 7.38,
+          "build_ms": 2959.73,
+          "hints_ms": 795.13,
+          "packing_ms": 2155.61,
+          "layout_ms": 0,
+          "prepare_ms": 2959.73
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.71,
+          "build_ms": 2241.15,
+          "hints_ms": 803.73,
+          "packing_ms": 1434.42,
+          "layout_ms": 0,
+          "prepare_ms": 2241.15
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 3.82,
+          "build_ms": 3005.26,
+          "hints_ms": 803.86,
+          "packing_ms": 2197.68,
+          "layout_ms": 0,
+          "prepare_ms": 3005.26
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 3203.267172000007,
+       "uploadMs": 174.97335600000224,
+       "workMs": 3378.2405280000094,
+       "worker": {
+        "block": 14,
+        "mode": "pool",
+        "wall_ms": 3202.77,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 4.28,
+          "build_ms": 2274.93,
+          "hints_ms": 809.17,
+          "packing_ms": 1462.92,
+          "layout_ms": 0,
+          "prepare_ms": 2274.92
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.32,
+          "build_ms": 3142.46,
+          "hints_ms": 809.14,
+          "packing_ms": 2330.56,
+          "layout_ms": 0,
+          "prepare_ms": 3142.46
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.18,
+          "build_ms": 3183.31,
+          "hints_ms": 835.53,
+          "packing_ms": 2343.9,
+          "layout_ms": 0,
+          "prepare_ms": 3183.28
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 6.78,
+          "build_ms": 3195.89,
+          "hints_ms": 801.5,
+          "packing_ms": 2386.43,
+          "layout_ms": 0,
+          "prepare_ms": 3195.88
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.51,
+          "build_ms": 3193.6,
+          "hints_ms": 807.72,
+          "packing_ms": 2381.83,
+          "layout_ms": 0,
+          "prepare_ms": 3193.59
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.45,
+          "build_ms": 2265.87,
+          "hints_ms": 808.93,
+          "packing_ms": 1454.13,
+          "layout_ms": 0,
+          "prepare_ms": 2265.86
+         }
+        ]
+       }
+      },
+      {
+       "compileMs": 3980.016201999999,
+       "uploadMs": 180.20483899999817,
+       "workMs": 4160.221040999997,
+       "worker": {
+        "block": 15,
+        "mode": "pool",
+        "wall_ms": 3979.51,
+        "tables": [
+         {
+          "rows": 2048,
+          "prep_ms": 3.92,
+          "build_ms": 3187.86,
+          "hints_ms": 811.02,
+          "packing_ms": 2372.75,
+          "layout_ms": 0,
+          "prepare_ms": 3187.86
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.97,
+          "build_ms": 3130.67,
+          "hints_ms": 810.78,
+          "packing_ms": 2316.69,
+          "layout_ms": 0,
+          "prepare_ms": 3130.67
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 2.54,
+          "build_ms": 3955.53,
+          "hints_ms": 812.68,
+          "packing_ms": 3139.09,
+          "layout_ms": 0,
+          "prepare_ms": 3955.52
+         },
+         {
+          "rows": 6144,
+          "prep_ms": 7.43,
+          "build_ms": 3968.51,
+          "hints_ms": 803.57,
+          "packing_ms": 3156.92,
+          "layout_ms": 0,
+          "prepare_ms": 3968.5
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 2.23,
+          "build_ms": 2161.95,
+          "hints_ms": 812.18,
+          "packing_ms": 1345.24,
+          "layout_ms": 0,
+          "prepare_ms": 2161.94
+         },
+         {
+          "rows": 2048,
+          "prep_ms": 4.13,
+          "build_ms": 2147.73,
+          "hints_ms": 811.37,
+          "packing_ms": 1332.7,
+          "layout_ms": 0,
+          "prepare_ms": 2147.72
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "10m": null
+ },
+ "sysinfoStart": {
+  "date": "2026-11-24T21:02:16.115Z",
+  "hostname": "pop-os",
+  "os": "linux",
+  "arch": "x86_64",
+  "osRelease": "7.0.11-76070011-generic",
+  "loadavg": [
+   3.5673828125,
+   3.0615234375,
+   2.8203125
+  ],
+  "deno": {
+   "deno": "2.7.5",
+   "v8": "14.6.202.9-rusty",
+   "typescript": "5.9.2"
+  },
+  "env": {
+   "DENO_WEBGPU_BACKEND": "vulkan"
+  },
+  "nvidiaSmi": [
+   {
+    "name": "NVIDIA GeForce RTX 2060",
+    "driver_version": "580.159.03",
+    "memory.total": "6144",
+    "memory.used": "688",
+    "memory.free": "5050",
+    "pcie.link.gen.current": "1",
+    "pcie.link.width.current": "16",
+    "clocks.max.sm": "2160",
+    "clocks.max.mem": "7001",
+    "power.limit": "190.00",
+    "temperature.gpu": "51",
+    "pstate": "P8",
+    "compute_mode": "Default",
+    "vbios_version": "90.06.2E.40.D3"
+   }
+  ],
+  "nvidiaSmiVersion": [
+   "NVIDIA-SMI version  : 580.159.03",
+   "NVML version        : 580.159",
+   "DRIVER version      : 580.159.03",
+   "CUDA Version        : 13.0"
+  ],
+  "gpuProcesses": "14860, cosmic-term, 47 MiB\n14861, cosmic-term, 47 MiB\n2626530, chrome, 60 MiB\n3463045, cosmic-term, 43 MiB\n3727115, zed-editor, 83 MiB\n3779259, cosmic-files, 143 MiB",
+  "vulkan": null,
+  "cpuModel": null,
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           43 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  16\nOn-line CPU(s) list:                     0-15\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 7 2700X Eight-Core Processor\nCPU family:                              23\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      72%\nCPU max MHz:                             3700.0000\nCPU min MHz:                             2200.0000\nBogoMIPS:                                7399.20\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb hw_pstate ssbd ibpb vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif overflow_recov succor smca sev sev_es\nVirtualization:                          AMD-V\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               512 KiB (8 instances)\nL2 cache:                                4 MiB (8 instances)\nL3 cache:                                16 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-15\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; untrained return thunk; SMT vulnerable\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace",
+  "memTotalKiB": null,
+  "memAvailableKiB": null,
+  "cpuGovernor": null,
+  "distro": "Pop!_OS 24.04 LTS",
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)",
+  "webgpu": {
+   "summary": "4318 7944 NVIDIA GeForce RTX 2060",
+   "vendor": "4318",
+   "architecture": "",
+   "device": "7944",
+   "description": "NVIDIA GeForce RTX 2060",
+   "isFallbackAdapter": false,
+   "features": [
+    "bgra8unorm-storage",
+    "depth-clip-control",
+    "depth32float-stencil8",
+    "dual-source-blending",
+    "float32-filterable",
+    "immediate-data",
+    "indirect-first-instance",
+    "rg11b10ufloat-renderable",
+    "shader-f16",
+    "texture-compression-bc",
+    "texture-compression-bc-sliced-3d",
+    "timestamp-query"
+   ],
+   "maxBufferSize": 4503599627370496,
+   "maxStorageBufferBindingSize": 2147483644,
+   "timestampQuery": true,
+   "software": false,
+   "softwareReason": null
+  }
+ },
+ "sysinfoEnd": {
+  "date": "2026-11-24T21:04:43.981Z",
+  "hostname": "pop-os",
+  "os": "linux",
+  "arch": "x86_64",
+  "osRelease": "7.0.11-76070011-generic",
+  "loadavg": [
+   5.5595703125,
+   4.02685546875,
+   3.21484375
+  ],
+  "deno": {
+   "deno": "2.7.5",
+   "v8": "14.6.202.9-rusty",
+   "typescript": "5.9.2"
+  },
+  "env": {
+   "DENO_WEBGPU_BACKEND": "vulkan"
+  },
+  "nvidiaSmi": [
+   {
+    "name": "NVIDIA GeForce RTX 2060",
+    "driver_version": "580.159.03",
+    "memory.total": "6144",
+    "memory.used": "689",
+    "memory.free": "5049",
+    "pcie.link.gen.current": "3",
+    "pcie.link.width.current": "16",
+    "clocks.max.sm": "2160",
+    "clocks.max.mem": "7001",
+    "power.limit": "190.00",
+    "temperature.gpu": "57",
+    "pstate": "P3",
+    "compute_mode": "Default",
+    "vbios_version": "90.06.2E.40.D3"
+   }
+  ],
+  "nvidiaSmiVersion": [
+   "NVIDIA-SMI version  : 580.159.03",
+   "NVML version        : 580.159",
+   "DRIVER version      : 580.159.03",
+   "CUDA Version        : 13.0"
+  ],
+  "gpuProcesses": "14860, cosmic-term, 47 MiB\n14861, cosmic-term, 47 MiB\n2626530, chrome, 60 MiB\n3463045, cosmic-term, 43 MiB\n3727115, zed-editor, 83 MiB\n3779259, cosmic-files, 143 MiB",
+  "vulkan": null,
+  "cpuModel": null,
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           43 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  16\nOn-line CPU(s) list:                     0-15\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 7 2700X Eight-Core Processor\nCPU family:                              23\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      65%\nCPU max MHz:                             3700.0000\nCPU min MHz:                             2200.0000\nBogoMIPS:                                7399.20\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb hw_pstate ssbd ibpb vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif overflow_recov succor smca sev sev_es\nVirtualization:                          AMD-V\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               512 KiB (8 instances)\nL2 cache:                                4 MiB (8 instances)\nL3 cache:                                16 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-15\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; untrained return thunk; SMT vulnerable\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace",
+  "memTotalKiB": null,
+  "memAvailableKiB": null,
+  "cpuGovernor": null,
+  "distro": "Pop!_OS 24.04 LTS",
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)"
+ }
+}

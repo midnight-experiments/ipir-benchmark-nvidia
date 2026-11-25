@@ -1,0 +1,365 @@
+{
+ "schema": "ipir-benchmark-nvidia/1",
+ "meta": {
+  "name": "pop-os-2026-11-24-quick",
+  "date": "2026-11-24",
+  "quick": true,
+  "repoCommit": "32668eb",
+  "denoWebgpuBackend": "vulkan",
+  "started": "2026-11-24T20:55:58Z",
+  "seconds": 14
+ },
+ "machine": {
+  "hostname": "pop-os",
+  "gpu": "NVIDIA GeForce RTX 2060",
+  "driver": "580.159.03",
+  "vramMiB": 6144,
+  "vramUsedAtStartMiB": 688,
+  "vulkan": null,
+  "webgpuAdapter": {
+   "summary": "4318 7944 NVIDIA GeForce RTX 2060",
+   "vendor": "4318",
+   "architecture": "",
+   "device": "7944",
+   "description": "NVIDIA GeForce RTX 2060",
+   "isFallbackAdapter": false,
+   "features": [
+    "bgra8unorm-storage",
+    "depth-clip-control",
+    "depth32float-stencil8",
+    "dual-source-blending",
+    "float32-filterable",
+    "immediate-data",
+    "indirect-first-instance",
+    "rg11b10ufloat-renderable",
+    "shader-f16",
+    "texture-compression-bc",
+    "texture-compression-bc-sliced-3d",
+    "timestamp-query"
+   ],
+   "maxBufferSize": 4503599627370496,
+   "maxStorageBufferBindingSize": 2147483644,
+   "timestampQuery": true,
+   "software": false,
+   "softwareReason": null
+  },
+  "cpu": null,
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "ramGiB": null,
+  "os": "Pop!_OS 24.04 LTS",
+  "kernel": "7.0.11-76070011-generic",
+  "deno": "2.7.5",
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "loadavgStart": [
+   3.294921875,
+   2.67578125,
+   2.62646484375
+  ],
+  "loadavgEnd": [
+   3.6298828125,
+   2.7880859375,
+   2.66455078125
+  ]
+ },
+ "compile": [
+  {
+   "rows": 2048,
+   "tablesAtOnce": 1,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 1191.35,
+   "wallMsAll": [
+    1191.35
+   ],
+   "perTableMedianMs": {
+    "build": 1181.24,
+    "hints": 95.67,
+    "packing": 1077.09
+   }
+  },
+  {
+   "rows": 8192,
+   "tablesAtOnce": 1,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 1305.43,
+   "wallMsAll": [
+    1305.43
+   ],
+   "perTableMedianMs": {
+    "build": 1293.39,
+    "hints": 231.33,
+    "packing": 1052.91
+   }
+  },
+  {
+   "rows": 2048,
+   "tablesAtOnce": 4,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 3553.89,
+   "wallMsAll": [
+    3553.89
+   ],
+   "perTableMedianMs": {
+    "build": 2585.105,
+    "hints": 350.40999999999997,
+    "packing": 2231.29
+   }
+  },
+  {
+   "rows": 8192,
+   "tablesAtOnce": 4,
+   "reps": 1,
+   "rayonThreads": 16,
+   "wallMs": 3874.91,
+   "wallMsAll": [
+    3874.91
+   ],
+   "perTableMedianMs": {
+    "build": 3406.5299999999997,
+    "hints": 893.85,
+    "packing": 2502.87
+   }
+  }
+ ],
+ "fetch": {
+  "runs": 3,
+  "vramMib": 6144,
+  "results": [
+   {
+    "ok": false,
+    "skipped": false,
+    "rows": 2048,
+    "cols": 2048,
+    "residentBytes": 41943040,
+    "stage": "answering calls of 1",
+    "reason": "validation error occurred",
+    "stderrTail": "",
+    "processSeconds": 0.81928886
+   },
+   {
+    "ok": false,
+    "skipped": false,
+    "rows": 2048,
+    "cols": 4096,
+    "residentBytes": 83886080,
+    "stage": "answering calls of 1",
+    "reason": "validation error occurred",
+    "stderrTail": "",
+    "processSeconds": 0.611497538
+   },
+   {
+    "ok": false,
+    "skipped": false,
+    "rows": 4096,
+    "cols": 8192,
+    "residentBytes": 201326592,
+    "stage": "answering calls of 1",
+    "reason": "validation error occurred",
+    "stderrTail": "",
+    "processSeconds": 0.9318202460000002
+   }
+  ],
+  "largest": {
+   "fit": null,
+   "tried": []
+  }
+ },
+ "budget": {
+  "today": {
+   "set": "today",
+   "tables": [
+    {
+     "name": "read",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "nullifier",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "shielded groups",
+     "rows": 2048,
+     "cols": 4096
+    },
+    {
+     "name": "Dust groups",
+     "rows": 6144,
+     "cols": 28672
+    },
+    {
+     "name": "first coins",
+     "rows": 2048,
+     "cols": 2048
+    },
+    {
+     "name": "generation groups",
+     "rows": 2048,
+     "cols": 4096
+    }
+   ],
+   "rates": [
+    2,
+    5
+   ],
+   "modes": [
+    "seq",
+    "pool"
+   ],
+   "blocks": 4,
+   "intervalMs": 6000,
+   "baselineS": 5,
+   "budgetMs": 3000,
+   "residentBytes": 1115684864,
+   "note": "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+   "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+   "ok": false,
+   "stage": "uploading table read 2048x2048",
+   "error": "uploading table read 2048x2048: GPU out of memory: not enough memory left"
+  },
+  "10m": null
+ },
+ "sysinfoStart": {
+  "date": "2026-11-24T20:55:57.629Z",
+  "hostname": "pop-os",
+  "os": "linux",
+  "arch": "x86_64",
+  "osRelease": "7.0.11-76070011-generic",
+  "loadavg": [
+   3.294921875,
+   2.67578125,
+   2.62646484375
+  ],
+  "deno": {
+   "deno": "2.7.5",
+   "v8": "14.6.202.9-rusty",
+   "typescript": "5.9.2"
+  },
+  "env": {
+   "DENO_WEBGPU_BACKEND": "vulkan"
+  },
+  "nvidiaSmi": [
+   {
+    "name": "NVIDIA GeForce RTX 2060",
+    "driver_version": "580.159.03",
+    "memory.total": "6144",
+    "memory.used": "688",
+    "memory.free": "5050",
+    "pcie.link.gen.current": "1",
+    "pcie.link.width.current": "16",
+    "clocks.max.sm": "2160",
+    "clocks.max.mem": "7001",
+    "power.limit": "190.00",
+    "temperature.gpu": "50",
+    "pstate": "P8",
+    "compute_mode": "Default",
+    "vbios_version": "90.06.2E.40.D3"
+   }
+  ],
+  "nvidiaSmiVersion": [
+   "NVIDIA-SMI version  : 580.159.03",
+   "NVML version        : 580.159",
+   "DRIVER version      : 580.159.03",
+   "CUDA Version        : 13.0"
+  ],
+  "gpuProcesses": "14860, cosmic-term, 47 MiB\n14861, cosmic-term, 47 MiB\n2626530, chrome, 60 MiB\n3463045, cosmic-term, 43 MiB\n3727115, zed-editor, 83 MiB\n3779259, cosmic-files, 143 MiB",
+  "vulkan": null,
+  "cpuModel": null,
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           43 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  16\nOn-line CPU(s) list:                     0-15\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 7 2700X Eight-Core Processor\nCPU family:                              23\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      92%\nCPU max MHz:                             3700.0000\nCPU min MHz:                             2200.0000\nBogoMIPS:                                7399.20\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb hw_pstate ssbd ibpb vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif overflow_recov succor smca sev sev_es\nVirtualization:                          AMD-V\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               512 KiB (8 instances)\nL2 cache:                                4 MiB (8 instances)\nL3 cache:                                16 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-15\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; untrained return thunk; SMT vulnerable\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace",
+  "memTotalKiB": null,
+  "memAvailableKiB": null,
+  "cpuGovernor": null,
+  "distro": "Pop!_OS 24.04 LTS",
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)",
+  "webgpu": {
+   "summary": "4318 7944 NVIDIA GeForce RTX 2060",
+   "vendor": "4318",
+   "architecture": "",
+   "device": "7944",
+   "description": "NVIDIA GeForce RTX 2060",
+   "isFallbackAdapter": false,
+   "features": [
+    "bgra8unorm-storage",
+    "depth-clip-control",
+    "depth32float-stencil8",
+    "dual-source-blending",
+    "float32-filterable",
+    "immediate-data",
+    "indirect-first-instance",
+    "rg11b10ufloat-renderable",
+    "shader-f16",
+    "texture-compression-bc",
+    "texture-compression-bc-sliced-3d",
+    "timestamp-query"
+   ],
+   "maxBufferSize": 4503599627370496,
+   "maxStorageBufferBindingSize": 2147483644,
+   "timestampQuery": true,
+   "software": false,
+   "softwareReason": null
+  }
+ },
+ "sysinfoEnd": {
+  "date": "2026-11-24T20:56:11.776Z",
+  "hostname": "pop-os",
+  "os": "linux",
+  "arch": "x86_64",
+  "osRelease": "7.0.11-76070011-generic",
+  "loadavg": [
+   3.6298828125,
+   2.7880859375,
+   2.66455078125
+  ],
+  "deno": {
+   "deno": "2.7.5",
+   "v8": "14.6.202.9-rusty",
+   "typescript": "5.9.2"
+  },
+  "env": {
+   "DENO_WEBGPU_BACKEND": "vulkan"
+  },
+  "nvidiaSmi": [
+   {
+    "name": "NVIDIA GeForce RTX 2060",
+    "driver_version": "580.159.03",
+    "memory.total": "6144",
+    "memory.used": "688",
+    "memory.free": "5050",
+    "pcie.link.gen.current": "3",
+    "pcie.link.width.current": "16",
+    "clocks.max.sm": "2160",
+    "clocks.max.mem": "7001",
+    "power.limit": "190.00",
+    "temperature.gpu": "51",
+    "pstate": "P0",
+    "compute_mode": "Default",
+    "vbios_version": "90.06.2E.40.D3"
+   }
+  ],
+  "nvidiaSmiVersion": [
+   "NVIDIA-SMI version  : 580.159.03",
+   "NVML version        : 580.159",
+   "DRIVER version      : 580.159.03",
+   "CUDA Version        : 13.0"
+  ],
+  "gpuProcesses": "14860, cosmic-term, 47 MiB\n14861, cosmic-term, 47 MiB\n2626530, chrome, 60 MiB\n3463045, cosmic-term, 43 MiB\n3727115, zed-editor, 83 MiB\n3779259, cosmic-files, 143 MiB",
+  "vulkan": null,
+  "cpuModel": null,
+  "lscpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           43 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  16\nOn-line CPU(s) list:                     0-15\nVendor ID:                               AuthenticAMD\nModel name:                              AMD Ryzen 7 2700X Eight-Core Processor\nCPU family:                              23\nModel:                                   8\nThread(s) per core:                      2\nCore(s) per socket:                      8\nSocket(s):                               1\nStepping:                                2\nFrequency boost:                         enabled\nCPU(s) scaling MHz:                      73%\nCPU max MHz:                             3700.0000\nCPU min MHz:                             2200.0000\nBogoMIPS:                                7399.20\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb hw_pstate ssbd ibpb vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 clzero xsaveerptr arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif overflow_recov succor smca sev sev_es\nVirtualization:                          AMD-V\nL1d cache:                               256 KiB (8 instances)\nL1i cache:                               512 KiB (8 instances)\nL2 cache:                                4 MiB (8 instances)\nL3 cache:                                16 MiB (2 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-15\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Mitigation; untrained return thunk; SMT vulnerable\nVulnerability Spec rstack overflow:      Mitigation; Safe RET\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Mitigation; IBPB before exit to userspace",
+  "memTotalKiB": null,
+  "memAvailableKiB": null,
+  "cpuGovernor": null,
+  "distro": "Pop!_OS 24.04 LTS",
+  "logicalCpus": 16,
+  "physicalCpus": 8,
+  "rustc": "rustc 1.92.0 (ded5c06cf 2025-12-08)",
+  "cargo": "cargo 1.92.0 (344c4567c 2025-10-21)"
+ }
+}
