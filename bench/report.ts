@@ -96,6 +96,7 @@ const machine = {
   kernel: s.osRelease,
   deno: s.deno?.deno,
   rustc: s.rustc,
+  powerSource: s.powerSource ?? null,
   loadavgStart: s.loadavg,
   loadavgEnd: sysEnd?.loadavg ?? null,
 };
@@ -114,11 +115,15 @@ lines.push(
   "",
 );
 lines.push(
-  `GPU ${machine.gpu ?? "?"}, driver ${machine.driver ?? "?"}, ${machine.vramMiB ?? "?"} MiB (${machine.vramUsedAtStartMiB ?? "?"} used at start); ` +
+  (machine.driver === null && machine.vramMiB === null
+    ? `GPU ${machine.gpu ?? "?"}${machine.gpuCores ? `, ${machine.gpuCores} cores` : ""}; `
+    : `GPU ${machine.gpu ?? "?"}, driver ${machine.driver ?? "?"}, ${machine.vramMiB ?? "?"} MiB (${machine.vramUsedAtStartMiB ?? "?"} used at start); `) +
     `WebGPU adapter "${machine.webgpuAdapter?.summary ?? "?"}"${machine.webgpuAdapter?.timestampQuery ? " with timestamp queries" : ", no timestamp queries"}. ` +
     `CPU ${machine.cpu ?? "?"}, ${machine.physicalCpus ?? "?"} cores / ${machine.logicalCpus ?? "?"} threads, ${machine.ramGiB ?? "?"} GiB RAM. ` +
     `${machine.os ?? ""} ${machine.kernel ?? ""}, Deno ${machine.deno ?? "?"}, ${machine.rustc ?? "rustc ?"}. ` +
     `Load average at start ${machine.loadavgStart?.map((x: number) => x.toFixed(2)).join(" ") ?? "?"}, at end ${machine.loadavgEnd?.map((x: number) => x.toFixed(2)).join(" ") ?? "?"}. ` +
+    (machine.powerSource ? `Power: ${machine.powerSource}. ` : "") +
+    (meta?.preflight ? `Before the run: ${JSON.stringify(meta.preflight)}. ` : "") +
     `Run took ${meta?.seconds ? Math.round(meta.seconds / 60) + " min" : "?"}.`,
   "",
 );

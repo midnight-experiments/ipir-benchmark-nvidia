@@ -10,7 +10,8 @@
 # --skip-budget, --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
 # a GPU that is not NVIDIA's), --name NAME (results file name instead of <host>-<date>-<backend>).
 # Environment: DENO (the deno binary), DENO_WEBGPU_BACKEND (default "vulkan" on Linux), CARGO_BUILD_JOBS,
-# IPIR_BENCH_HOST (the host name in file names and results, instead of `hostname -s`).
+# IPIR_BENCH_HOST (the host name in file names and results, instead of `hostname -s`), IPIR_BENCH_PREFLIGHT (a JSON
+# object recorded in the results as `meta.preflight`, for example the load and the wait before the run).
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$PWD
@@ -133,7 +134,7 @@ VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/
 RAM_MIB=$("$DENO" eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));console.log(s.memTotalKiB?Math.floor(s.memTotalKiB/1024):"")' "$RAW/sysinfo-start.json")
 
 cat > "$RAW/meta.json" <<JSON
-{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","started":"$(date -u +%FT%TZ)"}
+{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
 JSON
 
 # 3. compile (task 2), for each build.

@@ -116,6 +116,7 @@ if (os === "linux") {
   info.perfCores = await run("sysctl", ["-n", "hw.perflevel0.physicalcpu"]);
   info.efficiencyCores = await run("sysctl", ["-n", "hw.perflevel1.physicalcpu"]);
   info.distro = `macOS ${await run("sw_vers", ["-productVersion"])}`;
+  info.powerSource = (await run("pmset", ["-g", "batt"]))?.match(/'([^']+)'/)?.[1] ?? null;
   try {
     const sp = JSON.parse((await run("system_profiler", ["SPDisplaysDataType", "-json"])) ?? "{}");
     const g = sp.SPDisplaysDataType?.[0];
