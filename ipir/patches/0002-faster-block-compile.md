@@ -46,7 +46,7 @@ median of 6 alternating runs):
 
 | Change | What it does | Packing |
 |---|---|---|
-| `public_dot` without division or allocation | Runs the same butterflies as spiral's single-prime NTT, on spiral's own root tables, with a 64-bit lazy Shoup multiply (a precomputed quotient per fixed multiplier, values kept in [0, 2p)) and a branch-free select instead of the `subtle` one. Its buffers are allocated once per call and prime. The pointwise multiply uses a Shoup quotient that the prepared operand now stores for every word. The CRT reconstruction for two and three primes uses Shoup products instead of `u128 %`. A butterfly now costs about 1.8 ns. | 1,075 → 647 ms |
+| `public_dot` without division or allocation | Runs the same butterflies as spiral's single-prime NTT, on spiral's own root tables, with a 64-bit lazy Shoup multiply (a precomputed quotient per fixed multiplier, values kept in [0, 2p)) and a branch-free select instead of the `subtle` one. The NTT and the Shoup helpers are in `reinspiring/src/lazy_ntt.rs`. Its buffers are allocated once per call and prime. The pointwise multiply uses a Shoup quotient that `prepare_public_dot` stores for every word of the prepared operand. The CRT reconstruction for two and three primes uses Shoup products instead of `u128 %`. A butterfly costs about 1.8 ns. | 1,075 → 647 ms |
 | `decompose` and `tau_coeffs` without division | `NativeParams` only allows q = 2^k with k ≤ 56 and digit and dropped widths of at most 27 bits, so the digit split works in `i64` with masks and shifts instead of `i128` division. `tau_coeffs` takes a direct path when d and q are powers of two and g is odd: then g permutes the slots, each slot is written once, and reductions are masks. | 640 → 507 ms |
 | Both primes of a chain step in parallel | A chain step works on its auxiliary primes independently until the reconstruction. The chain now runs the primes as parallel Rayon tasks (`public_dot_parallel_primes`). The hints keep the sequential loop, because their loop over columns already fills the pool. | 521 → 491 ms |
 | Matrix compilation without copies | The chain's digit polynomials move into compilation instead of being cloned and added into zeroed rows. The ring FFT writes into one reused scratch row instead of cloning a row for every butterfly. `NativeMatrix::from_blocks` checks its blocks with a parallel scan, in the same order, so the same error wins. | 474 → 381 ms |
@@ -70,13 +70,22 @@ Three kinds of check confirm it:
 - New unit tests compare each new routine word for word with the code it replaces: the NTTs with spiral's, the
   reconstruction with the division formula, `public_dot` with the stock implementation at production shapes,
   `decompose` with the `i128` definition for every valid profile at every rounding and digit boundary, and
-  `tau_coeffs` with the general loop, including inputs the fast path does not take.
-- `ipir/bench/src/bin/pack_digest.rs` hashes the hint masks and every word a built `NativeServer` keeps (setup id,
-  both masks, the compiled matrices). With and without the patch, the hashes are equal at 2,048, 8,192, 16,384 and
-  32,768 rows, for seeds 1, 2 and 3. 32,768 rows is the size where the hints take the three-prime path. A deliberate
-  +1 on one matrix word, and on one hint word, changes the hash.
-- The crates' own tests pass: `cargo test --release -p reinspiring -p ipir-sp`, 143 passed, plus the ignored
+  `tau_coeffs` with the general loop, including inputs the fast path does not take. A test also checks that
+  `ring_fft_eval_pow2` gives the unpatched output when a row is longer than the first.
+- `ipir/bench/src/bin/pack_digest.rs` computes the hints and the packing state through the public calls that
+  `NativeServer::build_with_concurrency` makes: `LiftContext::public_dot` for each column, then
+  `NativePreprocessed::build_two_mask`. It hashes the hint masks, both public masks, and the compiled matrix with its
+  storage width. The matrix comes from `NativePreprocessed::matrix()`, the one hidden accessor the patch adds. The
+  reference digests come from the unpatched crates with only that accessor added. The hashes are equal at 2,048,
+  8,192, 16,384 and 32,768 rows, for seeds 1, 2 and 3. 32,768 rows is the size where the hints take the three-prime
+  path. A deliberate +1 on one matrix word changes the hash, and so does a +1 on one coefficient of every hint mask.
+- The crates' own tests pass: `cargo test --release -p reinspiring -p ipir-sp`, 144 passed, plus the ignored
   degree-2,048 roundtrip when run explicitly.
+
+The checks ran on a Ryzen 7 2700X, which lacks AVX-512 VBMI, so they did not reach the bit-packed `Packed27` and
+`Packed28` matrix storage that `NativeMatrix::from_blocks` picks on CPUs with VBMI. The patched scan picks those widths
+from the same centered range that decides between `i32` and `i64` words, and the test
+`blocks_roundtrip_and_multiply_at_storage_boundaries` covers that choice on the 2700X.
 
 ## Results
 
@@ -116,13 +125,15 @@ at p50.
 
 ## What the patch costs
 
-- About 500 lines of code and 310 lines of tests added to `reinspiring` and `ipir-sp`, and 166 lines removed. The
-  vendored crates then differ from `valargroup/ipir-sp` beyond patch 0001.
-- Each `PreparedPublicDot` stores a Shoup quotient for every transform word, twice its earlier size and under 1 MB for
-  the benchmark's profile.
+- About 450 lines of code and 320 lines of tests added to `reinspiring`, and 170 lines removed. The patch touches 7
+  files and creates one of them, `reinspiring/src/lazy_ntt.rs`. `ipir-sp` is unchanged. The vendored crates then differ
+  from `valargroup/ipir-sp` beyond patch 0001.
+- Each `PreparedPublicDot` stores a Shoup quotient for every transform word, which doubles its size. It stays under
+  1 MB for the benchmark's profile. The client's decoder keeps only the transforms of its masks and computes no
+  quotients.
 - `compile_fast` copies its input once up front.
-- Two `#[doc(hidden)]` read-only accessors (`digest_words`, `digest_hint_masks`) for the equality check, and `sha2` in
-  the bench crate. The public API is otherwise unchanged.
+- One `#[doc(hidden)]` read-only accessor, `NativePreprocessed::matrix()`, for the equality check, and `sha2` in the
+  bench crate. The public API is otherwise unchanged.
 - `std::hint::select_unpredictable` needs Rust 1.88. The crates declare `rust-version = "1.89"`.
 - The new NTT and pointwise multiply run only inside `public_dot`, which handles public preprocessing data: the
   public setup, the masks it expands to, and the database the server already holds. The stock code documents
