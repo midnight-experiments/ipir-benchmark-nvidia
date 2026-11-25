@@ -1165,6 +1165,12 @@ pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, Reinspiri
     // NativeParams fixes q = 2^q_bits <= 2^56 and bits, dropped <= 27, and a < q,
     // so every intermediate is a non-negative i64 (digits aside): masks equal the
     // Euclidean remainders and shifts the exact divisions of the i128 definition.
+    debug_assert!(
+        p.q.is_power_of_two()
+            && p.q <= 1 << 56
+            && p.bits <= MAX_GADGET_BITS
+            && p.dropped <= MAX_GADGET_BITS
+    );
     let z = 1i64 << p.bits;
     let rounding = if p.dropped == 0 {
         0
@@ -1346,7 +1352,7 @@ mod decompose_fast_path_tests {
     fn i64_digits_equal_i128_definition_for_every_profile() {
         let mut rng = rand::rngs::StdRng::seed_from_u64(0xdec0);
         let mut profiles = 0;
-        for q_bits in 16..=56u32 {
+        for q_bits in 1..=63u32 {
             for bits in 1..=MAX_GADGET_BITS {
                 for ell in 1..=8 {
                     let Ok(p) =
