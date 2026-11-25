@@ -94,7 +94,7 @@ for (const b of builds) {
     const runs: Any[] = (s.runs ?? []).filter((x: Any) => x.mode !== "none");
     say(s.ok === true && runs.length > 0, `budget ${set}, build ${b}: ${runs.length} run(s)${s.ok === true ? "" : `, not ok${s.error ? ` (${String(s.error).slice(0, 300)})` : ""}`}`);
     const over = runs.filter((x) => x.overBudget > 0).length;
-    if (over) console.log(`note    budget ${set}, build ${b}: ${over} of ${runs.length} run(s) had a block over 3 s (a result, not a failure)`);
+    if (over) console.log(`note    budget ${set}, build ${b}: ${over} of ${runs.length} run(s) had a block over the 3 s ceiling (a result, not a failure)`);
   }
 }
 

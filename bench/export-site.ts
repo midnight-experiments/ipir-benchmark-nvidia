@@ -28,6 +28,10 @@
  * `atOnce`, several tables of a row count at once; `sets`, one chain block of the six tables, back to back and with
  * the GPU idle before each build (`afterIdle...`, as between chain blocks). And `budget.gpu`: the
  * budget cells with the blocks built on the GPU that is answering (`compileP50S` is then the GPU build).
+ *
+ * Every budget cell has the share of the time between two blocks (6 s) that the block's work takes at p50
+ * (`windowPct`, with `compilePct` and `uploadPct` for its two parts), and how many blocks were over the 1 s goal
+ * (`over1s`) and over the 3 s ceiling (`over3s`).
  */
 import { options } from "./lib.ts";
 
@@ -113,6 +117,7 @@ const compile: Record<Build, Any[]> = { stock: [], patch0002: [] };
 const budget: Record<Build | "gpu", Any[]> = { stock: [], patch0002: [], gpu: [] };
 /** A budget set's cells for the page. */
 function budgetRows(s: Any, set: string): Any[] {
+  const pct = (ms: number | null | undefined) => (ms === null || ms === undefined ? null : round((ms / (s.intervalMs ?? 6000)) * 100, 1));
   return s.runs.filter((x: Any) => x.mode !== "none").map((run: Any) => ({
     shapes: set,
     callsPerSec: run.rate,
@@ -121,6 +126,11 @@ function budgetRows(s: Any, set: string): Any[] {
     blockWorkP99S: round(run.blockWorkMs.p99 / 1000, 3),
     compileP50S: round(run.compileMs.p50 / 1000, 3),
     uploadP50Ms: round(run.uploadMs?.p50, 2),
+    windowPct: pct(run.blockWorkMs.p50),
+    compilePct: pct(run.compileMs.p50),
+    uploadPct: pct(run.uploadMs?.p50),
+    // Runs made before the 1 s goal keep every block's time: count from those.
+    over1s: run.overGoal ?? (run.work ?? []).filter((w: Any) => w.workMs > 1000).length,
     over3s: run.overBudget,
     blocks: run.blocks,
   }));
