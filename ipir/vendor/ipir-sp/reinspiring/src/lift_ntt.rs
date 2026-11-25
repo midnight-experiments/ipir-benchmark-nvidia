@@ -330,6 +330,13 @@ impl LiftContext {
             PRIMES[1],
         );
         let x = r0 as u128 + p0 * t as u128;
+        self.center_mod_q(x, product)
+    }
+
+    // x < product is the residue of a signed integer of magnitude below
+    // product / 2: recover the integer, then reduce it modulo q.
+    #[inline(always)]
+    fn center_mod_q(&self, x: u128, product: u128) -> u64 {
         let signed = if x > product / 2 {
             x as i128 - product as i128
         } else {
@@ -711,7 +718,9 @@ impl LiftContext {
     }
 
     // Canonical residues modulo all three primes. Mixed-radix (Garner) CRT
-    // with Shoup products; the signed value is reduced modulo q.
+    // with Shoup products; the signed value is reduced modulo q. `multiply`,
+    // `sum_prepared` and `sum_cached` compute the same three-prime CRT with
+    // u128 remainders, so this file has two of them.
     fn reconstruct_three(&self, r0: u64, r1: u64, r2: u64) -> u64 {
         let [p0, p1, p2] = PRIMES;
         // r0 < p0 < p1, so r0 is already reduced modulo p1.
@@ -739,16 +748,7 @@ impl LiftContext {
             p2,
         );
         let x = r0 as u128 + p0 as u128 * t1 as u128 + p0 as u128 * p1 as u128 * t2 as u128;
-        let signed = if x > self.product / 2 {
-            x as i128 - self.product as i128
-        } else {
-            x as i128
-        };
-        if self.q.is_power_of_two() {
-            signed as u64 & (self.q - 1)
-        } else {
-            signed.rem_euclid(self.q as i128) as u64
-        }
+        self.center_mod_q(x, self.product)
     }
 
     /// Sum independent exact products, reducing each one before accumulation.
@@ -822,8 +822,31 @@ mod exact_fast_path_tests {
     use super::*;
     use rand::{Rng, SeedableRng};
 
+    // Reference CRT: mixed radix with u128 remainders over the first
+    // residues.len() primes, centered, then reduced modulo ctx.q.
+    fn crt_by_division(ctx: &LiftContext, residues: &[u64]) -> u64 {
+        let product: u128 = PRIMES[..residues.len()]
+            .iter()
+            .map(|&x| x as u128)
+            .product();
+        let mut x = residues[0] as u128;
+        let mut m = PRIMES[0] as u128;
+        for j in 1..residues.len() {
+            let p = PRIMES[j] as u128;
+            let delta = (residues[j] as u128 + p - x % p) % p;
+            x += m * (delta * ctx.inverses[j - 1] as u128 % p);
+            m *= p;
+        }
+        let signed = if x > product / 2 {
+            x as i128 - product as i128
+        } else {
+            x as i128
+        };
+        signed.rem_euclid(ctx.q as i128) as u64
+    }
+
     // Reference: the same dot product through spiral's to_ntt, multiply and
-    // from_ntt, reconstructed with u128 remainders.
+    // from_ntt, reconstructed with crt_by_division.
     fn public_dot_reference(ctx: &LiftContext, a: &PreparedPublicDot, b: &[Vec<u64>]) -> Vec<u64> {
         let mut residues = Vec::with_capacity(a.transforms.len());
         for (params, operands) in ctx.params.iter().zip(&a.transforms) {
@@ -857,26 +880,10 @@ mod exact_fast_path_tests {
             }
             residues.push(from_ntt_alloc(&sum).as_slice().to_vec());
         }
-        let product: u128 = PRIMES[..residues.len()]
-            .iter()
-            .map(|&x| x as u128)
-            .product();
         (0..ctx.d)
             .map(|i| {
-                let mut x = residues[0][i] as u128;
-                let mut m = PRIMES[0] as u128;
-                for j in 1..residues.len() {
-                    let p = PRIMES[j] as u128;
-                    let delta = (residues[j][i] as u128 + p - x % p) % p;
-                    x += m * (delta * ctx.inverses[j - 1] as u128 % p);
-                    m *= p;
-                }
-                let signed = if x > product / 2 {
-                    x as i128 - product as i128
-                } else {
-                    x as i128
-                };
-                signed.rem_euclid(ctx.q as i128) as u64
+                let column: Vec<u64> = residues.iter().map(|r| r[i]).collect();
+                crt_by_division(ctx, &column)
             })
             .collect()
     }
@@ -906,21 +913,7 @@ mod exact_fast_path_tests {
             for [r0, r1, r2] in cases {
                 for count in [2, 3] {
                     let residues = [r0, r1, r2];
-                    let product: u128 = PRIMES[..count].iter().map(|&x| x as u128).product();
-                    let mut x = r0 as u128;
-                    let mut m = p0 as u128;
-                    for j in 1..count {
-                        let p = PRIMES[j] as u128;
-                        let delta = (residues[j] as u128 + p - x % p) % p;
-                        x += m * (delta * ctx.inverses[j - 1] as u128 % p);
-                        m *= p;
-                    }
-                    let signed = if x > product / 2 {
-                        x as i128 - product as i128
-                    } else {
-                        x as i128
-                    };
-                    let expected = signed.rem_euclid(q as i128) as u64;
+                    let expected = crt_by_division(&ctx, &residues[..count]);
                     let actual = if count == 2 {
                         ctx.reconstruct_two(r0, r1)
                     } else {
