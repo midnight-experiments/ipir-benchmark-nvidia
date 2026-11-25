@@ -25,7 +25,8 @@
  *
  * A run that built the blocks on the GPU (`gpu/block-build.ts`) also has `gpuCompile` (null otherwise): `check`, how
  * many of the checked blocks equal the CPU's output; `one`, one table per row count, with the GPU's time per stage;
- * `atOnce`, several tables of a row count at once; `sets`, one chain block of the six tables. And `budget.gpu`: the
+ * `atOnce`, several tables of a row count at once; `sets`, one chain block of the six tables, back to back and with
+ * the GPU idle before each build (`afterIdle...`, as between chain blocks). And `budget.gpu`: the
  * budget cells with the blocks built on the GPU that is answering (`compileP50S` is then the GPU build).
  */
 import { options } from "./lib.ts";
@@ -167,7 +168,16 @@ if (gpuFile) {
       compileMs: round(s.stagesExecMedianMs?.compile, 2),
     })),
     atOnce: (t?.shapes ?? []).flatMap((s: Any) => (s.atOnce ?? []).filter((m: Any) => !m.failed).map((m: Any) => ({ rows: s.rows, tables: m.tables, wallMs: round(m.wallMs?.median, 2), execMs: round(m.execMs?.median, 2) }))),
-    sets: (t?.sets ?? []).filter((s: Any) => !s.failed).map((s: Any) => ({ shapes: s.set, wallMs: round(s.wallMs?.median, 2), execMs: round(s.execMs?.median, 2), gpuMemoryMiB: round(s.scratchBytes / 2 ** 20, 0) })),
+    sets: (t?.sets ?? []).filter((s: Any) => !s.failed).map((s: Any) => ({
+      shapes: s.set,
+      wallMs: round(s.wallMs?.median, 2),
+      execMs: round(s.execMs?.median, 2),
+      // The same build with the GPU idle before it (null when not measured).
+      idleMs: s.afterIdle && !s.afterIdle.failed ? s.afterIdle.idleMs : null,
+      afterIdleWallMs: s.afterIdle && !s.afterIdle.failed ? round(s.afterIdle.wallMs?.median, 2) : null,
+      afterIdleExecMs: s.afterIdle && !s.afterIdle.failed ? round(s.afterIdle.execMs?.median, 2) : null,
+      gpuMemoryMiB: round(s.scratchBytes / 2 ** 20, 0),
+    })),
   };
   for (const set of ["today", "10m"] as const) {
     const s = gpuFile.r.budget?.gpu?.[set];

@@ -4,18 +4,26 @@
  *
  *   deno run --allow-read --allow-write --allow-run --allow-env bench/gpu-compile.ts --out FILE
  *     [--rows 2048,8192,16384,32768] [--reps 5] [--at-once 4,6] [--sets today,10m] [--set-reps 10]
- *     [--bin ipir/target/release]
+ *     [--idle-ms 6000] [--idle-reps 5] [--pause-ms 0] [--keep-warm-ms 0] [--bin ipir/target/release]
  *
  * Per row count:
  * - one table: the wall time from writing the block's cells to the build's end (what a server waits for), the GPU's
  *   own time for the four passes together (timestamp queries), and for each stage alone (a second build, each pass
  *   timed on its own);
  * - N tables of that shape at once (`--at-once`), all their chains in one dispatch: wall and GPU time.
- * Per set (`--sets`): one block of each of the block budget's six tables at once, one chain block's whole compile.
+ * Per set (`--sets`): one block of each of the block budget's six tables at once, one chain block's whole compile;
+ * measured back to back, and again with the GPU left idle for `--idle-ms` before each build (`afterIdle`), as it is
+ * between chain blocks. A GPU that lowers its clocks when idle builds more slowly then: on an RTX 4090, 213 ms of
+ * GPU time 6 s after the last build against 33 ms back to back. `--idle-ms 0` skips that measurement.
  *
  * A case that fails (most often: its buffers do not fit in the GPU's free memory) is recorded with its error and the
  * run goes on with the next, on a new device if the failure lost the old one; the run is `ok` when at least one case
  * was measured. The sets are measured first and the largest cases last, so a failure costs the least.
+ *
+ * For experiments: `--pause-ms N` leaves the GPU idle for N ms before every timed build of every case, and with
+ * `--keep-warm-ms M` a small dispatch (one table's compile stage, under a millisecond of GPU time) is submitted every
+ * M ms during a pause, to see whether that keeps the clocks up (on the RTX 4090: partly, 114 ms at M = 20).
+ * `--rows none` times the sets only.
  *
  * Kernels, tables and scratch are made before the clock starts (`setupMs`), and one build per set is not reported.
  * The cells are random; the time does not depend on them. Correctness is `bench/check-gpu-build.ts`'s job.
@@ -28,7 +36,11 @@ import { median, openBenchGpu, options, scoped, syntheticCells, xorshift } from 
 const opts = options(Deno.args);
 const out = opts.get("out");
 if (!out) throw new Error("usage: gpu-compile.ts --out FILE [options]");
-const rowsList = (opts.get("rows") ?? "2048,8192,16384,32768").split(",").filter(Boolean).map(Number);
+const rowsList = opts.get("rows") === "none" ? [] : (opts.get("rows") ?? "2048,8192,16384,32768").split(",").filter(Boolean).map(Number);
+const pauseMs = Number(opts.get("pause-ms") ?? 0);
+const idleMs = Number(opts.get("idle-ms") ?? 6000);
+const idleReps = Number(opts.get("idle-reps") ?? 5);
+const keepWarmMs = Number(opts.get("keep-warm-ms") ?? 0);
 const reps = Number(opts.get("reps") ?? 5);
 const atOnce = (opts.get("at-once") ?? "4,6").split(",").filter(Boolean).map(Number);
 const sets = (opts.get("sets") ?? "today,10m").split(",").filter(Boolean);
@@ -36,7 +48,7 @@ const setReps = Number(opts.get("set-reps") ?? 10);
 const bin = opts.get("bin") ?? "ipir/target/release";
 
 const summary = (xs: number[]) => (xs.length ? { min: Math.min(...xs), median: median(xs), max: Math.max(...xs), n: xs.length } : null);
-const result: Record<string, unknown> = { ok: false, reps, setReps };
+const result: Record<string, unknown> = { ok: false, reps, setReps, pauseMs, keepWarmMs, idleMs, idleReps };
 let stage = "opening the GPU";
 const tmp = await Deno.makeTempDir({ prefix: "ipir-gpu-compile-" });
 try {
@@ -93,7 +105,7 @@ try {
 
   let measured = 0;
   /** `measure`, or the case's failure: recorded, and the run goes on (unless the device is lost). */
-  async function time(what: string, rows: number[], n: number): Promise<Record<string, unknown>> {
+  async function time(what: string, rows: number[], n: number, pause = pauseMs): Promise<Record<string, unknown>> {
     let set: GpuBlockBuildSet | null = null;
     try {
       stage = `${what}: making the kernels and tables`;
@@ -103,7 +115,7 @@ try {
         await device.queue.onSubmittedWorkDone();
         return s;
       });
-      const r = await measure(what, set, rows, n, performance.now() - t0);
+      const r = await measure(what, set, rows, n, performance.now() - t0, pause);
       measured++;
       return r;
     } catch (e) {
@@ -125,13 +137,21 @@ try {
     }
   }
 
-  async function measure(what: string, set: GpuBlockBuildSet, rows: number[], n: number, setupMs: number) {
+  async function measure(what: string, set: GpuBlockBuildSet, rows: number[], n: number, setupMs: number, pause: number) {
     const next = xorshift(0x9b1d ^ rows.reduce((a, r) => a * 31 + r, rows.length));
     const cells = rows.map((r) => syntheticCells(r, 2048, next));
     stage = `${what}: building`;
     await scoped(device, stage, () => build(set, cells));
     const wall: number[] = [], exec: number[] = [];
     for (let i = 0; i < n; i++) {
+      for (const until = performance.now() + pause; performance.now() < until;) {
+        if (keepWarmMs > 0) {
+          const enc = device.createCommandEncoder();
+          set.encodeStage(enc, "compile");
+          device.queue.submit([enc.finish()]);
+        }
+        await new Promise((r) => setTimeout(r, Math.min(keepWarmMs > 0 ? keepWarmMs : pause, Math.max(0, until - performance.now()))));
+      }
       const b = await scoped(device, stage, () => build(set, cells));
       wall.push(b.wallMs);
       if (b.execMs !== null) exec.push(b.execMs);
@@ -162,7 +182,10 @@ try {
   for (const name of sets) {
     const rows = SET_ROWS[name];
     if (!rows) throw new Error(`--sets takes today and 10m: ${name}`);
-    setResults.push({ set: name, rows, ...(await time(`set ${name}`, rows, setReps)) });
+    const backToBack = await time(`set ${name}`, rows, setReps);
+    // The same build with the GPU idle before it, as between chain blocks.
+    const idle = idleMs > 0 && !backToBack.failed ? await time(`set ${name}, ${idleMs} ms after the last build`, rows, idleReps, idleMs) : null;
+    setResults.push({ set: name, rows, ...backToBack, afterIdle: idle ? { idleMs, wallMs: idle.wallMs ?? null, execMs: idle.execMs ?? null, failed: idle.failed ?? false, error: idle.error ?? null } : null });
   }
   const shapes: (Record<string, unknown> & { atOnce: Record<string, unknown>[] })[] = [];
   result.shapes = shapes;
