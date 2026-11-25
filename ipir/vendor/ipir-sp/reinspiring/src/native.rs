@@ -1203,46 +1203,29 @@ pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, Reinspiri
 fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, ReinspiringError> {
     let d = masks.len();
     // Each destination gets exactly one input here. Row-wise filling avoids
-    // scattering writes across the entire integer matrix.
-    let mut polys = vec![vec![0i64; d]; d];
-    polys.par_iter_mut().enumerate().for_each(|(k, poly)| {
-        for (j, row) in masks.iter().enumerate() {
-            let c = if k == 0 {
-                row[0] as i64
-            } else {
-                -(row[d - k] as i64)
-            };
-            poly[(j + k) & (d - 1)] = if j + k >= d { -c } else { c };
-        }
-    });
+    // scattering writes across the entire integer matrix; rows are allocated
+    // in parallel too.
+    let mut polys: Vec<Vec<i64>> = (0..d)
+        .into_par_iter()
+        .map(|k| {
+            let mut poly = vec![0i64; d];
+            for (j, row) in masks.iter().enumerate() {
+                let c = if k == 0 {
+                    row[0] as i64
+                } else {
+                    -(row[d - k] as i64)
+                };
+                poly[(j + k) & (d - 1)] = if j + k >= d { -c } else { c };
+            }
+            poly
+        })
+        .collect();
     bit_reverse_rows(&mut polys);
     let mut len = 2;
     // After a length-L stage, |coefficient| <= L*(q-1). Stay in i64 only
     // while that public worst-case bound fits, then widen before the next stage.
     while len <= d && (len as u128) * (q as u128 - 1) <= i64::MAX as u128 {
-        let half = len / 2;
-        let step = d / len;
-        polys.par_chunks_mut(len).with_min_len(4).for_each(|block| {
-            let (left, right) = block.split_at_mut(half);
-            left.par_iter_mut()
-                .zip(right.par_iter_mut())
-                .enumerate()
-                .with_min_len(16)
-                .for_each(|(k, (u, v))| {
-                    let rot = 2 * step * k;
-                    let old = v.clone();
-                    for ((u, v), &t) in u[..rot].iter_mut().zip(&mut v[..rot]).zip(&old[d - rot..])
-                    {
-                        *v = *u + t;
-                        *u -= t;
-                    }
-                    for ((u, v), &t) in u[rot..].iter_mut().zip(&mut v[rot..]).zip(&old[..d - rot])
-                    {
-                        *v = *u - t;
-                        *u += t;
-                    }
-                });
-        });
+        integer_ring_fft_stage(&mut polys, len);
         len *= 2;
     }
     let shift = d.trailing_zeros();
@@ -1257,7 +1240,7 @@ fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, Reinspir
             .collect());
     }
     let mut wide: Vec<Vec<i128>> = polys
-        .into_iter()
+        .into_par_iter()
         .map(|poly| poly.into_iter().map(i128::from).collect())
         .collect();
     integer_ring_fft_wide(&mut wide, len);
@@ -1286,33 +1269,58 @@ fn bit_reverse_rows<T>(a: &mut [T]) {
     }
 }
 fn integer_ring_fft_wide(a: &mut [Vec<i128>], mut len: usize) {
-    let d = a.len();
-    while len <= d {
-        let half = len / 2;
-        let step = d / len;
-        a.par_chunks_mut(len).with_min_len(4).for_each(|block| {
-            let (left, right) = block.split_at_mut(half);
-            left.par_iter_mut()
-                .zip(right.par_iter_mut())
-                .enumerate()
-                .with_min_len(16)
-                .for_each(|(k, (u, v))| {
-                    let rot = 2 * step * k;
-                    let old = v.clone();
-                    for ((u, v), &t) in u[..rot].iter_mut().zip(&mut v[..rot]).zip(&old[d - rot..])
-                    {
-                        *v = *u + t;
-                        *u -= t;
-                    }
-                    for ((u, v), &t) in u[rot..].iter_mut().zip(&mut v[rot..]).zip(&old[..d - rot])
-                    {
-                        *v = *u - t;
-                        *u += t;
-                    }
-                });
-        });
+    while len <= a.len() {
+        integer_ring_fft_stage(a, len);
         len *= 2;
     }
+}
+// One length-`len` stage of the integer ring FFT over d rows of length d. Each
+// butterfly's new v goes to a reused scratch row that then swaps with v, so v
+// is read unchanged without a copy.
+fn integer_ring_fft_stage<T>(a: &mut [Vec<T>], len: usize)
+where
+    T: Copy
+        + Default
+        + Send
+        + Sync
+        + std::ops::Add<Output = T>
+        + std::ops::Sub<Output = T>
+        + std::ops::AddAssign
+        + std::ops::SubAssign,
+{
+    let d = a.len();
+    let half = len / 2;
+    let step = d / len;
+    a.par_chunks_mut(len).with_min_len(4).for_each(|block| {
+        let (left, right) = block.split_at_mut(half);
+        left.par_iter_mut()
+            .zip(right.par_iter_mut())
+            .enumerate()
+            .with_min_len(16)
+            .for_each_init(
+                || vec![T::default(); d],
+                |scratch, (k, (u, v))| {
+                    let rot = 2 * step * k;
+                    for ((u, dst), &t) in u[..rot]
+                        .iter_mut()
+                        .zip(&mut scratch[..rot])
+                        .zip(&v[d - rot..])
+                    {
+                        *dst = *u + t;
+                        *u -= t;
+                    }
+                    for ((u, dst), &t) in u[rot..]
+                        .iter_mut()
+                        .zip(&mut scratch[rot..])
+                        .zip(&v[..d - rot])
+                    {
+                        *dst = *u - t;
+                        *u += t;
+                    }
+                    std::mem::swap(v, scratch);
+                },
+            );
+    });
 }
 
 fn invalid(s: &str) -> ReinspiringError {
