@@ -95,7 +95,7 @@ if [[ $QUICK == 1 ]]; then
   BUDGET_SETS=(today)
   BUDGET_ARGS=(--rates 2,5 --blocks 4 --baseline-s 5)
   GPU_CHECK_ARGS=(--rows 2048,8192 --seeds 1 --sets today)
-  GPU_COMPILE_ARGS=(--rows 2048,8192 --reps 3 --at-once 4 --sets today --set-reps 3)
+  GPU_COMPILE_ARGS=(--rows 2048,8192 --reps 3 --at-once 4 --sets today --set-reps 3 --idle-ms 2000 --idle-reps 2)
 else
   FETCH_ARGS=(--runs 9)
   COMPILE_ARGS=(2048,8192,16384,32768 3 1,4)

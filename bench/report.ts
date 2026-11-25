@@ -205,12 +205,17 @@ if (gpuCompile) {
     }
     lines.push("");
     if (t.sets?.length) {
-      lines.push("One chain block: one column block of each of the six tables, built at once (all chains in one dispatch).", "");
-      lines.push("| shapes | rows of the six tables | wall | GPU | GPU memory besides the cells |", "|---|---|---|---|---|");
+      lines.push(
+        "One chain block: one column block of each of the six tables, built at once (all chains in one dispatch). \"Back to back\": one build right after another. " +
+          "\"After idle\": the GPU left idle before each build, as between chain blocks; a GPU that lowers its clocks when idle is slower then.",
+        "",
+      );
+      lines.push("| shapes | rows of the six tables | back to back: wall | GPU | after idle: wall | GPU | GPU memory besides the cells |", "|---|---|---|---|---|---|---|");
       for (const s of t.sets) {
         const name = s.set === "today" ? "today's starting shapes" : "10 million outputs";
-        if (s.failed) lines.push(`| ${name} | ${s.rows.join(", ")} | ${bad(s)} | | |`);
-        else lines.push(`| ${name} | ${s.rows.join(", ")} | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
+        const idle = s.afterIdle && !s.afterIdle.failed ? s.afterIdle : null;
+        if (s.failed) lines.push(`| ${name} | ${s.rows.join(", ")} | ${bad(s)} | | | | |`);
+        else lines.push(`| ${name} | ${s.rows.join(", ")} | ${f(s.wallMs?.median)} ms | ${f(s.execMs?.median)} ms | ${idle ? `${f(idle.wallMs?.median)} ms (${idle.idleMs / 1000} s idle)` : "—"} | ${idle ? f(idle.execMs?.median) + " ms" : "—"} | ${f(s.scratchBytes / 2 ** 20, 0)} MiB |`);
       }
       lines.push("");
     }
