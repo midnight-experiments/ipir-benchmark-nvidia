@@ -67,11 +67,14 @@ The only differences reported are `Only in fresh/…` for the files listed under
 
 ## In ipir-benchmark-nvidia
 
-This folder was copied from UmbraDB's `examples/private-shielded-sync/ipir/vendor/` (commit `4f362386`). Two things
+This folder was copied from UmbraDB's `examples/private-shielded-sync/ipir/vendor/` (commit `4f362386`). Three things
 differ from what is written above:
 
 - `ipir-native-client/src/lib.rs` has patch `../patches/0001-setup-without-columns.patch` applied
-  (`NativePublicSetup::new_without_columns`); no other copied file is changed.
+  (`NativePublicSetup::new_without_columns`).
+- `ipir-sp/src/native.rs` and `reinspiring/src/{compile,lift_ntt,native,native_matrix}.rs` have patch
+  `../patches/0002-faster-block-compile.patch` applied (a faster CPU block compile with the same output words, and
+  read-only digest accessors). No other copied file is changed.
 - The workspace (`../Cargo.toml`) holds these five crates and the benchmark crate `../bench` only; there is no
   `core`, `node` or `wasm` here, and `../Cargo.lock` keeps the versions of the proof of concept's lock for every
   package still used.

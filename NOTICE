@@ -13,8 +13,9 @@ Apache License, Version 2.0 (LICENSE, identical to UmbraDB's):
 
 ipir/vendor/ipir-sp/ holds five crates of the IPIR+SP repository of the Zcash wallet services
 (https://github.com/valargroup/ipir-sp, commit 791b5287a26e4fe021f6f1a8fe70b7ab23849787), each licensed
-MIT OR Apache-2.0 (ipir/vendor/ORIGIN.md, ipir/vendor/LICENSE-MIT, ipir/vendor/LICENSE-APACHE), with one patch of
-this design applied (ipir/patches/0001-setup-without-columns.patch).
+MIT OR Apache-2.0 (ipir/vendor/ORIGIN.md, ipir/vendor/LICENSE-MIT, ipir/vendor/LICENSE-APACHE), with two patches
+applied: this design's ipir/patches/0001-setup-without-columns.patch, and ipir/patches/0002-faster-block-compile.patch
+(a faster CPU block compile with the same output words).
 
 UmbraDB's NOTICE follows.
 
