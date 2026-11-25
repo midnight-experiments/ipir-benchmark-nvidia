@@ -366,6 +366,7 @@
    }
   ]
  },
+ "gpuCompile": null,
  "fetch": {
   "backend": "gpu",
   "runs": 9,
@@ -50933,6 +50934,10 @@
      }
     ]
    }
+  },
+  "gpu": {
+   "today": null,
+   "10m": null
   }
  },
  "sysinfoStart": {
