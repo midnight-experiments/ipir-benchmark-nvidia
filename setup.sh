@@ -36,7 +36,22 @@ if [[ "$(uname)" == Linux ]]; then
     echo "vulkaninfo not found: sudo apt install vulkan-tools libvulkan1"
     ok=0
   fi
+  # The NVIDIA Vulkan driver is libGLX_nvidia.so.0, found through an ICD file. Containers (most GPU rentals) often
+  # have the library but not the file, or neither when the container lacks the `graphics` driver capability.
+  if command -v nvidia-smi >/dev/null && ! ls /usr/share/vulkan/icd.d/nvidia_icd*.json /etc/vulkan/icd.d/nvidia_icd*.json >/dev/null 2>&1; then
+    if ldconfig -p 2>/dev/null | grep 'libGLX_nvidia.so.0' >/dev/null; then
+      echo "no NVIDIA Vulkan ICD file, but the driver library is there: create it with"
+      echo "  sudo mkdir -p /usr/share/vulkan/icd.d && echo '{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"libGLX_nvidia.so.0\",\"api_version\":\"1.3\"}}' | sudo tee /usr/share/vulkan/icd.d/nvidia_icd.json"
+    elif [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+      echo "in a container without the NVIDIA Vulkan driver (libGLX_nvidia.so.0): start the container with"
+      echo "  NVIDIA_DRIVER_CAPABILITIES=all (or compute,utility,graphics); see the README, 'The nvidia file'"
+    else
+      echo "no NVIDIA Vulkan driver (libGLX_nvidia.so.0): sudo apt install libnvidia-gl-<driver branch>"
+    fi
+    ok=0
+  fi
 fi
+command -v patch >/dev/null || { echo "patch not found (ipir/build-stock.sh needs it): sudo apt install patch"; ok=0; }
 
 echo "== Deno $DENO_VERSION"
 if [[ -x .tools/deno/deno ]] && [[ "$(.tools/deno/deno --version | head -1 | awk '{print $2}')" == "$DENO_VERSION" ]]; then

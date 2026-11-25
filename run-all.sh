@@ -182,3 +182,10 @@ echo
 cat "results/$NAME.md"
 echo
 echo "== done in $(( (END-START)/60 )) min: results/$NAME.json and results/$NAME.md (raw files in $RAW)"
+if [[ $QUICK == 0 ]]; then
+  echo "== next: commit the results, then make the overview page's file (see the README, 'Backends'):"
+  echo "  git add results/$NAME.json results/$NAME.md && git commit -m \"Results from $HOST\""
+  echo "  $DENO run --allow-read --allow-write --allow-run bench/export-site.ts --label \"<GPU> + <CPU>\" results/$NAME.json"
+  [[ $BACKEND == nvidia-unknown-bar ]] && echo "  (resizable BAR was not detected either way: add --backend nvidia or --backend nvidia-no-bar after checking nvidia-smi -q -d MEMORY)"
+fi
+true
