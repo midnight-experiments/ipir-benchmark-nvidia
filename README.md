@@ -1,24 +1,83 @@
 # ipir-benchmark-nvidia
 
-This repository measures, on one Linux machine with an NVIDIA GPU (written for a GeForce RTX 2060 with 6 GB), how fast
-a server answers IPIR+SP private information retrieval calls on the GPU, and whether it can also keep its tables up to
-date as the chain grows. The answer code is the private shielded sync proof of concept's WebGPU implementation of
-IPIR+SP's server answer (`GpuIpirTable`, byte for byte the same answers as the native add-on), run under Deno, which
-uses Vulkan on Linux. The table preparation code is the Zcash IPIR+SP crates, in Rust, on the CPU.
+This repository measures how fast a server answers IPIR+SP private information retrieval calls, and whether it can
+also keep its tables up to date as the chain grows. It was written for one Linux machine with an NVIDIA GPU (a GeForce
+RTX 2060 with 6 GB), and now measures four backends:
+
+| Backend | Where the answers run | Host |
+|---|---|---|
+| `nvidia` | the GPU, WebGPU on Vulkan | Linux, NVIDIA GPU with resizable BAR |
+| `nvidia-no-bar` | the GPU, WebGPU on Vulkan | Linux, NVIDIA GPU without resizable BAR (needs the Vulkan layer in `tools/hide-memory-budget-layer/`) |
+| `metal` | the GPU, WebGPU on Metal | macOS, Apple silicon |
+| `cpu` | the CPU, the IPIR+SP crates' server path | any of the above |
+
+The GPU answer code is the private shielded sync proof of concept's WebGPU implementation of IPIR+SP's server answer
+(`GpuIpirTable`, byte for byte the same answers as the native add-on), run under Deno, which uses Vulkan on Linux and
+Metal on macOS. The CPU answer code is the add-on's: `NativeServer::respond` of the vendored IPIR+SP crates. The table
+preparation code is the Zcash IPIR+SP crates, in Rust, on the CPU, for every backend.
 
 It exists for the design of UmbraDB's private sync modules (spec 00065). There, every table follows the chain block by
 block (one block every 6 s), and the server must finish a block's table work in under 3 s while it keeps answering
-wallets. So far this has only been measured on an Apple M4 Max. The numbers here say whether a common, older GPU and
-an ordinary desktop CPU are enough: how long a call of 32 requests takes for each table shape, how long the CPU takes
-to compile one changed column block, and whether a block's work stays under 3 s while the GPU is answering calls.
+wallets. The production target is NVIDIA through CUDA, with WebGPU for Apple's Metal and other GPUs, and a CPU
+fallback. The numbers here say how long a call of 32 requests takes for each table shape on each backend, how long
+the CPU takes to compile one changed column block, and whether a block's work stays under 3 s while the server is
+answering calls. `bench/export-site.ts` turns a run into the file the overview page reads
+(https://umbradb-private-sync.pages.dev/, the server timings per backend).
+
+## Run it
+
+On the machine to measure (Linux with an NVIDIA GPU and its driver, or a Mac with Apple silicon):
+
+```sh
+git clone https://github.com/midnight-experiments/ipir-benchmark-nvidia.git
+cd ipir-benchmark-nvidia
+./bench.sh --install-deps
+```
+
+`bench.sh` is the whole procedure in one command. It checks the tools and the GPU stack, builds, runs a quick check
+of a few minutes, and stops there if anything failed. Then it runs the full benchmark on this host's GPU (about 80
+minutes), writes the results and the overview page's file, and packs them into one file to copy off the machine. On
+an NVIDIA GPU without resizable BAR it builds and loads the Vulkan layer by itself; with resizable BAR it does not
+load it. A full run takes over an hour, so start it inside `tmux` or `screen`, or with
+`nohup ./bench.sh --install-deps > bench.log 2>&1 &`.
+
+| Command | What it does |
+|---|---|
+| `./bench.sh --quick` | Setup and the quick check only, a few minutes. Its numbers are not results |
+| `./bench.sh` | Setup, the quick check, the full run on this host's GPU, the site file, the bundle |
+| `./bench.sh --cpu` | The same, then the full run again with the answers on the CPU (about 1.5 hours more) |
+| `./bench.sh --cpu-only` | The CPU backend alone, also on a host with no GPU |
+| `./bench.sh --cuda` | Also upstream's CUDA first-pass benchmark (NVIDIA; needs the CUDA driver library and NVRTC) |
+
+Other options: `--install-deps` installs what is missing (the apt packages `build-essential curl unzip git patch
+ca-certificates libvulkan1 vulkan-tools`, as root or with `sudo`, and Rust with rustup into `$HOME`); without it,
+`bench.sh` prints the command and stops. It never installs a GPU driver. `--skip-quick` goes straight to the full
+run. `--host NAME` sets the host's name in file names and results (rented machines have random names). `--label TEXT`
+sets the machine's name on the overview page, for example `--label "RTX 4090 + EPYC 7B13"`.
+
+What a run leaves, for a host named `box` on an NVIDIA GPU with resizable BAR:
+
+| File | What |
+|---|---|
+| `results/box-<date>-nvidia.json` | All data, including the machine description and the backend |
+| `results/box-<date>-nvidia.md` | A short summary, also printed at the end |
+| `site/box-<date>-nvidia-site.json` | The file the overview page reads |
+| `results/box-<date>-nvidia-quick.json`, `.md` | The quick check |
+| `results/box-<date>-bundle.tar.gz` | All of the above and the run's log, in one file (git ignores it) |
+
+To send the results back, either push them from the machine
+(`git checkout -b results/box && git add results site && git commit -s -m "Results from box" && git push -u origin HEAD`),
+or copy the bundle off it (`scp`) and unpack it at the top of a clone. The `.md` summary alone is enough to read the
+numbers; the `.json` holds the per-call and per-block data.
 
 ## What it measures
 
 | Step | Script | What |
 |---|---|---|
 | 1. `fetch` on the GPU | `bench/fetch-all.ts` → `bench/fetch-shape.ts` | For each table shape (rows × columns): 2048×2048, 2048×4096, 2048×8192, 4096×8192, 4096×12288, 6144×16384, 6144×28672, 8192×20480, 8192×22528, 10240×22528, 12288×26624, 14336×34816, 16384×18432, 16384×49152, 20480×40960, then the largest of 32768×32768, 32768×30720, … that fits. The time to answer a call of 32 requests (the padded call every wallet sends) and a call of 1. Reports wall time (from the call to the answer in host memory) and the GPU's own execution time per stage (timestamp queries). Median of 9 calls after a warm-up. Each shape runs in its own process, so a shape that does not fit in the GPU's memory is recorded as "does not fit" and the run goes on. |
+| 1. `fetch` on the CPU (backend `cpu`) | `bench/fetch-all.ts --backend cpu` → `ipir/bench/src/bin/cpu_fetch.rs` | The same shapes and calls, answered by `NativeServer::respond` on the CPU: the requests of a call one after another, each in parallel over the columns on all cores, as the add-on answers a call. Wall time only (there is no GPU time). Also the table's CPU build. Once per shape, the CPU's answers to 32 requests are compared byte for byte with `GpuIpirTable`'s on the host's GPU, for the same cells and compiled matrices (`bench/check-cpu-answer.ts`). |
 | 2. `compile` one column block | `ipir/bench/src/bin/compile_block.rs` | The CPU build of a table that is one column block (2,048 columns) at 2048, 8192, 16384 and 32768 rows, median of 3. Hint columns and packing matrix are timed separately. Then 4 at once in one process, sharing Rayon's pool, as the Node add-on would. |
-| 3. The 3 s block budget | `bench/budget.ts` + `ipir/bench/src/bin/block_worker.rs` | Six tables stay resident on the GPU. The GPU answers calls of 32 against them, round robin, at a steady 2, 5 and 10 calls/s; calls are issued open loop, so a slow call does not delay the next. Every 6 s a chain block changes one column block of every table. The CPU compiles the six blocks, either one after another on all cores (`seq`) or all at once on a pool of half the cores at the lowest priority (`pool`). Then the six new blocks (cells and matrix) are uploaded to the GPU. Reported: the block's work time (p50, p99 over 30 blocks) against 3 s, and the answer latency p50/p99 during block work and with no block work. Run at today's starting shapes (2048×2048 read, 2048×2048 nullifier, 2048×4096 shielded groups, 6144×28672 Dust groups, 2048×2048 first coins, 2048×4096 generation groups) and at the 10-million-output shapes (14336×34816 read, 16384×18432 nullifier, 8192×20480 groups, and the same three Dust tables). |
+| 3. The 3 s block budget | `bench/budget.ts` + `ipir/bench/src/bin/block_worker.rs` | Six tables stay resident on the GPU. The GPU answers calls of 32 against them, round robin, at a steady 2, 5 and 10 calls/s; calls are issued open loop, so a slow call does not delay the next. Every 6 s a chain block changes one column block of every table. The CPU compiles the six blocks, either one after another on all cores (`seq`) or all at once on a pool of half the cores at the lowest priority (`pool`). Then the six new blocks (cells and matrix) are uploaded to the GPU. Reported: the block's work time (p50, p99 over 30 blocks) against 3 s, and the answer latency p50/p99 during block work and with no block work. On the `cpu` backend, the six tables stay in a `cpu_server` process (`ipir/bench/src/bin/cpu_server.rs`) that answers the calls on the CPU, all cores, while `block_worker` compiles; there is no upload, so a block's work is its compile. Calls the CPU cannot keep up with queue; those still waiting 30 s after a run's last block are dropped and counted. Run at today's starting shapes (2048×2048 read, 2048×2048 nullifier, 2048×4096 shielded groups, 6144×28672 Dust groups, 2048×2048 first coins, 2048×4096 generation groups) and at the 10-million-output shapes (14336×34816 read, 16384×18432 nullifier, 8192×20480 groups, and the same three Dust tables). |
 
 Notes on what the numbers mean:
 
@@ -27,12 +86,20 @@ Notes on what the numbers mean:
 - The compile in step 3 rebuilds each changed block's whole hint columns. The real design only updates the hints for
   the new records, and that code is not built yet, so these figures are an **upper bound** for the hints part.
 - The setups use this design's patch 0001 (`new_without_columns`, seed and snapshot 32 zero bytes).
-- The CPU build of a column block uses patch 0002 (`ipir/patches/0002-faster-block-compile.patch`), which computes
-  the same output words as the unpatched crates in less time.
+- Steps 2 and 3 run twice: with the stock crates and with patch 0002 (`ipir/patches/0002-faster-block-compile.patch`),
+  which computes the same output words in less time. Patch 0002 is applied in `ipir/vendor/` (`ipir/target/release/`);
+  `ipir/build-stock.sh` builds the same programs from a copy with the patch reversed (`ipir/target/stock/release/`).
+  The results keep the two apart (`compile.stock`, `compile.patch0002`, and the same for `budget`). Step 1 on the CPU
+  uses the patched build. Patch 0002 changes one helper of the answer path, the CRT reconstruction in `prepare_pack`;
+  the GPU answer does not use the crates.
 - Every Deno call pays a fixed read-back cost (about 12 ms on macOS). That is why wall time is much larger than
   execution time for small shapes.
 
 ## Host requirements
+
+On macOS (Apple silicon), only Rust and `curl`/`unzip` are needed: `setup.sh` installs Deno for darwin-aarch64, and
+Deno's WebGPU uses Metal. There is no `nvidia-smi` or `vulkaninfo` to check there. The rest of this section is for
+Linux with an NVIDIA GPU.
 
 - Linux, x86_64: Ubuntu 22.04 or 24.04, or similar. Root is needed only to install the driver and the packages below.
 - NVIDIA driver **550 or newer** (535 should work; the RTX 2060 is Turing). The driver must include its **Vulkan ICD**:
@@ -51,41 +118,136 @@ Notes on what the numbers mean:
 - A machine that is otherwise idle. Close other GPU programs: `nvidia-smi` should show no other compute processes,
   and little memory in use by a desktop.
 
-## Setup and run
+## The steps by hand
+
+`bench.sh` runs these; each also runs alone:
 
 ```sh
-git clone git@github.com:midnight-experiments/ipir-benchmark-nvidia.git
-cd ipir-benchmark-nvidia
-./setup.sh            # checks the driver and Vulkan, installs Deno 2.7.5 into .tools/, fetches and builds the Rust side
-./run-all.sh --quick  # a few minutes: small shapes, few blocks; checks everything works
-./run-all.sh          # the full benchmark, about 45 to 60 minutes
+./setup.sh                  # checks the GPU stack, installs Deno 2.7.5 into .tools/, builds the Rust side (both builds)
+./run-all.sh --quick        # a few minutes: small shapes, few blocks; checks everything works
+./run-all.sh                # the full benchmark on this host's GPU, about 80 minutes
+./run-all.sh --backend cpu  # the full benchmark with the answers on the CPU, about 1.5 hours
+.tools/deno/deno run --allow-read bench/check-run.ts results/<run>.json   # is the run complete?
 ```
 
 `setup.sh` needs network access once: it downloads Deno and runs `cargo fetch --locked`. After that, builds are
 `--offline --locked`. To prepare an air-gapped host, run `cargo vendor` in `ipir/` on a connected machine and copy
-the result over.
+the result over. `./setup.sh --cpu` is for the CPU backend alone: a missing or unusable GPU does not fail it.
 
-`run-all.sh` writes `results/<host>-<date>.json` (all data, including the machine description) and
-`results/<host>-<date>.md` (a short summary, also printed at the end). It also writes raw files and a log in
-`results/raw/<host>-<date>/`, which git ignores. Options: `--quick`, `--skip-build`, `--skip-compile`,
-`--skip-fetch`, `--skip-budget`, `--allow-non-nvidia`, `--name NAME`.
+`run-all.sh` writes `results/<host>-<date>-<backend>.json` (all data, including the machine description and the
+backend) and `results/<host>-<date>-<backend>.md` (a short summary, also printed at the end). It also writes raw files
+and a log in `results/raw/<host>-<date>-<backend>/`, which git ignores. Options: `--backend cpu`, `--builds
+stock,patch0002`, `--quick`, `--skip-build`, `--skip-compile`, `--skip-fetch`, `--skip-budget`, `--no-gpu-check`,
+`--allow-non-nvidia`, `--name NAME`. `IPIR_BENCH_HOST=<name>` sets the host name used in the file names and results.
+`run-all.sh` does not load the Vulkan layer: on a GPU without resizable BAR, load it first
+(`tools/hide-memory-budget-layer/README.md`), or use `bench.sh`.
 
-How long it takes, in the full run: building about 2 min the first time. Step 2 is about 1 to 2 min. Step 1 is 5 to
-15 min, mostly making the synthetic tables on the host. Step 3 is about 40 min (2 shape sets × 3 rates × 2 modes × 30
-blocks × 6 s, plus baselines).
+`run-all.sh` goes on when a step fails, so that one failed shape does not lose the rest of a long run.
+`bench/check-run.ts` reads the results afterwards and lists what is missing or failed; it exits 1 on a problem. A
+shape that does not fit in the GPU's memory is a problem only in a quick run.
+
+How long it takes, in the full run: building about 4 min the first time (two builds). Step 2 is about 2 to 4 min for
+both builds. Step 1 is 5 to 15 min, mostly making the synthetic tables on the host. Step 3 is about 80 min (2 builds ×
+2 shape sets × 3 rates × 2 modes × 30 blocks × 6 s, plus baselines).
+
+## Backends, and the files for the overview page
+
+`run-all.sh` decides the backend (`bench/sysinfo.ts`, recorded as `backend` in the results and `gpuBackend` in the
+machine description):
+
+- `metal`: macOS. Deno's WebGPU on Metal. A software adapter is refused, as on Linux.
+- `nvidia` or `nvidia-no-bar`: Linux with an NVIDIA GPU. Resizable BAR is on when `nvidia-smi -q -d MEMORY` reports a
+  BAR1 total at least as large as the framebuffer total; the results keep both totals and BAR1's use. The results also
+  record whether the Vulkan layer of `tools/hide-memory-budget-layer/` was loaded (`VK_INSTANCE_LAYERS`). When
+  `nvidia-smi` reports neither total, the run is named `nvidia-unknown-bar`, and the export needs
+  `--backend nvidia` or `--backend nvidia-no-bar`.
+- `cpu`: `--backend cpu`, on any host. Steps 1 and 3 answer on the CPU. If the host has a usable GPU, step 1 also
+  checks the CPU's answers against it.
+
+`bench.sh` makes the file the overview page reads. By hand:
+
+```sh
+.tools/deno/deno run --allow-read --allow-write --allow-run bench/export-site.ts results/<host>-<date>-<backend>.json
+```
+
+It writes `site/<host>-<date>-<backend>-site.json` (schema `ipir-benchmark-site/1`): the machine, the `fetch` time
+of each shape that ran (wall time, and the GPU's own time, null on the CPU), the `compile` of one column block, and
+the 3 s budget cells, the last two for `stock` and `patch0002`. Shapes that did not fit and sections that did not run
+are left out, not filled in. `source.commit` is the commit that holds the inputs, so by default the export wants them
+committed; `--commit none` exports before the commit and leaves it null, which is what `bench.sh` does. To fill it
+in, run the export again after the results are committed. The page picks the files up from `site/`. The files there
+now:
+
+| Backend | Site file | From |
+|---|---|---|
+| `nvidia-no-bar` | `site/pop-os-2026-11-25-nvidia-no-bar-site.json` | `results/pop-os-2026-11-25-hidebudget-quiet.json` (stock) and `results/pop-os-2026-11-25-hidebudget-opt.json` (patch 0002): an RTX 2060 without resizable BAR, with the Vulkan layer |
+| `metal` | `site/m4-max-2026-11-25-metal-site.json` | `results/m4-max-2026-11-25-metal.json`: an Apple M4 Max |
+| `cpu` | not yet | `./bench.sh --cpu-only` on any host |
+| `nvidia` | not yet | a Linux host with a modern NVIDIA GPU and resizable BAR, below |
+
+The RTX 2060 runs predate backends: their results files hold one build each, so the export names it and fills in what
+`results/pop-os-notes.md` records and the files do not:
+
+```sh
+.tools/deno/deno run --allow-read --allow-write --allow-run bench/export-site.ts --backend nvidia-no-bar \
+  --label "RTX 2060 + Ryzen 7 2700X" \
+  --machine '{"cpu":"AMD Ryzen 7 2700X","ramGiB":31,"rebar":false,"memoryBudgetLayer":true}' \
+  results/pop-os-2026-11-25-hidebudget-quiet.json:stock results/pop-os-2026-11-25-hidebudget-opt.json:patch0002
+```
+
+## The `nvidia` file: a rented Linux machine with resizable BAR
+
+Rent a VM with one recent NVIDIA GPU passed through whole (an L4, L40S, A10, A100, H100 or an RTX 4090/5090 class
+card; not a vGPU or MIG slice), 8 or more vCPUs, 32 GB of RAM and Ubuntu 22.04 or 24.04. Data-centre GPUs and most
+recent clouds expose the full BAR (a T4 does not: its BAR1 is 256 MiB). A whole VM is simplest: the driver and its
+Vulkan part are yours to install.
+
+**A container instead of a VM** (RunPod, vast.ai and similar rent containers): the host's driver is mounted into
+the container, and only the parts its `NVIDIA_DRIVER_CAPABILITIES` names. The default, `compute,utility`, leaves out
+the Vulkan driver (`libGLX_nvidia.so.0`), and WebGPU then finds no NVIDIA device. Start the container with
+`NVIDIA_DRIVER_CAPABILITIES=all` (an environment variable in the provider's template; with Docker,
+`docker run --gpus all -e NVIDIA_DRIVER_CAPABILITIES=all ...`). Do not install a driver inside it. If
+`libGLX_nvidia.so.0` is there but `vulkaninfo` still sees no NVIDIA device, the ICD file is missing; `./setup.sh`
+prints the one line that creates it.
+
+Then:
+
+1. On a VM, the driver with its Vulkan part, which `bench.sh` does not install:
+   `sudo apt install nvidia-driver-570-server libnvidia-gl-570-server` (or the `-open` and desktop branches;
+   whatever the image has, add its `libnvidia-gl-<branch>`), then reboot. `nvidia-smi` must list the GPU.
+2. Clone and run the quick check first:
+   ```sh
+   git clone https://github.com/midnight-experiments/ipir-benchmark-nvidia.git && cd ipir-benchmark-nvidia
+   ./bench.sh --install-deps --quick --host <short name>
+   ```
+   What to look for in its output:
+   - `GPU backend: nvidia`, and `bar1 total` at least `fb total` (for example 32768 MiB BAR1 for a 24 GB card). If
+     BAR1 is 256 MiB, resizable BAR is off, and the run would be `nvidia-no-bar`.
+   - `without the layer, 1024 MiB: ok`: wgpu allows the buffers, and the layer is not loaded.
+   - The WebGPU adapter is the NVIDIA GPU, not llvmpipe.
+   - It ends with `The quick check passed`.
+3. The full run, on an otherwise idle machine, inside `tmux`:
+   ```sh
+   ./bench.sh --skip-quick --host <short name> --label "<GPU> + <CPU>"          # the nvidia file, about 80 minutes
+   ./bench.sh --skip-quick --host <short name> --label "<GPU> + <CPU>" --cpu --cuda   # or with that host's CPU and cuda_bench
+   ```
+   Then send back `results/<short name>-<date>-bundle.tar.gz`, or push (see "Run it").
+4. `--cuda` runs upstream's CUDA first-pass kernel, for comparison with the WebGPU scan (the production target is
+   CUDA). It needs the CUDA driver library and NVRTC (`sudo apt install cuda-nvrtc-12-8`, or the CUDA toolkit), and
+   loads them at run time. By hand:
+   ```sh
+   cd ipir
+   cargo run --release --locked -p simplepir-kernel --features cuda --example cuda_bench -- 14336 34816 100
+   cargo run --release --locked -p simplepir-kernel --features cuda --example cuda_bench -- 32768 32768 100
+   ```
+   It checks every GPU product against the CPU kernel and prints the upload time, the CPU time per query, and the GPU
+   wall, kernel and latency time per query with 1 and 4 callers. It times one query's first pass only (no packing,
+   no rounding), so it is not the same quantity as step 1's call of 32. `bench.sh` keeps its output in
+   `results/<short name>-<date>-cuda-bench.txt`.
 
 The results record: GPU name, driver, VRAM and VRAM in use (`nvidia-smi`); the Vulkan devices (`vulkaninfo
 --summary`); the WebGPU adapter Deno picked, and whether it has timestamp queries; CPU model, cores and threads; RAM;
 OS and kernel; Deno and Rust versions; the load average at the start and the end.
-
-## Sending the results back
-
-Either:
-
-- commit `results/<host>-<date>.json` and `.md` to a branch and push it:
-  `git checkout -b results/<host> && git add results/*.json results/*.md && git commit -m "Results from <host>" && git push -u origin HEAD`;
-- or paste the `.md` summary into the conversation. Attach the `.json` if you can; it holds the per-call and
-  per-block data.
 
 ## Troubleshooting
 
@@ -101,8 +263,9 @@ Either:
   run (`VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json`), or pass `--allow-non-nvidia` if that is really
   intended.
 - **"not enough memory left" for every shape, even small ones**: on an NVIDIA GPU without resizable BAR, wgpu's
-  memory-budget check counts the BAR heap, whose usage the driver sums over all processes, the desktop included. Load
-  the Vulkan layer in `tools/hide-memory-budget-layer/`. Its README shows how to check whether your host needs it.
+  memory-budget check counts the BAR heap, whose usage the driver sums over all processes, the desktop included.
+  `bench.sh` builds and loads the Vulkan layer in `tools/hide-memory-budget-layer/` when it sees this; `run-all.sh`
+  alone does not. The layer's README shows how to check whether your host needs it and how to load it by hand.
 - **Shapes that do not fit in memory**: expected for the largest shapes on 6 GB. A shape whose resident bytes
   (2 bytes a cell plus 32 MiB a column block) exceed the VRAM is skipped without trying. Any other shape is tried, and
   an out-of-memory error, a lost device or a 15-minute timeout is recorded as a skip with its reason. The "largest"
@@ -116,6 +279,23 @@ Either:
   record the load average and governor.
 
 ## What was checked, and where
+
+The backends, patch 0002's two builds and the site export were added and run on macOS (Apple M4 Max, 16 cores,
+48 GB, macOS 15.7.3, Deno 2.7.5, Rust 1.92.0). The full GPU run is `results/m4-max-2026-11-25-metal.json` (78 min).
+The CPU backend ran only as `--quick`: there, the CPU's answers equal the GPU's byte for byte at 2048 × 2048,
+2048 × 4096 and 4096 × 8192. The full CPU run has not been made. Resizable BAR detection was checked against the
+`nvidia-smi -q -d MEMORY` output of the RTX 2060 (BAR1 256 MiB, framebuffer 6144 MiB: `nvidia-no-bar`).
+
+Not run yet anywhere: `bench.sh` from start to end with a real benchmark, and on Linux the backends' code (the CPU
+answer programs, the stock build, `bench.sh`'s layer step, the Vulkan and container checks in `setup.sh`), the
+`nvidia` path on a card with resizable BAR, and `cuda_bench`. Checked on macOS without a benchmark run:
+`bench/check-run.ts` and the export against the committed Metal run and against copies of it renamed to `nvidia`,
+`nvidia-no-bar` and `nvidia-unknown-bar`; resizable BAR detection against `nvidia-smi -q -d MEMORY` reports with
+BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of steps, with stand-ins for `setup.sh`,
+`run-all.sh` and the GPU tools (the layer loaded and not, a failed quick check, a stopped run, the CPU options).
+The first `./bench.sh --quick` on a Linux host is the check of the rest.
+
+Before the backends:
 
 Developed and run on macOS (Apple M4 Max, Metal, Deno 2.7.5, Rust 1.92.0). There, the Rust programs build and run,
 patch 0001's test passes, every Deno script type-checks and runs, `./run-all.sh --quick` completes, the 10-million
@@ -142,7 +322,10 @@ It has also run on Linux, on one desktop with an RTX 2060 (6 GB, driver 580.159.
 | `ipir/sizes.ts` | IPIR+SP byte lengths, unchanged | UmbraDB, `examples/private-shielded-sync/ipir/` at `c620f0e7` |
 | `ipir/vendor/` | Five IPIR+SP crates (`inspiring`, `reinspiring`, `ipir-native-client`, `ipir-sp`, `simplepir-kernel`) | UmbraDB at `4f362386`, copied from `valargroup/ipir-sp` at `791b528` |
 | `ipir/patches/` | Patches applied to `ipir/vendor/`: this design's 0001, and 0002 (a faster CPU block compile with the same output words) | 0001: UmbraDB research, spec 00065; 0002: new |
-| `ipir/bench/` | The compile benchmark programs | new, adapted from spec 00065's compile checks |
+| `ipir/bench/` | The compile benchmark programs, and the CPU answer programs (`cpu_fetch`, `cpu_server`) | new, adapted from spec 00065's compile checks |
+| `ipir/build-stock.sh` | Builds `ipir/bench/` without patch 0002 | new |
+| `site/` | The files for the overview page, one per backend | new |
+| `bench.sh` | The whole procedure in one command: tools, setup, the Vulkan layer when needed, the quick check, the full run, the site file, the bundle | new |
 | `bench/` | The Deno benchmark scripts | new, adapted from spec 00065's GPU answer-time harness |
 | `tools/hide-memory-budget-layer/` | A Vulkan layer that hides `VK_EXT_memory_budget` from wgpu, for NVIDIA GPUs without resizable BAR | new |
 
