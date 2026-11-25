@@ -260,27 +260,22 @@ pub(crate) fn compile_fast_owned(
     }
     // tau_g(X^j) = X^j (X^(2j))^((g-1)/2). Missing exponents
     // have zero coefficients; repeated exponents add in the generating polynomial.
-    let mut p_hat: Vec<Vec<u64>> = (0..d).map(|_| Vec::new()).collect();
+    let mut p_hat: Vec<Option<Vec<u64>>> = vec![None; d];
     for (t, &g) in ts.into_iter().zip(exponents) {
-        let row = &mut p_hat[((g - 1) / 2) as usize];
-        if row.is_empty() {
+        match &mut p_hat[((g - 1) / 2) as usize] {
             // (0 + x) % q = x: the coefficients are canonical.
-            *row = t;
-        } else if q.is_power_of_two() {
-            for (dst, &x) in row.iter_mut().zip(&t) {
-                *dst = (*dst + x) & (q - 1);
-            }
-        } else {
-            for (dst, &x) in row.iter_mut().zip(&t) {
-                *dst = (*dst + x) % q;
+            slot @ None => *slot = Some(t),
+            Some(row) => {
+                for (dst, &x) in row.iter_mut().zip(&t) {
+                    *dst = (*dst + x) % q;
+                }
             }
         }
     }
-    for row in &mut p_hat {
-        if row.is_empty() {
-            *row = vec![0; d];
-        }
-    }
+    let p_hat = p_hat
+        .into_iter()
+        .map(|row| row.unwrap_or_else(|| vec![0; d]))
+        .collect();
     compile_validated_fft(p_hat, q)
 }
 
