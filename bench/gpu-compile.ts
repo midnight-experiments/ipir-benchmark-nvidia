@@ -14,7 +14,8 @@
  * Per set (`--sets`): one block of each of the block budget's six tables at once, one chain block's whole compile.
  *
  * A case that fails (most often: its buffers do not fit in the GPU's free memory) is recorded with its error and the
- * run goes on with the next; the run is `ok` when at least one case was measured.
+ * run goes on with the next, on a new device if the failure lost the old one; the run is `ok` when at least one case
+ * was measured. The sets are measured first and the largest cases last, so a failure costs the least.
  *
  * Kernels, tables and scratch are made before the clock starts (`setupMs`), and one build per set is not reported.
  * The cells are random; the time does not depend on them. Correctness is `bench/check-gpu-build.ts`'s job.
@@ -40,12 +41,13 @@ let stage = "opening the GPU";
 const tmp = await Deno.makeTempDir({ prefix: "ipir-gpu-compile-" });
 try {
   const gpu = await openBenchGpu();
-  const { device } = gpu;
+  let device = gpu.device;
   result.gpu = gpu.description;
   result.timestampQuery = gpu.adapter.timestampQuery;
   if (!gpu.adapter.blockBuild) throw new Error("this adapter lacks the limits the GPU block build needs (1,024 invocations per workgroup, 32 KB of workgroup memory)");
   let lost: string | null = null;
-  device.lost.then((i) => (lost = `device lost (${i.reason}): ${i.message}`));
+  const watch = (d: GPUDevice) => d.lost.then((i) => d === device && (lost = `device lost (${i.reason}): ${i.message}`));
+  watch(device);
 
   const preps = new Map<number, BlockBuildPrep>();
   async function prep(rows: number): Promise<BlockBuildPrep> {
@@ -101,10 +103,18 @@ try {
       measured++;
       return r;
     } catch (e) {
-      if (lost) throw e;
-      const error = String((e as Error)?.message ?? e);
+      const deviceLost = lost;
+      const error = [String((e as Error)?.message ?? e), deviceLost].filter(Boolean).join("; ");
       console.error(`gpu compile ${what}: FAILED at ${stage}: ${error}`);
-      return { tables: rows.length, failed: true, doesNotFit: /out of memory|not enough memory|OutOfMemory/i.test(error), stage, error };
+      set?.destroy();
+      set = null;
+      if (deviceLost) {
+        // The failure took the device with it (an allocation the driver could not make): go on with a new one.
+        device = (await openBenchGpu()).device;
+        lost = null;
+        watch(device);
+      }
+      return { tables: rows.length, failed: true, doesNotFit: /out of memory|not enough memory|OutOfMemory/i.test(error), deviceLost: deviceLost !== null, stage, error };
     } finally {
       set?.destroy();
       await device.queue.onSubmittedWorkDone().catch(() => {});
@@ -142,20 +152,19 @@ try {
     return r;
   }
 
-  const shapes: Record<string, unknown>[] = [];
-  result.shapes = shapes;
-  for (const rows of rowsList) {
-    const one = await time(`${rows} rows`, [rows], reps);
-    const many = [];
-    for (const n of atOnce) many.push(await time(`${rows} rows, ${n} tables`, Array(n).fill(rows), reps));
-    shapes.push({ rows, ...one, atOnce: many });
-  }
+  // One chain block of each set first, then one table per row count, then several tables at once.
   const setResults: Record<string, unknown>[] = [];
   result.sets = setResults;
   for (const name of sets) {
     const rows = SET_ROWS[name];
     if (!rows) throw new Error(`--sets takes today and 10m: ${name}`);
     setResults.push({ set: name, rows, ...(await time(`set ${name}`, rows, setReps)) });
+  }
+  const shapes: (Record<string, unknown> & { atOnce: Record<string, unknown>[] })[] = [];
+  result.shapes = shapes;
+  for (const rows of rowsList) shapes.push({ rows, ...(await time(`${rows} rows`, [rows], reps)), atOnce: [] });
+  for (const n of atOnce) {
+    for (const [i, rows] of rowsList.entries()) shapes[i]!.atOnce.push(await time(`${rows} rows, ${n} tables`, Array(n).fill(rows), reps));
   }
   if (measured === 0) throw new Error("no case could be measured");
   result.ok = true;
