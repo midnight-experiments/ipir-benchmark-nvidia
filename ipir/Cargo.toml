@@ -1,5 +1,5 @@
-# The CPU side of the benchmark: the IPIR+SP crates of `valargroup/ipir-sp` (vendor/, see vendor/ORIGIN.md) with this
-# design's patch 0001 applied (patches/), and the benchmark programs (bench/).
+# The CPU side of the benchmark: the IPIR+SP crates of `valargroup/ipir-sp` (vendor/, see vendor/ORIGIN.md) with the
+# patches in patches/ applied, and the benchmark programs (bench/).
 [workspace]
 resolver = "2"
 members = [

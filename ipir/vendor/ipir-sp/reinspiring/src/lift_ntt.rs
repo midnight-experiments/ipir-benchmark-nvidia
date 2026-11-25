@@ -5,6 +5,8 @@
 //! proves that the entire signed sum fits two primes. Public preprocessing
 //! checks full-sum capacity with `prepare_public_dot` before accumulation.
 use crate::error::ReinspiringError;
+use crate::lazy_ntt::{mul_shoup_lazy, ntt_forward, ntt_inverse, reduce_once, shoup_quotient};
+use rayon::prelude::*;
 use spiral_rs::{
     params::Params,
     poly::{from_ntt_alloc, multiply, to_ntt_alloc, PolyMatrix, PolyMatrixNTT, PolyMatrixRaw},
@@ -35,9 +37,11 @@ const PRIMES: [u64; 3] = [4398046568449, 4398046666753, 4398046781441];
 pub struct LiftContext {
     d: usize,
     q: u64,
-    params: Vec<Params>,
+    pub(crate) params: Vec<Params>,
     product: u128,
     inverses: [u64; 2],
+    // Shoup quotients for division-free CRT: inverses[0] mod p1, inverses[1] mod p2, p0 mod p2.
+    crt_quotients: [u64; 3],
 }
 
 /// Offline transforms of a public left operand. The prime count is selected
@@ -68,6 +72,8 @@ pub struct PreparedPublicDot {
     right_bound: u64,
     // prime, operand, NTT coefficient
     transforms: Vec<Vec<Vec<u64>>>,
+    // Shoup quotients of `transforms`, same layout.
+    quotients: Vec<Vec<Vec<u64>>>,
 }
 
 impl Drop for PreparedLiftRight {
@@ -100,8 +106,8 @@ impl LiftContext {
         masks: &[Vec<u64>],
         support: u64,
     ) -> Result<PreparedLiftOperand, ReinspiringError> {
-        let dot = self.prepare_public_dot(masks, support)?;
-        if dot.transforms.len() != 2 {
+        let transforms = self.public_dot_transforms(masks, support)?;
+        if transforms.len() != 2 {
             return Err(ReinspiringError::InvalidParams(
                 "decoder requires two-prime capacity".into(),
             ));
@@ -111,7 +117,7 @@ impl LiftContext {
             q: self.q,
             sum_fits_two: true,
             transforms: (0..masks.len())
-                .map(|i| dot.transforms.iter().map(|p| p[i].clone()).collect())
+                .map(|i| transforms.iter().map(|p| p[i].clone()).collect())
                 .collect(),
         })
     }
@@ -319,7 +325,18 @@ impl LiftContext {
         } else {
             delta
         };
-        let x = r0 as u128 + p0 * (delta as u128 * self.inverses[0] as u128 % p1);
+        let t = reduce_once(
+            mul_shoup_lazy(delta, self.inverses[0], self.crt_quotients[0], PRIMES[1]),
+            PRIMES[1],
+        );
+        let x = r0 as u128 + p0 * t as u128;
+        self.center_mod_q(x, product)
+    }
+
+    // x < product is the residue of a signed integer of magnitude below
+    // product / 2: recover the integer, then reduce it modulo q.
+    #[inline(always)]
+    fn center_mod_q(&self, x: u128, product: u128) -> u64 {
         let signed = if x > product / 2 {
             x as i128 - product as i128
         } else {
@@ -360,12 +377,18 @@ impl LiftContext {
             .iter()
             .map(|&p| Params::init(d, &[p], 6.4, 1, 2, 20, 1, 1, 1, 1, false, 0, 0, 1, 1, 0))
             .collect();
+        let crt_quotients = [
+            shoup_quotient(inverses[0], PRIMES[1]),
+            shoup_quotient(inverses[1], PRIMES[2]),
+            shoup_quotient(PRIMES[0], PRIMES[2]),
+        ];
         Ok(Self {
             d,
             q,
             params,
             product,
             inverses,
+            crt_quotients,
         })
     }
 
@@ -525,6 +548,37 @@ impl LiftContext {
         a: &[Vec<u64>],
         right_bound: u64,
     ) -> Result<PreparedPublicDot, ReinspiringError> {
+        let transforms = self.public_dot_transforms(a, right_bound)?;
+        let quotients = transforms
+            .iter()
+            .zip(&self.params)
+            .map(|(polys, params)| {
+                polys
+                    .iter()
+                    .map(|poly| {
+                        poly.iter()
+                            .map(|&w| shoup_quotient(w, params.modulus))
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        Ok(PreparedPublicDot {
+            d: self.d,
+            q: self.q,
+            right_bound,
+            transforms,
+            quotients,
+        })
+    }
+
+    // The capacity checks and transforms of `prepare_public_dot` (prime,
+    // operand, NTT coefficient), without the Shoup quotients `public_dot` uses.
+    fn public_dot_transforms(
+        &self,
+        a: &[Vec<u64>],
+        right_bound: u64,
+    ) -> Result<Vec<Vec<Vec<u64>>>, ReinspiringError> {
         if a.is_empty() || right_bound > self.q / 2 {
             return Err(ReinspiringError::LweShape(
                 "invalid public dot bound or shape".into(),
@@ -556,7 +610,7 @@ impl LiftContext {
                 "insufficient public dot CRT capacity".into(),
             ));
         };
-        let transforms = self.params[..count]
+        Ok(self.params[..count]
             .iter()
             .map(|params| {
                 a.iter()
@@ -569,13 +623,7 @@ impl LiftContext {
                     })
                     .collect()
             })
-            .collect();
-        Ok(PreparedPublicDot {
-            d: self.d,
-            q: self.q,
-            right_bound,
-            transforms,
-        })
+            .collect())
     }
 
     /// Evaluate a capacity-checked public dot product. Accumulate in the
@@ -586,81 +634,121 @@ impl LiftContext {
         a: &PreparedPublicDot,
         b: &[Vec<u64>],
     ) -> Result<Vec<u64>, ReinspiringError> {
+        self.dot(a, b, false)
+    }
+
+    /// `public_dot` with the auxiliary primes evaluated in parallel on the
+    /// current Rayon pool, for a caller on a sequential critical path. Same words.
+    pub(crate) fn public_dot_parallel_primes(
+        &self,
+        a: &PreparedPublicDot,
+        b: &[Vec<u64>],
+    ) -> Result<Vec<u64>, ReinspiringError> {
+        self.dot(a, b, true)
+    }
+
+    fn dot(
+        &self,
+        a: &PreparedPublicDot,
+        b: &[Vec<u64>],
+        parallel_primes: bool,
+    ) -> Result<Vec<u64>, ReinspiringError> {
         if a.d != self.d || a.q != self.q || a.transforms[0].len() != b.len() {
             return Err(ReinspiringError::LweShape(
                 "public dot context or shape mismatch".into(),
             ));
         }
+        let (q, half) = (self.q, self.q / 2);
         for poly in b {
             self.validate(poly)?;
-            if poly
-                .iter()
-                .any(|&x| centered(x, self.q).unsigned_abs() > a.right_bound as u128)
-            {
+            if poly.iter().any(|&x| centered_abs(x, q) > a.right_bound) {
                 return Err(ReinspiringError::LweShape(
                     "public dot coefficient exceeds bound".into(),
                 ));
             }
         }
-        let mut residues = Vec::with_capacity(a.transforms.len());
-        for (params, operands) in self.params.iter().zip(&a.transforms) {
-            let mut sum = PolyMatrixNTT::zero(params, 1, 1);
-            let mut left = PolyMatrixNTT::zero(params, 1, 1);
-            let mut raw = PolyMatrixRaw::zero(params, 1, 1);
-            let mut product = PolyMatrixNTT::zero(params, 1, 1);
-            for (lhs, rhs) in operands.iter().zip(b) {
-                left.as_mut_slice().copy_from_slice(lhs);
-                for (dst, &x) in raw.as_mut_slice().iter_mut().zip(rhs) {
-                    let signed = centered(x, self.q);
-                    *dst = if a.right_bound < params.modulus {
-                        if signed < 0 {
-                            (signed + params.modulus as i128) as u64
-                        } else {
-                            signed as u64
-                        }
-                    } else {
-                        signed.rem_euclid(params.modulus as i128) as u64
-                    };
+        let residue = |j: usize| {
+            let params = &self.params[j];
+            let p = params.modulus;
+            let mut operand = vec![0u64; self.d];
+            let mut sum = vec![0u64; self.d];
+            for ((lhs, lhs_quotients), rhs) in a.transforms[j].iter().zip(&a.quotients[j]).zip(b) {
+                if a.right_bound < p {
+                    // centered(x, q) + p when negative; |centered| <= right_bound < p.
+                    for (dst, &x) in operand.iter_mut().zip(rhs) {
+                        *dst = std::hint::select_unpredictable(
+                            x > half,
+                            p.wrapping_sub(centered_abs(x, q)),
+                            x,
+                        );
+                    }
+                } else {
+                    for (dst, &x) in operand.iter_mut().zip(rhs) {
+                        *dst = centered(x, q).rem_euclid(p as i128) as u64;
+                    }
                 }
-                multiply(&mut product, &left, &to_ntt_alloc(&raw));
-                for (dst, &x) in sum.as_mut_slice().iter_mut().zip(product.as_slice()) {
-                    let value = *dst + x;
-                    *dst = if value >= params.modulus {
-                        value - params.modulus
-                    } else {
-                        value
-                    };
+                ntt_forward(params, &mut operand);
+                for (((dst, &x), &w), &w_quotient) in
+                    sum.iter_mut().zip(&operand).zip(lhs).zip(lhs_quotients)
+                {
+                    let product = reduce_once(mul_shoup_lazy(x, w, w_quotient, p), p);
+                    *dst = reduce_once(*dst + product, p);
                 }
             }
-            residues.push(from_ntt_alloc(&sum).as_slice().to_vec());
-        }
-        if residues.len() == 2 {
-            return Ok((0..self.d)
+            ntt_inverse(params, &mut sum);
+            sum
+        };
+        let residues: Vec<Vec<u64>> = if parallel_primes {
+            (0..a.transforms.len())
+                .into_par_iter()
+                .map(residue)
+                .collect()
+        } else {
+            (0..a.transforms.len()).map(residue).collect()
+        };
+        Ok(if residues.len() == 2 {
+            (0..self.d)
                 .map(|i| self.reconstruct_two(residues[0][i], residues[1][i]))
-                .collect());
-        }
-        let product: u128 = PRIMES[..residues.len()]
-            .iter()
-            .map(|&x| x as u128)
-            .product();
-        Ok((0..self.d)
-            .map(|i| {
-                let mut x = residues[0][i] as u128;
-                let mut m = PRIMES[0] as u128;
-                for j in 1..residues.len() {
-                    let p = PRIMES[j] as u128;
-                    let delta = (residues[j][i] as u128 + p - x % p) % p;
-                    x += m * (delta * self.inverses[j - 1] as u128 % p);
-                    m *= p;
-                }
-                let signed = if x > product / 2 {
-                    x as i128 - product as i128
-                } else {
-                    x as i128
-                };
-                signed.rem_euclid(self.q as i128) as u64
-            })
-            .collect())
+                .collect()
+        } else {
+            (0..self.d)
+                .map(|i| self.reconstruct_three(residues[0][i], residues[1][i], residues[2][i]))
+                .collect()
+        })
+    }
+
+    // Canonical residues modulo all three primes. Mixed-radix (Garner) CRT
+    // with Shoup products; the signed value is reduced modulo q. `multiply`,
+    // `sum_prepared` and `sum_cached` compute the same three-prime CRT with
+    // u128 remainders, so this file has two of them.
+    fn reconstruct_three(&self, r0: u64, r1: u64, r2: u64) -> u64 {
+        let [p0, p1, p2] = PRIMES;
+        // r0 < p0 < p1, so r0 is already reduced modulo p1.
+        let t1 = reduce_once(
+            mul_shoup_lazy(
+                reduce_once(r1 + p1 - r0, p1),
+                self.inverses[0],
+                self.crt_quotients[0],
+                p1,
+            ),
+            p1,
+        );
+        // (r0 + p0 * t1) mod p2, with r0 < p0 < p2.
+        let x_mod_p2 = reduce_once(
+            r0 + reduce_once(mul_shoup_lazy(t1, p0, self.crt_quotients[2], p2), p2),
+            p2,
+        );
+        let t2 = reduce_once(
+            mul_shoup_lazy(
+                reduce_once(r2 + p2 - x_mod_p2, p2),
+                self.inverses[1],
+                self.crt_quotients[1],
+                p2,
+            ),
+            p2,
+        );
+        let x = r0 as u128 + p0 as u128 * t1 as u128 + p0 as u128 * p1 as u128 * t2 as u128;
+        self.center_mod_q(x, self.product)
     }
 
     /// Sum independent exact products, reducing each one before accumulation.
@@ -686,6 +774,12 @@ pub(crate) fn centered(x: u64, q: u64) -> i128 {
     } else {
         x as i128
     }
+}
+
+// |centered(x, q)| for a canonical x, in u64 and without a branch.
+#[inline(always)]
+fn centered_abs(x: u64, q: u64) -> u64 {
+    std::hint::select_unpredictable(x > q / 2, q - x, x)
 }
 
 /// Exact modular product using a checked auxiliary context.
@@ -721,6 +815,164 @@ pub fn lifted_mul_mod_q(
         ));
     }
     LiftContext::new(a.len(), q)?.multiply(a, b)
+}
+
+#[cfg(test)]
+mod exact_fast_path_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+
+    // Reference CRT: mixed radix with u128 remainders over the first
+    // residues.len() primes, centered, then reduced modulo ctx.q.
+    fn crt_by_division(ctx: &LiftContext, residues: &[u64]) -> u64 {
+        let product: u128 = PRIMES[..residues.len()]
+            .iter()
+            .map(|&x| x as u128)
+            .product();
+        let mut x = residues[0] as u128;
+        let mut m = PRIMES[0] as u128;
+        for j in 1..residues.len() {
+            let p = PRIMES[j] as u128;
+            let delta = (residues[j] as u128 + p - x % p) % p;
+            x += m * (delta * ctx.inverses[j - 1] as u128 % p);
+            m *= p;
+        }
+        let signed = if x > product / 2 {
+            x as i128 - product as i128
+        } else {
+            x as i128
+        };
+        signed.rem_euclid(ctx.q as i128) as u64
+    }
+
+    // Reference: the same dot product through spiral's to_ntt, multiply and
+    // from_ntt, reconstructed with crt_by_division.
+    fn public_dot_reference(ctx: &LiftContext, a: &PreparedPublicDot, b: &[Vec<u64>]) -> Vec<u64> {
+        let mut residues = Vec::with_capacity(a.transforms.len());
+        for (params, operands) in ctx.params.iter().zip(&a.transforms) {
+            let mut sum = PolyMatrixNTT::zero(params, 1, 1);
+            let mut left = PolyMatrixNTT::zero(params, 1, 1);
+            let mut raw = PolyMatrixRaw::zero(params, 1, 1);
+            let mut product = PolyMatrixNTT::zero(params, 1, 1);
+            for (lhs, rhs) in operands.iter().zip(b) {
+                left.as_mut_slice().copy_from_slice(lhs);
+                for (dst, &x) in raw.as_mut_slice().iter_mut().zip(rhs) {
+                    let signed = centered(x, ctx.q);
+                    *dst = if a.right_bound < params.modulus {
+                        if signed < 0 {
+                            (signed + params.modulus as i128) as u64
+                        } else {
+                            signed as u64
+                        }
+                    } else {
+                        signed.rem_euclid(params.modulus as i128) as u64
+                    };
+                }
+                multiply(&mut product, &left, &to_ntt_alloc(&raw));
+                for (dst, &x) in sum.as_mut_slice().iter_mut().zip(product.as_slice()) {
+                    let value = *dst + x;
+                    *dst = if value >= params.modulus {
+                        value - params.modulus
+                    } else {
+                        value
+                    };
+                }
+            }
+            residues.push(from_ntt_alloc(&sum).as_slice().to_vec());
+        }
+        (0..ctx.d)
+            .map(|i| {
+                let column: Vec<u64> = residues.iter().map(|r| r[i]).collect();
+                crt_by_division(ctx, &column)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn reconstruction_equals_division_formula() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0x0003);
+        let [p0, p1, p2] = PRIMES;
+        for q in [12289, 1 << 54, 1 << 56] {
+            let ctx = LiftContext::new(16, q).unwrap();
+            let edges = |p: u64| [0, 1, p / 2, p / 2 + 1, p - 1];
+            let mut cases: Vec<[u64; 3]> = Vec::new();
+            for r0 in edges(p0) {
+                for r1 in edges(p1) {
+                    for r2 in edges(p2) {
+                        cases.push([r0, r1, r2]);
+                    }
+                }
+            }
+            cases.extend((0..200_000).map(|_| {
+                [
+                    rng.gen::<u64>() % p0,
+                    rng.gen::<u64>() % p1,
+                    rng.gen::<u64>() % p2,
+                ]
+            }));
+            for [r0, r1, r2] in cases {
+                for count in [2, 3] {
+                    let residues = [r0, r1, r2];
+                    let expected = crt_by_division(&ctx, &residues[..count]);
+                    let actual = if count == 2 {
+                        ctx.reconstruct_two(r0, r1)
+                    } else {
+                        ctx.reconstruct_three(r0, r1, r2)
+                    };
+                    assert_eq!(
+                        actual, expected,
+                        "q={q} residues={residues:?} count={count}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn public_dot_equals_reference_at_production_shapes() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0x0004);
+        for (d, q) in [(2048, 1u64 << 54), (64, 12289), (64, 1 << 56), (2, 1 << 54)] {
+            let ctx = LiftContext::new(d, q).unwrap();
+            for operands in [1, 2, 4, 16] {
+                let a: Vec<Vec<u64>> = (0..operands)
+                    .map(|_| (0..d).map(|_| rng.gen::<u64>() % q).collect())
+                    .collect();
+                // Small bounds (the packing digits, the 16-bit hints) and the
+                // largest admitted bound, which selects the generic residue path.
+                for bound in [0, 1, (1 << 18).min(q / 2), 65535.min(q / 2), q / 2] {
+                    let Ok(cached) = ctx.prepare_public_dot(&a, bound) else {
+                        continue;
+                    };
+                    for pattern in 0..3 {
+                        let b: Vec<Vec<u64>> = (0..operands)
+                            .map(|_| {
+                                (0..d)
+                                    .map(|i| match pattern {
+                                        0 => [bound, (q - bound) % q, 0][i % 3],
+                                        1 => (q - bound) % q,
+                                        _ => {
+                                            let v = rng.gen_range(0..=bound);
+                                            if rng.gen::<bool>() {
+                                                v
+                                            } else {
+                                                (q - v) % q
+                                            }
+                                        }
+                                    })
+                                    .collect()
+                            })
+                            .collect();
+                        assert_eq!(
+                            ctx.public_dot(&cached, &b).unwrap(),
+                            public_dot_reference(&ctx, &cached, &b),
+                            "d={d} q={q} operands={operands} bound={bound} pattern={pattern} primes={}",
+                            cached.transforms.len()
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

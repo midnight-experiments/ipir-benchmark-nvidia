@@ -27,6 +27,8 @@ Notes on what the numbers mean:
 - The compile in step 3 rebuilds each changed block's whole hint columns. The real design only updates the hints for
   the new records, and that code is not built yet, so these figures are an **upper bound** for the hints part.
 - The setups use this design's patch 0001 (`new_without_columns`, seed and snapshot 32 zero bytes).
+- The CPU build of a column block uses patch 0002 (`ipir/patches/0002-faster-block-compile.patch`), which computes
+  the same output words as the unpatched crates in less time.
 - Every Deno call pays a fixed read-back cost (about 12 ms on macOS). That is why wall time is much larger than
   execution time for small shapes.
 
@@ -139,7 +141,7 @@ It has also run on Linux, on one desktop with an RTX 2060 (6 GB, driver 580.159.
 | `gpu/` | `GpuIpirTable` and its WGSL kernels, unchanged | UmbraDB, `examples/private-shielded-sync/gpu/` at `c620f0e7` |
 | `ipir/sizes.ts` | IPIR+SP byte lengths, unchanged | UmbraDB, `examples/private-shielded-sync/ipir/` at `c620f0e7` |
 | `ipir/vendor/` | Five IPIR+SP crates (`inspiring`, `reinspiring`, `ipir-native-client`, `ipir-sp`, `simplepir-kernel`) | UmbraDB at `4f362386`, copied from `valargroup/ipir-sp` at `791b528` |
-| `ipir/patches/` | This design's patch 0001, applied to `ipir/vendor/` | UmbraDB research, spec 00065 |
+| `ipir/patches/` | Patches applied to `ipir/vendor/`: this design's 0001, and 0002 (a faster CPU block compile with the same output words) | 0001: UmbraDB research, spec 00065; 0002: new |
 | `ipir/bench/` | The compile benchmark programs | new, adapted from spec 00065's compile checks |
 | `bench/` | The Deno benchmark scripts | new, adapted from spec 00065's GPU answer-time harness |
 | `tools/hide-memory-budget-layer/` | A Vulkan layer that hides `VK_EXT_memory_budget` from wgpu, for NVIDIA GPUs without resizable BAR | new |

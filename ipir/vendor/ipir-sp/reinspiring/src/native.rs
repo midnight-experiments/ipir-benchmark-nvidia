@@ -5,7 +5,7 @@
 //! odd-modulus InspiRING profile. Ciphertext convention is b + a*s = Delta*m+e.
 use crate::native_gaussian::gaussian;
 use crate::{
-    compile::{collapse_kg_exponents, compile_fast, tau_coeffs},
+    compile::{collapse_kg_exponents, compile_fast_owned, tau_coeffs},
     error::ReinspiringError,
     lift_ntt::{centered, LiftContext, PreparedLiftOperand, PreparedLiftRight},
     matrix::PackingMatrix,
@@ -944,7 +944,11 @@ impl NativePreprocessed {
                 let inverse =
                     spiral_rs::number_theory::invert_uint_mod(exps[step], (2 * d) as u64).unwrap();
                 let unrotated: Vec<_> = ds.iter().map(|x| tau_coeffs(x, inverse, q)).collect();
-                let update = tau_coeffs(&lift.public_dot(&public_w, &unrotated)?, exps[step], q);
+                let update = tau_coeffs(
+                    &lift.public_dot_parallel_primes(&public_w, &unrotated)?,
+                    exps[step],
+                    q,
+                );
                 for (a, x) in half[idx - 1].iter_mut().zip(update) {
                     *a = (*a + x) & (q - 1);
                 }
@@ -979,14 +983,22 @@ impl NativePreprocessed {
         };
         let trace = trace_start.elapsed();
         let compilation_start = Instant::now();
-        let blocks: Result<Vec<_>, _> = (0..p.ell)
+        // Each limb's digit polynomials, in chain order, move to its compilation.
+        let mut limbs: Vec<Vec<Vec<u64>>> = (0..p.ell)
+            .map(|_| Vec::with_capacity(digits.len()))
+            .collect();
+        for ds in digits {
+            for (limb, x) in limbs.iter_mut().zip(ds) {
+                limb.push(x);
+            }
+        }
+        let blocks: Result<Vec<_>, _> = limbs
             .into_par_iter()
-            .map(|j| {
-                let ts: Vec<_> = digits.iter().map(|x| x[j].clone()).collect();
+            .map(|ts| {
                 if d == 2 {
                     Ok(PackingMatrix::zero(d, d, q))
                 } else {
-                    compile_fast(&ts, &exponents, q)
+                    compile_fast_owned(ts, &exponents, q)
                 }
             })
             .collect();
@@ -1136,6 +1148,12 @@ impl NativePreprocessed {
     pub fn other_mask(&self) -> Option<&[u64]> {
         self.a_other.as_deref()
     }
+    /// The compiled key-switching matrix, read only, so a program can compare
+    /// builds word for word. Not part of the API.
+    #[doc(hidden)]
+    pub fn matrix(&self) -> &NativeMatrix {
+        &self.h
+    }
 }
 
 /// Signed approximate gadget digits, least significant retained limb first.
@@ -1144,17 +1162,27 @@ impl NativePreprocessed {
 pub fn decompose(a: &[u64], p: &NativeParams) -> Result<Vec<Vec<u64>>, ReinspiringError> {
     validate_poly(a, p)?;
     let mut out = vec![vec![0; p.d]; p.ell];
-    let z = 1i128 << p.bits;
+    // NativeParams fixes q = 2^q_bits <= 2^56 and bits, dropped <= 27, and a < q,
+    // so every intermediate is a non-negative i64 (digits aside): masks equal the
+    // Euclidean remainders and shifts the exact divisions of the i128 definition.
+    debug_assert!(
+        p.q.is_power_of_two()
+            && p.q <= 1 << 56
+            && p.bits <= MAX_GADGET_BITS
+            && p.dropped <= MAX_GADGET_BITS
+    );
+    let z = 1i64 << p.bits;
+    let rounding = if p.dropped == 0 {
+        0
+    } else {
+        1i64 << (p.dropped - 1)
+    };
     for (i, &a) in a.iter().enumerate() {
-        let mut x = if p.dropped == 0 {
-            a as i128
-        } else {
-            (a as i128 + (1i128 << (p.dropped - 1))) >> p.dropped
-        };
+        let mut x = (a as i64 + rounding) >> p.dropped;
         for limb in &mut out {
-            let digit = (x + z / 2).rem_euclid(z) - z / 2;
-            limb[i] = digit.rem_euclid(p.q as i128) as u64;
-            x = (x - digit) / z;
+            let digit = ((x + z / 2) & (z - 1)) - z / 2;
+            limb[i] = digit as u64 & (p.q - 1);
+            x = (x - digit) >> p.bits;
         }
     }
     Ok(out)
@@ -1167,45 +1195,27 @@ fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, Reinspir
     let d = masks.len();
     // Each destination gets exactly one input here. Row-wise filling avoids
     // scattering writes across the entire integer matrix.
-    let mut polys = vec![vec![0i64; d]; d];
-    polys.par_iter_mut().enumerate().for_each(|(k, poly)| {
-        for (j, row) in masks.iter().enumerate() {
-            let c = if k == 0 {
-                row[0] as i64
-            } else {
-                -(row[d - k] as i64)
-            };
-            poly[(j + k) & (d - 1)] = if j + k >= d { -c } else { c };
-        }
-    });
+    let mut polys: Vec<Vec<i64>> = (0..d)
+        .into_par_iter()
+        .map(|k| {
+            let mut poly = vec![0i64; d];
+            for (j, row) in masks.iter().enumerate() {
+                let c = if k == 0 {
+                    row[0] as i64
+                } else {
+                    -(row[d - k] as i64)
+                };
+                poly[(j + k) & (d - 1)] = if j + k >= d { -c } else { c };
+            }
+            poly
+        })
+        .collect();
     bit_reverse_rows(&mut polys);
     let mut len = 2;
     // After a length-L stage, |coefficient| <= L*(q-1). Stay in i64 only
     // while that public worst-case bound fits, then widen before the next stage.
     while len <= d && (len as u128) * (q as u128 - 1) <= i64::MAX as u128 {
-        let half = len / 2;
-        let step = d / len;
-        polys.par_chunks_mut(len).with_min_len(4).for_each(|block| {
-            let (left, right) = block.split_at_mut(half);
-            left.par_iter_mut()
-                .zip(right.par_iter_mut())
-                .enumerate()
-                .with_min_len(16)
-                .for_each(|(k, (u, v))| {
-                    let rot = 2 * step * k;
-                    let old = v.clone();
-                    for ((u, v), &t) in u[..rot].iter_mut().zip(&mut v[..rot]).zip(&old[d - rot..])
-                    {
-                        *v = *u + t;
-                        *u -= t;
-                    }
-                    for ((u, v), &t) in u[rot..].iter_mut().zip(&mut v[rot..]).zip(&old[..d - rot])
-                    {
-                        *v = *u - t;
-                        *u += t;
-                    }
-                });
-        });
+        integer_ring_fft_stage(&mut polys, len);
         len *= 2;
     }
     let shift = d.trailing_zeros();
@@ -1220,7 +1230,7 @@ fn aggregate_masks(masks: &[Vec<u64>], q: u64) -> Result<Vec<Vec<u64>>, Reinspir
             .collect());
     }
     let mut wide: Vec<Vec<i128>> = polys
-        .into_iter()
+        .into_par_iter()
         .map(|poly| poly.into_iter().map(i128::from).collect())
         .collect();
     integer_ring_fft_wide(&mut wide, len);
@@ -1249,33 +1259,58 @@ fn bit_reverse_rows<T>(a: &mut [T]) {
     }
 }
 fn integer_ring_fft_wide(a: &mut [Vec<i128>], mut len: usize) {
-    let d = a.len();
-    while len <= d {
-        let half = len / 2;
-        let step = d / len;
-        a.par_chunks_mut(len).with_min_len(4).for_each(|block| {
-            let (left, right) = block.split_at_mut(half);
-            left.par_iter_mut()
-                .zip(right.par_iter_mut())
-                .enumerate()
-                .with_min_len(16)
-                .for_each(|(k, (u, v))| {
-                    let rot = 2 * step * k;
-                    let old = v.clone();
-                    for ((u, v), &t) in u[..rot].iter_mut().zip(&mut v[..rot]).zip(&old[d - rot..])
-                    {
-                        *v = *u + t;
-                        *u -= t;
-                    }
-                    for ((u, v), &t) in u[rot..].iter_mut().zip(&mut v[rot..]).zip(&old[..d - rot])
-                    {
-                        *v = *u - t;
-                        *u += t;
-                    }
-                });
-        });
+    while len <= a.len() {
+        integer_ring_fft_stage(a, len);
         len *= 2;
     }
+}
+// One length-`len` stage of the integer ring FFT over d rows of length d. Each
+// butterfly's new v goes to a reused scratch row that then swaps with v, so v
+// is read unchanged without a copy.
+fn integer_ring_fft_stage<T>(a: &mut [Vec<T>], len: usize)
+where
+    T: Copy
+        + Default
+        + Send
+        + Sync
+        + std::ops::Add<Output = T>
+        + std::ops::Sub<Output = T>
+        + std::ops::AddAssign
+        + std::ops::SubAssign,
+{
+    let d = a.len();
+    let half = len / 2;
+    let step = d / len;
+    a.par_chunks_mut(len).with_min_len(4).for_each(|block| {
+        let (left, right) = block.split_at_mut(half);
+        left.par_iter_mut()
+            .zip(right.par_iter_mut())
+            .enumerate()
+            .with_min_len(16)
+            .for_each_init(
+                || vec![T::default(); d],
+                |scratch, (k, (u, v))| {
+                    let rot = 2 * step * k;
+                    for ((u, dst), &t) in u[..rot]
+                        .iter_mut()
+                        .zip(&mut scratch[..rot])
+                        .zip(&v[d - rot..])
+                    {
+                        *dst = *u + t;
+                        *u -= t;
+                    }
+                    for ((u, dst), &t) in u[rot..]
+                        .iter_mut()
+                        .zip(&mut scratch[rot..])
+                        .zip(&v[..d - rot])
+                    {
+                        *dst = *u - t;
+                        *u += t;
+                    }
+                    std::mem::swap(v, scratch);
+                },
+            );
+    });
 }
 
 fn invalid(s: &str) -> ReinspiringError {
@@ -1286,6 +1321,70 @@ fn validate_poly(a: &[u64], p: &NativeParams) -> Result<(), ReinspiringError> {
         Err(invalid("wrong degree or noncanonical coefficient"))
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod decompose_fast_path_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+
+    // Reference: the i128 definition, with Euclidean remainders and division.
+    fn decompose_reference(a: &[u64], p: &NativeParams) -> Vec<Vec<u64>> {
+        let mut out = vec![vec![0; p.d]; p.ell];
+        let z = 1i128 << p.bits;
+        for (i, &a) in a.iter().enumerate() {
+            let mut x = if p.dropped == 0 {
+                a as i128
+            } else {
+                (a as i128 + (1i128 << (p.dropped - 1))) >> p.dropped
+            };
+            for limb in &mut out {
+                let digit = (x + z / 2).rem_euclid(z) - z / 2;
+                limb[i] = digit.rem_euclid(p.q as i128) as u64;
+                x = (x - digit) / z;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn i64_digits_equal_i128_definition_for_every_profile() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0xdec0);
+        let mut profiles = 0;
+        for q_bits in 1..=63u32 {
+            for bits in 1..=MAX_GADGET_BITS {
+                for ell in 1..=8 {
+                    let Ok(p) =
+                        NativeParams::new(8, q_bits, 1, bits, ell, SecretDistribution::Gaussian)
+                    else {
+                        continue;
+                    };
+                    profiles += 1;
+                    let (q, step) = (p.q, 1u64 << p.dropped);
+                    let mut values = vec![0, 1, q - 1, q / 2, q / 2 - 1, q / 2 + 1];
+                    // Both sides of every rounding and digit boundary near random points.
+                    for _ in 0..8 {
+                        let base = rng.gen::<u64>() & (q - 1) & !(step - 1);
+                        for delta in [0, step / 2, step / 2 + 1, step - 1] {
+                            values.push(base.wrapping_add(delta).wrapping_sub(1) & (q - 1));
+                            values.push(base.wrapping_add(delta) & (q - 1));
+                        }
+                    }
+                    values.extend((0..16).map(|_| rng.gen::<u64>() & (q - 1)));
+                    for chunk in values.chunks(8) {
+                        let mut a = chunk.to_vec();
+                        a.resize(8, q - 1);
+                        assert_eq!(
+                            decompose(&a, &p).unwrap(),
+                            decompose_reference(&a, &p),
+                            "q_bits={q_bits} bits={bits} ell={ell} a={a:?}"
+                        );
+                    }
+                }
+            }
+        }
+        assert!(profiles > 1000, "only {profiles} profiles");
     }
 }
 

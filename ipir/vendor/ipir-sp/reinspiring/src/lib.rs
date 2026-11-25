@@ -14,6 +14,7 @@
 
 pub mod compile;
 pub mod error;
+mod lazy_ntt;
 pub mod lift_ntt;
 pub mod matrix;
 pub mod modswitch;

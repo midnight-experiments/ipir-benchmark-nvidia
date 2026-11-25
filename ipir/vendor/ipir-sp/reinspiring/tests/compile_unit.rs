@@ -132,3 +132,12 @@ fn ring_fft_normalizes_rotations_when_polynomial_count_exceeds_degree() {
     expected[0] = vec![8, 0];
     assert_eq!(ring_fft_eval_pow2(&input, 16), expected);
 }
+
+#[test]
+fn ring_fft_keeps_the_tail_of_a_longer_row() {
+    use reinspiring::compile::ring_fft_eval_pow2;
+    // The first row sets d; a longer row keeps its coefficients past d.
+    let input = vec![vec![1, 2, 3, 4], vec![5, 6, 7, 8, 9, 10]];
+    let expected = vec![vec![6, 8, 10, 12], vec![12, 12, 12, 12, 9, 10]];
+    assert_eq!(ring_fft_eval_pow2(&input, 16), expected);
+}

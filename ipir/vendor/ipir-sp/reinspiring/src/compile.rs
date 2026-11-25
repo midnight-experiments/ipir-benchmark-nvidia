@@ -29,6 +29,18 @@ pub fn tau_coeffs(p: &[u64], g: u64, q: u64) -> Vec<u64> {
     let d = p.len();
     let two_d = 2 * d as u64;
     let mut out = vec![0u64; d];
+    if d.is_power_of_two() && q.is_power_of_two() && g % 2 == 1 {
+        // An odd g permutes the d slots, so each slot is written once from zero
+        // and the general loop's remainders reduce to masks.
+        let mask = q - 1;
+        for (i, &c) in p.iter().enumerate() {
+            let e = (i as u64).wrapping_mul(g) & (two_d - 1);
+            let c = c & mask;
+            out[e as usize & (d - 1)] =
+                std::hint::select_unpredictable(e >= d as u64, c.wrapping_neg() & mask, c);
+        }
+        return out;
+    }
     for (i, &c) in p.iter().enumerate() {
         let e = (i as u64 * g) % two_d;
         if e < d as u64 {
@@ -221,6 +233,16 @@ pub fn compile_fast(
     exponents: &[u64],
     q: u64,
 ) -> Result<PackingMatrix, ReinspiringError> {
+    compile_fast_owned(ts.to_vec(), exponents, q)
+}
+
+/// [`compile_fast`] taking ownership of `ts`: its polynomials become rows of
+/// the generating polynomial without a copy.
+pub(crate) fn compile_fast_owned(
+    ts: Vec<Vec<u64>>,
+    exponents: &[u64],
+    q: u64,
+) -> Result<PackingMatrix, ReinspiringError> {
     if ts.is_empty() || ts.len() != exponents.len() || !(2..=(1 << 62)).contains(&q) {
         return Err(ReinspiringError::InvalidParams(
             "invalid Compile inputs".into(),
@@ -238,12 +260,22 @@ pub fn compile_fast(
     }
     // tau_g(X^j) = X^j (X^(2j))^((g-1)/2). Missing exponents
     // have zero coefficients; repeated exponents add in the generating polynomial.
-    let mut p_hat = vec![vec![0; d]; d];
-    for (t, &g) in ts.iter().zip(exponents) {
-        for (dst, &x) in p_hat[((g - 1) / 2) as usize].iter_mut().zip(t) {
-            *dst = (*dst + x) % q;
+    let mut p_hat: Vec<Option<Vec<u64>>> = vec![None; d];
+    for (t, &g) in ts.into_iter().zip(exponents) {
+        match &mut p_hat[((g - 1) / 2) as usize] {
+            // (0 + x) % q = x: the coefficients are canonical.
+            slot @ None => *slot = Some(t),
+            Some(row) => {
+                for (dst, &x) in row.iter_mut().zip(&t) {
+                    *dst = (*dst + x) % q;
+                }
+            }
         }
     }
+    let p_hat = p_hat
+        .into_iter()
+        .map(|row| row.unwrap_or_else(|| vec![0; d]))
+        .collect();
     compile_validated_fft(p_hat, q)
 }
 
@@ -347,20 +379,36 @@ fn ring_fft_inplace(a: &mut [Vec<u64>], q: u64) {
                     .zip(right.par_iter_mut())
                     .enumerate()
                     .with_min_len(16)
-                    .for_each(|(k, (u, v))| {
-                        let rot = (2 * step * k) & (2 * d - 1);
-                        let old = v.clone();
-                        for i in 0..d {
-                            let src = (i + 2 * d - rot) & (2 * d - 1);
-                            let t = if src >= d {
-                                old[src - d].wrapping_neg()
-                            } else {
-                                old[src]
-                            };
-                            v[i] = u[i].wrapping_sub(t) & mask;
-                            u[i] = u[i].wrapping_add(t) & mask;
-                        }
-                    });
+                    .for_each_init(
+                        || vec![0u64; d],
+                        |scratch, (k, (u, v))| {
+                            // t = X^rot v, negacyclic: t[i] = v[i - r] for i >= r and
+                            // -v[i + d - r] below, negated once more when rot >= d. The
+                            // new v goes to `scratch`, which then swaps with v.
+                            let rot = (2 * step * k) & (2 * d - 1);
+                            let r = rot & (d - 1);
+                            let sign = if rot >= d { u64::MAX } else { 0 };
+                            let (low, high) = scratch.split_at_mut(r);
+                            let (u_low, u_high) = u.split_at_mut(r);
+                            for ((dst, u), &x) in low.iter_mut().zip(u_low).zip(&v[d - r..]) {
+                                let t = negate_if(x, !sign);
+                                *dst = u.wrapping_sub(t) & mask;
+                                *u = u.wrapping_add(t) & mask;
+                            }
+                            for ((dst, u), &x) in high.iter_mut().zip(u_high).zip(&v[..d - r]) {
+                                let t = negate_if(x, sign);
+                                *dst = u.wrapping_sub(t) & mask;
+                                *u = u.wrapping_add(t) & mask;
+                            }
+                            std::mem::swap(v, scratch);
+                            // The transform covers the first d coefficients;
+                            // a longer row keeps the rest, and scratch stays d long.
+                            if scratch.len() > d {
+                                v.extend_from_slice(&scratch[d..]);
+                                scratch.truncate(d);
+                            }
+                        },
+                    );
             });
             len *= 2;
         }
@@ -385,6 +433,12 @@ fn ring_fft_inplace(a: &mut [Vec<u64>], q: u64) {
         }
         len *= 2;
     }
+}
+
+// -x (wrapping) when mask is all ones, x when it is zero.
+#[inline(always)]
+fn negate_if(x: u64, mask: u64) -> u64 {
+    (x ^ mask).wrapping_sub(mask)
 }
 
 fn rotate_by_x_power(p: &[u64], exp_mod_2d: usize, q: u64) -> Vec<u64> {
@@ -416,4 +470,57 @@ pub fn ring_fft_eval_pow2(polys: &[Vec<u64>], q: u64) -> Vec<Vec<u64>> {
     }
     ring_fft_inplace(&mut a, q);
     a
+}
+
+#[cfg(test)]
+mod tau_fast_path_tests {
+    use super::*;
+    use rand::{Rng, SeedableRng};
+
+    // Reference: the general loop, with remainders.
+    fn tau_coeffs_reference(p: &[u64], g: u64, q: u64) -> Vec<u64> {
+        let d = p.len();
+        let two_d = 2 * d as u64;
+        let mut out = vec![0u64; d];
+        for (i, &c) in p.iter().enumerate() {
+            let e = (i as u64 * g) % two_d;
+            if e < d as u64 {
+                let idx = e as usize;
+                out[idx] = (out[idx] + c) % q;
+            } else {
+                let idx = (e - d as u64) as usize;
+                out[idx] = (out[idx] + q - (c % q)) % q;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn fast_path_equals_general_loop() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(0x7a0);
+        for d in [1usize, 2, 8, 64, 2048, 4096] {
+            for q in [2u64, 1 << 16, 1 << 54, 1 << 56, 1 << 62, 12289] {
+                let mut gs: Vec<u64> = (0..2 * d as u64).collect();
+                if d > 64 {
+                    gs = (0..64).map(|_| rng.gen_range(0..2 * d as u64)).collect();
+                    gs.extend([1, 2 * d as u64 - 1, 5, 4 * d as u64 + 3]);
+                }
+                for g in gs {
+                    // Canonical and non-canonical coefficients, including 0 and q.
+                    let p: Vec<u64> = (0..d)
+                        .map(|i| match i % 4 {
+                            0 => 0,
+                            1 => q,
+                            _ => rng.gen::<u64>() >> rng.gen_range(0..64),
+                        })
+                        .collect();
+                    assert_eq!(
+                        tau_coeffs(&p, g, q),
+                        tau_coeffs_reference(&p, g, q),
+                        "d={d} q={q} g={g}"
+                    );
+                }
+            }
+        }
+    }
 }
