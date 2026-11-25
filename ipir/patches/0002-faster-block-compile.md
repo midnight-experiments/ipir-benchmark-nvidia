@@ -90,9 +90,10 @@ Three kinds of check confirm it:
 | Six 2,048-row tables at once | 3,893 ms [3,320–4,720] | 1,876 ms [1,655–2,002] |
 | CPU time per table, one thread | ~2.7 s | ~0.98 s |
 
-Full `run-all.sh` runs on the same host, back to back: `results/pop-os-2026-11-25-hidebudget-quiet` (stock, on branch
-`results/pop-os`) and `results/pop-os-2026-11-25-hidebudget-opt` (patched, on this branch). Block work is the CPU
-build of the six tables plus their upload to the GPU, 30 blocks per cell, p50 / p99:
+Two full `run-all.sh` runs on the same host, back to back, both with the Vulkan layer in
+`tools/hide-memory-budget-layer/`: `results/pop-os-2026-11-25-hidebudget-quiet` (stock) and
+`results/pop-os-2026-11-25-hidebudget-opt` (patched). `results/pop-os-notes.md` describes the host. Block work is the
+CPU build of the six tables plus their upload to the GPU, 30 blocks per cell, p50 / p99:
 
 | Set, mode, calls/s | Stock | Patched |
 |---|---:|---:|
@@ -106,8 +107,9 @@ build of the six tables plus their upload to the GPU, 30 blocks per cell, p50 / 
 All six blocks over 3 s are in one cell, `10m` `seq` at 2 calls/s. Its CPU build (p50 2,543 ms) is the same as at 5
 and 10 calls/s, but its upload took 387 ms at p50 instead of the 166 to 234 ms of every other cell. A second run of
 that cell alone gave 5 of 30 over. During it the GPU moved between power states P0 and P8 and between PCIe Gen 3 and
-Gen 1 several times. The cause is not proven, and the upload is GPU code this patch does not touch. `10m` `seq`
-therefore has about 0.2 s of margin, and the upload decides whether a block fits.
+Gen 1 several times. The cause is not proven: finding it needs the GPU clocks pinned, which needs root. The upload is
+GPU code this patch does not touch. `10m` `seq` therefore has about 0.2 s of margin, and the upload decides whether a
+block fits.
 
 The GPU fetch times are the same in both runs. Answer latency during block work stays within 12 ms of the stock run
 at p50.

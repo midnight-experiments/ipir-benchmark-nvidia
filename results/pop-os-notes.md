@@ -23,7 +23,8 @@ list is empty. `gpuProcesses` holds program names, not full command lines.
 | `pop-os-2026-11-24-quick-stock-bar52` | as shipped, `--skip-compile`, Chrome and Zed closed (52 MiB of BAR) | every GPU step fails |
 | `pop-os-2026-11-24-quick-hidebudget` | with the Vulkan layer below | every step runs |
 | `pop-os-2026-11-24-hidebudget` | full run with the Vulkan layer below | every step runs |
-| `pop-os-2026-11-25-hidebudget-quiet` | the same full run, with the host's other CPU-heavy work paused | every step runs. These are the numbers for this host. |
+| `pop-os-2026-11-25-hidebudget-quiet` | the same full run, with the host's other CPU-heavy work paused | every step runs. These are the stock numbers for this host. |
+| `pop-os-2026-11-25-hidebudget-opt` | the quiet run again, right after it, with patch 0002 | every step runs, and 354 of 360 blocks finish within 3 s |
 
 Background services use 2 to 3 of the 16 threads, measured between runs. In the 2026-11-24 full run, another CPU-heavy
 test started at 21:26Z. It overlapped the last `today` budget run and all of the `10m` set. For the 2026-11-25 run,
@@ -59,7 +60,7 @@ runs.
 
 ## What the numbers show
 
-Every simulated block takes longer than 3 s. In the quiet run, block work p50 is 6.9 to 7.8 s in `seq` mode and 3.4 to
+Without patch 0002, every simulated block takes longer than 3 s. In the quiet run, block work p50 is 6.9 to 7.8 s in `seq` mode and 3.4 to
 4.6 s in `pool` mode, and all 360 blocks are over 3 s. The CPU compile sets that time. The packing matrix takes about
 1.0 to 1.06 s per column block at every row count, and each block changes six tables. The GPU part is small. Each
 block uploads in about 0.2 s, and a call of 32 on the largest table takes at most 110 ms of GPU time.
@@ -68,3 +69,7 @@ The 2026-11-24 full run's block work p50 is 6 to 16 % higher in every budget cel
 last `today` cells and the `10m` set, and the first `today` cells differ by as much, so that test does not explain all
 of it. The quiet run is the reference for this host. The GPU fetch times of the two runs agree, for example 2.16 and
 2.15 ms of GPU time for a call of 32 at 2048 × 2048.
+
+Patch 0002 makes the CPU compile about three times faster with the same output words. With it, 354 of the 360 blocks
+finish within 3 s. `ipir/patches/0002-faster-block-compile.md` explains the patch and compares the two 2026-11-25
+runs.
