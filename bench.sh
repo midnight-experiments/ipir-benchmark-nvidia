@@ -16,14 +16,14 @@
 #                  the CPU's names)
 #
 # What it does, in order:
-#   1. Checks the tools (curl, unzip, a C compiler, patch, git, cargo; on Linux vulkaninfo). With --install-deps it
+#   1. Checks the tools (curl, unzip, a C compiler, patch, git, cargo). With --install-deps it
 #      installs the missing ones; without, it prints the command and stops. It never installs a GPU driver.
 #   2. ./setup.sh: checks the GPU stack, installs the pinned Deno into .tools/, builds the Rust side.
 #   3. Linux: tries a 1 GiB WebGPU buffer. If wgpu refuses it (an NVIDIA GPU without resizable BAR), it builds the
 #      Vulkan layer in tools/hide-memory-budget-layer/ and loads it for the runs. With resizable BAR the layer is not
 #      needed and is not loaded. The results record which of the two happened.
 #   4. ./run-all.sh --quick, then bench/check-run.ts on its results: stops here when something failed.
-#   5. ./run-all.sh (about 80 minutes), the same check, and bench/export-site.ts: site/<run>-site.json.
+#   5. ./run-all.sh (about 100 minutes), the same check, and bench/export-site.ts: site/<run>-site.json.
 #   6. Packs the results into results/<host>-<date>-bundle.tar.gz and prints how to send them back.
 #
 # A full run takes over an hour: start it inside tmux or screen, or with `nohup ./bench.sh > bench.log 2>&1 &`.
@@ -59,7 +59,6 @@ step "tools"
 if ! command -v cargo >/dev/null && [[ -f "$HOME/.cargo/env" ]]; then . "$HOME/.cargo/env"; fi
 missing=""
 for c in curl unzip cc patch git; do command -v "$c" >/dev/null || missing="$missing $c"; done
-if [[ $OS == Linux && $CPU_ONLY == 0 ]]; then command -v vulkaninfo >/dev/null || missing="$missing vulkaninfo"; fi
 APT_PACKAGES="build-essential curl unzip git patch ca-certificates libvulkan1 vulkan-tools"
 if [[ -n "$missing" ]]; then
   echo "missing:$missing"
@@ -173,7 +172,7 @@ fi
 
 if [[ $QUICK_ONLY == 0 ]]; then
   if [[ $CPU_ONLY == 0 ]]; then
-    run "full run, this host's GPU (about 80 minutes)" || PROBLEMS=1
+    run "full run, this host's GPU (about 100 minutes)" || PROBLEMS=1
     if [[ -n "$NAME" ]]; then export_site "$NAME" label; fi
   fi
   if [[ $CPU_ONLY == 1 || $WITH_CPU == 1 ]]; then

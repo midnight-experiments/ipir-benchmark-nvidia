@@ -49,8 +49,9 @@ if [[ "$(uname)" == Linux ]]; then
       gpu_ok=0
     fi
   else
-    echo "vulkaninfo not found: sudo apt install vulkan-tools libvulkan1"
-    gpu_ok=0
+    # Without vulkaninfo there is no device list to show; the WebGPU adapter check below is the test.
+    echo "vulkaninfo not found (sudo apt install vulkan-tools): skipping the Vulkan device list"
+    ldconfig -p 2>/dev/null | grep 'libvulkan.so.1' >/dev/null || { echo "the Vulkan loader is missing too: sudo apt install libvulkan1"; gpu_ok=0; }
   fi
 fi
 command -v patch >/dev/null || { echo "patch not found (ipir/build-stock.sh needs it): sudo apt install patch"; ok=0; }
@@ -96,8 +97,16 @@ set +e
 rc=$?
 set -e
 .tools/deno/deno eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));const w=s.webgpu??{};console.log(w.error?"ERROR: "+w.error:`${w.summary} (vendor ${w.vendor}, device ${w.device}, timestamp queries: ${w.timestampQuery}, software: ${w.software})`);console.log(`GPU backend: ${s.gpuBackend}; memory-budget layer: ${s.memoryBudgetLayer}`)' /tmp/ipir-bench-sysinfo.$$.json
+cp /tmp/ipir-bench-sysinfo.$$.json /tmp/ipir-bench-sysinfo.$$.keep 2>/dev/null || true
 rm -f /tmp/ipir-bench-sysinfo.$$.json
 [[ $rc == 3 ]] && { echo "the adapter is a software rasterizer: fix the Vulkan driver before running (README, Troubleshooting)"; gpu_ok=0; }
+# On Linux with an NVIDIA GPU, the adapter must be that GPU (vendor 0x10de = 4318), whatever vulkaninfo could show.
+if [[ "$(uname)" == Linux && $rc == 0 ]] && command -v nvidia-smi >/dev/null; then
+  if ! grep -qiE '"vendor": *"?(4318|0x10de|nvidia)' /tmp/ipir-bench-sysinfo.$$.keep 2>/dev/null; then
+    echo "WebGPU did not open the NVIDIA GPU: check the Vulkan driver (README, Troubleshooting)"; gpu_ok=0
+  fi
+fi
+rm -f /tmp/ipir-bench-sysinfo.$$.keep
 
 if [[ $ok == 0 ]]; then echo "== fix the items above, then run ./setup.sh again"; exit 1; fi
 if [[ $gpu_ok == 1 ]]; then echo "== ready: ./bench.sh (or ./run-all.sh --quick to check, then ./run-all.sh)"
