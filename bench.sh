@@ -150,7 +150,16 @@ if [[ $REPORT == 1 ]]; then
     echo "building cuda_fetch ($feature)"
     (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$feature" --bin cuda_fetch 2>/dev/null \
       || cargo build --release --locked -p ipir-bench --features "$feature" --bin cuda_fetch; }) || { echo "cuda_fetch did not build" >&2; exit 1; }
+    # The CUDA port of the block build (bins cuda_build_report, cuda_build_digest), when this checkout has it.
+    if grep -q 'name = "cuda_build_report"' ipir/bench/Cargo.toml; then
+      (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$feature" --bin cuda_build_report 2>/dev/null \
+        || cargo build --release --locked -p ipir-bench --features "$feature" --bin cuda_build_report; }) || echo "cuda_build_report did not build: the CUDA build cells stay empty" >&2
+    fi
     args+=(--cuda)
+  fi
+  if [[ $OS == Darwin && -d metal ]]; then
+    echo "building the native Metal block build (metal/)"
+    (cd metal && cargo build --release --locked) || echo "the Metal build did not compile: the Metal cells stay empty" >&2
   fi
   KEEP_AWAKE=()
   [[ $OS == Darwin ]] && command -v caffeinate >/dev/null && KEEP_AWAKE=(caffeinate -s -i -m)
