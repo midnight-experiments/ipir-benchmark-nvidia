@@ -210,6 +210,73 @@ compile_block` on the M4 Max):
 
 Not measured: the memory of a whole server process, and of the CPU backend's resident tables.
 
+**Upstream's CUDA kernel against the WebGPU path** (`--cuda`, step 4 of the report). Upstream's CUDA kernel
+(`simplepir-kernel`, `CudaKernel`) does one part of an answer on the GPU: the first pass, the table times one
+request. It takes one request per call, behind a lock, has no packing, and takes a table whole. So an answer with it
+is the first pass on the GPU, 32 times for a call of 32, and the packing of every column block on the host's CPU. The
+WebGPU path does both steps on the GPU, the 32 requests in one submission. Both were timed on the same table and the
+same 32 requests, and every answer of both equals the CPU's, byte for byte. Times in ms, medians of 9 calls of 32.
+
+RTX 4090 host (packing on the Ryzen 7 7700X; 3 GiB of the card were free):
+
+| rows × cols | CUDA first pass, device | Packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | WebGPU is faster by |
+|---|---|---|---|---|---|---|
+| 2048 × 2048 (today's read table) | 0.4 | 4.7 | 10.5 | 0.3 | 12.7 | the CUDA path is 2 ms faster |
+| 12288 × 16384 (Dust commitment table) | 13.9 | 271 | 303 | 4.9 | 19.0 | 16 times |
+| 6144 × 28672 (the same table before the cap of 8 column blocks) | 12.1 | 497 | 527 | 5.7 | 20.2 | 26 times |
+| 14336 × 34816 (read table at 10 million outputs) | 34.0 | 611 | 669 | 11.3 | 27.4 | 24 times |
+| 32768 × 32768 | 72.6 | 589 | 699 | did not fit in the 3 GiB free | | |
+
+RTX 2060 desktop (packing on the Ryzen 7 2700X; no resizable BAR):
+
+| rows × cols | CUDA first pass, device | Packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | WebGPU is faster by |
+|---|---|---|---|---|---|---|
+| 2048 × 2048 | 2.9 | 39.8 | 52.8 | 2.2 | 15.8 | 3.3 times |
+| 12288 × 16384 | 74.0 | 283 | 384 | 30.1 | 46.7 | 8.2 times |
+| 6144 × 28672 | 70.1 | 489 | 585 | 32.9 | 54.0 | 10.8 times |
+| 14336 × 34816 | 198 | 594 | 828 | 63.6 | 83.0 | 10.0 times |
+| 32768 × 32768 | 368 | 563 | 986 | 110 | 147 | 6.7 times |
+
+"Whole answer" is wall time from the call to the answer's bytes; for the CUDA path it also holds the reading of the
+32 requests, the copies to and from the device and the writing of the answers, so it is more than the two columns
+before it.
+
+- **On the RTX 4090 the WebGPU path answers a call of 32 16 to 26 times faster than the CUDA path** at every table
+  of more than one column block; at the one-block table the two are level (10.5 against 12.7 ms). **On the RTX 2060
+  it is 3 to 11 times faster at every shape.**
+- **The packing on the CPU is most of the CUDA path**: 34 to 37 ms a column block for the 32 requests on both hosts,
+  0.3 to 0.6 s for the tables of more than one block. The CPU alone answers those calls in 0.7 to 3.3 s.
+- **The first pass alone is slower too.** The device's time for the 32 first passes of the CUDA kernel is 1.2 to
+  3.3 times the device's time for both steps on the WebGPU path: the kernel reads the table once per request, and
+  the WebGPU kernels read it once for the 32.
+- A call of 1 request goes the other way at small tables: 0.3 to 22 ms on the CUDA path against 12 to 14 ms on WebGPU
+  on the RTX 4090, and 1.5 to 28 ms against 13 to 22 ms on the RTX 2060 (the CUDA path is the faster one up to the
+  Dust commitment table, WebGPU from the 10-million read table on). The WebGPU wall time has about 12 ms that do
+  not depend on the call (submitting the work and reading the answer back in this harness); its device time for the
+  call is 0.2 to 9 ms. A wallet always sends 32.
+- **A changed column block**: the CUDA kernel has no call for one block, so the table goes up again: 36 to 48 ms for
+  336 to 384 MiB of cells, 99 to 119 ms for 952 MiB, 212 to 269 ms for 2 GiB. WebGPU writes the one block, its cells and
+  its packing matrix, in 20 to 36 ms whatever the table's width (55 ms at 32,768 rows on the RTX 2060).
+- Upstream's own `cuda_bench` (one request's first pass with a 56-bit prime modulus, 100 requests) gives the same
+  first-pass time per request as the comparison: 1.06 ms at 14336 × 34816 and 2.26 ms at 32768 × 32768 on the RTX
+  4090, 5.2 and 10.3 ms on the RTX 2060 (`results/rtx4090-2026-11-26-cuda-bench.txt`,
+  `results/pop-os-2026-11-26-cuda-bench.txt`).
+
+What it took, and what could not be run:
+
+- Upstream wires the kernel into another server type (`YServer`), not into `NativeServer::respond`, which the design
+  uses. The comparison joins the two with patch 0004 (`ipir/patches/README.md`): `respond` with the first pass
+  handed to the CUDA kernel.
+- Upstream fixes the bindings of CUDA 12.0, which do not load with the NVRTC of CUDA 13 that both hosts have. Patch
+  0004 makes the release a build choice (`cuda-12`, `cuda-13`).
+- The RTX 2060 desktop has the NVRTC of CUDA 13.4 and a driver for CUDA 13.0, which refuses what that NVRTC
+  compiles. Its run used the two NVRTC 13.0 library files of the RTX 4090 host, copied into `.tools/nvrtc-13.0/`
+  and put first in `LD_LIBRARY_PATH`.
+- 32768 × 32768 on WebGPU on the RTX 4090: its 2.6 GiB did not fit beside another user's 20.7 GiB.
+- The RTX 4090 figures are from a run while that shared host was quiet. A repeat while other users were compiling
+  (load average 8 to 16) gave the same device times and a slower packing (832 ms against 611 ms at 14336 × 34816);
+  `cuda_bench` ran during that load, so its CPU column there is not a quiet figure.
+
 ## What it measures
 
 | Step | Script | What |
@@ -459,7 +526,7 @@ on Metal; they have not been run there yet.
 A full run with the GPU build was then made on each of the two NVIDIA hosts (the "Results so far" section).
 
 Not run yet anywhere: the block budget at the 10-million-output shapes with the blocks built on the GPU (it needs
-more than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead), the GPU build on Metal, the container check in `setup.sh`, and `cuda_bench`. Checked on macOS without a benchmark run:
+more than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead), the GPU build on Metal, and the container check in `setup.sh`. Checked on macOS without a benchmark run:
 `bench/check-run.ts` and the export against the committed Metal run and against copies of it renamed to `nvidia`,
 `nvidia-no-bar` and `nvidia-unknown-bar`; resizable BAR detection against `nvidia-smi -q -d MEMORY` reports with
 BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of steps, with stand-ins for `setup.sh`,

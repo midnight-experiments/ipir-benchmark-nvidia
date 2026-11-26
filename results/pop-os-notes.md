@@ -110,3 +110,17 @@ them: `budget.gpu.largest` in the results, `budgetLargest` in the site file. The
   made, so a size at the limit does not always fail at the same point.
 - Memory in use depends on the call rate. Whether that is only the scratch of calls being answered, or also buffers
   of replaced blocks that are freed late, was not looked into.
+
+## Upstream's CUDA kernel against the WebGPU path (2026-11-26)
+
+`bench/cuda-compare.ts` at commit `8866374`, bindings `cuda-13`, the Vulkan layer loaded for the WebGPU side. Its
+figures are in the results file as `cuda`, in the report as step 4 and in the README; upstream's `cuda_bench` is in
+`results/pop-os-2026-11-26-cuda-bench.txt`.
+
+- CUDA did not start with what the machine has installed: the toolkit's NVRTC is of CUDA 13.4
+  (`/usr/local/cuda-13.4`) and the driver (580.159.03) supports CUDA 13.0, so loading the compiled kernels fails with
+  `CUDA_ERROR_UNSUPPORTED_PTX_VERSION`. The run used `libnvrtc.so.13.0.88` and `libnvrtc-builtins.so.13.0.88` of the
+  RTX 4090 host (package `cuda-nvrtc-13-0`), copied to `.tools/nvrtc-13.0/` of the clone, with that folder first in
+  `LD_LIBRARY_PATH`. Nothing installed on the machine was changed.
+- The desktop was using 526 MiB of the card and the load average was about 1 at the start.
+- Every answer of both paths equals the CPU's, byte for byte, at all five shapes.

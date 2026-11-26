@@ -174,4 +174,38 @@ read 12288 × 32768, nullifier 8192 × 30720, shielded groups 8192 × 16384, Dus
 | 5 | gpu | 0.30 / 0.36 s | 5.1 % | 0.21 / 0.25 s | 93.5 ms | 0/30 | 0/30 | 130.2 / 358.6 ms | 57.7 / 119.9 ms | 0 of 883 |
 | 10 | gpu | 0.31 / 0.38 s | 5.1 % | 0.20 / 0.29 s | 106.3 ms | 0/30 | 0/30 | 86.1 / 362.6 ms | 46.8 / 88.8 ms | 0 of 1765 |
 
+## 4. Upstream's CUDA kernel against the WebGPU path: a whole answer
+
+The same table and the same 32 requests, answered three ways; every answer is compared with the CPU's, byte for byte. CUDA: upstream's `CudaKernel` does the first pass (the table times the request) on the GPU, one request at a time, and the packing of every column block runs on this host's CPU; the kernel has neither packing nor a call for several requests. WebGPU: both steps on the GPU, the 32 requests in one submission. CPU: `NativeServer::respond` alone. Times in ms, medians.
+
+A call of 32:
+
+| rows × cols | CUDA first pass: device | CUDA first pass: as the host sees it | packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | CPU alone | answers equal the CPU's |
+|---|---|---|---|---|---|---|---|---|
+| 2048 × 2048 | 2.88 | 4.63 | 39.78 | 52.81 | 2.17 | 15.77 | 60.48 | CUDA yes, WebGPU yes |
+| 12288 × 16384 | 73.96 | 77.02 | 283.06 | 384.30 | 30.13 | 46.65 | 741.90 | CUDA yes, WebGPU yes |
+| 6144 × 28672 | 70.08 | 74.03 | 488.91 | 585.25 | 32.90 | 54.01 | 888.34 | CUDA yes, WebGPU yes |
+| 14336 × 34816 | 198.14 | 202.89 | 593.78 | 828.18 | 63.59 | 83.05 | 1674.09 | CUDA yes, WebGPU yes |
+| 32768 × 32768 | 367.80 | 372.60 | 562.79 | 985.99 | 110.05 | 147.38 | 2833.92 | CUDA yes, WebGPU yes |
+
+A call of 1:
+
+| rows × cols | CUDA first pass: device | CUDA first pass: as the host sees it | packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | CPU alone | answers equal the CPU's |
+|---|---|---|---|---|---|---|---|---|
+| 2048 × 2048 | 0.09 | 0.14 | 1.13 | 1.53 | 0.40 | 12.88 | 1.79 | CUDA yes, WebGPU yes |
+| 12288 × 16384 | 2.31 | 2.41 | 8.74 | 11.91 | 2.65 | 15.06 | 22.62 | CUDA yes, WebGPU yes |
+| 6144 × 28672 | 2.19 | 2.32 | 15.30 | 18.31 | 2.94 | 15.71 | 27.51 | CUDA yes, WebGPU yes |
+| 14336 × 34816 | 5.14 | 5.29 | 18.39 | 24.68 | 5.24 | 17.87 | 52.66 | CUDA yes, WebGPU yes |
+| 32768 × 32768 | 9.09 | 9.22 | 17.09 | 27.84 | 8.85 | 21.53 | 87.46 | CUDA yes, WebGPU yes |
+
+A changed column block: the CUDA kernel takes a table whole, so the table is uploaded again; WebGPU writes the one block (its cells and its packing matrix, from host memory).
+
+| rows × cols | table | CUDA: the table again | WebGPU: one block | WebGPU: the whole table, for comparison |
+|---|---|---|---|---|
+| 2048 × 2048 | 8 MiB of cells | 0.9 | 20.2 | 45 |
+| 12288 × 16384 | 384 MiB of cells | 40.8 | 34.2 | 185 |
+| 6144 × 28672 | 336 MiB of cells | 36.0 | 22.3 | 216 |
+| 14336 × 34816 | 952 MiB of cells | 99.0 | 36.2 | 354 |
+| 32768 × 32768 | 2048 MiB of cells | 211.5 | 54.9 | 880 |
+
 Full data: `pop-os-2026-11-25-nvidia-no-bar.json`.

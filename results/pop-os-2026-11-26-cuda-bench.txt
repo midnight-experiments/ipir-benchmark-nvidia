@@ -1,0 +1,48 @@
+== cuda_bench 2048 2048 100 (cuda-13)
+initialization_ms=391.607
+shape=2048x2048, db_bytes=8388608, upload_ms=10.876, cpu_avx512=false, cpu_threads=16
+repeat=0, cpu_wall_ms_per_query=0.386
+repeat=0, callers=1, queries=100, gpu_wall_ms_per_query=0.106, kernel_ms=0.078, request_latency_ms=0.102
+repeat=0, callers=4, queries=100, gpu_wall_ms_per_query=0.107, kernel_ms=0.078, request_latency_ms=0.263
+repeat=1, cpu_wall_ms_per_query=0.379
+repeat=1, callers=1, queries=100, gpu_wall_ms_per_query=0.108, kernel_ms=0.079, request_latency_ms=0.105
+repeat=1, callers=4, queries=100, gpu_wall_ms_per_query=0.110, kernel_ms=0.079, request_latency_ms=0.269
+repeat=2, cpu_wall_ms_per_query=0.392
+repeat=2, callers=1, queries=100, gpu_wall_ms_per_query=0.105, kernel_ms=0.078, request_latency_ms=0.102
+repeat=2, callers=4, queries=100, gpu_wall_ms_per_query=0.107, kernel_ms=0.079, request_latency_ms=0.260
+== cuda_bench 12288 16384 100 (cuda-13)
+initialization_ms=223.112
+shape=12288x16384, db_bytes=402653184, upload_ms=49.935, cpu_avx512=false, cpu_threads=16
+repeat=0, cpu_wall_ms_per_query=13.727
+repeat=0, callers=1, queries=100, gpu_wall_ms_per_query=2.372, kernel_ms=2.302, request_latency_ms=2.359
+repeat=0, callers=4, queries=100, gpu_wall_ms_per_query=1.913, kernel_ms=1.829, request_latency_ms=7.171
+repeat=1, cpu_wall_ms_per_query=13.557
+repeat=1, callers=1, queries=100, gpu_wall_ms_per_query=1.797, kernel_ms=1.730, request_latency_ms=1.786
+repeat=1, callers=4, queries=100, gpu_wall_ms_per_query=1.831, kernel_ms=1.745, request_latency_ms=6.311
+repeat=2, cpu_wall_ms_per_query=13.184
+repeat=2, callers=1, queries=100, gpu_wall_ms_per_query=1.803, kernel_ms=1.733, request_latency_ms=1.791
+repeat=2, callers=4, queries=100, gpu_wall_ms_per_query=1.829, kernel_ms=1.751, request_latency_ms=6.634
+== cuda_bench 14336 34816 100 (cuda-13)
+initialization_ms=250.101
+shape=14336x34816, db_bytes=998244352, upload_ms=111.194, cpu_avx512=false, cpu_threads=16
+repeat=0, cpu_wall_ms_per_query=32.517
+repeat=0, callers=1, queries=100, gpu_wall_ms_per_query=5.270, kernel_ms=5.161, request_latency_ms=5.245
+repeat=0, callers=4, queries=100, gpu_wall_ms_per_query=4.764, kernel_ms=4.639, request_latency_ms=18.727
+repeat=1, cpu_wall_ms_per_query=32.864
+repeat=1, callers=1, queries=100, gpu_wall_ms_per_query=5.129, kernel_ms=5.018, request_latency_ms=5.104
+repeat=1, callers=4, queries=100, gpu_wall_ms_per_query=4.764, kernel_ms=4.641, request_latency_ms=18.733
+repeat=2, cpu_wall_ms_per_query=32.250
+repeat=2, callers=1, queries=100, gpu_wall_ms_per_query=5.202, kernel_ms=5.087, request_latency_ms=5.177
+repeat=2, callers=4, queries=100, gpu_wall_ms_per_query=4.772, kernel_ms=4.649, request_latency_ms=18.765
+== cuda_bench 32768 32768 100 (cuda-13)
+initialization_ms=301.123
+shape=32768x32768, db_bytes=2147483648, upload_ms=219.254, cpu_avx512=false, cpu_threads=16
+repeat=0, cpu_wall_ms_per_query=69.350
+repeat=0, callers=1, queries=100, gpu_wall_ms_per_query=10.469, kernel_ms=10.343, request_latency_ms=10.447
+repeat=0, callers=4, queries=100, gpu_wall_ms_per_query=9.922, kernel_ms=9.765, request_latency_ms=38.261
+repeat=1, cpu_wall_ms_per_query=69.561
+repeat=1, callers=1, queries=100, gpu_wall_ms_per_query=10.132, kernel_ms=10.006, request_latency_ms=10.110
+repeat=1, callers=4, queries=100, gpu_wall_ms_per_query=9.892, kernel_ms=9.744, request_latency_ms=37.957
+repeat=2, cpu_wall_ms_per_query=69.427
+repeat=2, callers=1, queries=100, gpu_wall_ms_per_query=10.384, kernel_ms=10.254, request_latency_ms=10.362
+repeat=2, callers=4, queries=100, gpu_wall_ms_per_query=9.906, kernel_ms=9.744, request_latency_ms=38.998
