@@ -83,7 +83,7 @@ const NO_GPU = "no GPU code";
 /** A figure of a native build (Metal, CUDA): `*` marks "computing only" where the other columns also install. */
 const native = (n: Any, f: (n: Any) => string | null, star = true): string | null => {
   if (!n) return null;
-  if (!n.ok) return "failed";
+  if (!n.ok) return inUse ? "not run (card in use)" : /out of memory/i.test(String(n.error)) ? "does not fit" : "failed";
   const v = f(n);
   return v === null ? null : `${v}${star ? "\\*" : ""}`;
 };
