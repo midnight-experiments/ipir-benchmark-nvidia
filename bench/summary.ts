@@ -8,6 +8,8 @@
  * machine whose CPU is the reference column (the first by default). Columns: that CPU; Metal (no native Metal code
  * exists in this benchmark); WebGPU on every machine; upstream's CUDA kernel on every machine measured with `--cuda`.
  *
+ * A result file may carry a `note` (a sentence added by hand about the run's conditions); section 7 prints it.
+ *
  * A cell without a figure says why: `not run`, `does not fit` (the GPU's memory ran out), `failed`, `no code`,
  * `no GPU code` (upstream's CUDA kernel does only the first pass of a fetch).
  */
@@ -52,7 +54,9 @@ const gib = (mib: number | null | undefined) => (mib === null || mib === undefin
 let inUse = false;
 function why(step: Any): string {
   if (step === null || step === undefined) return "not run";
-  if (step.doesNotFit) return inUse ? "not run (card in use)" : "does not fit";
+  // On a card others are using, a lost device is the same shortage of memory as an out-of-memory error.
+  if (inUse) return "not run (card in use)";
+  if (step.doesNotFit) return "does not fit";
   return "failed";
 }
 const size = (m: { r: Any }, s: string): Any => m.r.sizes?.[s] ?? null;
@@ -195,8 +199,11 @@ L.push("## 7. Detail and conditions", "");
 for (const m of machines) {
   L.push(`**${m.name}**${m.r.label ? ` (${m.r.label})` : ""}, \`${m.file}\`, ${m.r.date}${m.r.quick ? ", a quick run" : ""}:`, "");
   const smi = m.r.sysinfo?.nvidiaSmi?.[0];
-  if (smi) L.push(`- GPU memory in use by others at the start: ${gib(Number(smi["memory.used"]))} of ${gib(Number(smi["memory.total"]))}. Load average at the start: ${m.r.sysinfo?.loadavg ?? "?"}.`);
-  else L.push(`- Load average at the start: ${m.r.sysinfo?.loadavg ?? "?"}.`);
+  const load = (l: Any) => (Array.isArray(l) ? Number(l[0]).toFixed(1) : "?");
+  const loads = `Load average (1 min) at the start: ${load(m.r.sysinfo?.loadavg)}${m.r.loadavgEnd ? `, at the end: ${load(m.r.loadavgEnd)}` : ""}.`;
+  if (smi) L.push(`- GPU memory in use by others at the start: ${gib(Number(smi["memory.used"]))} of ${gib(Number(smi["memory.total"]))}${m.r.cardInUse ? " (a card in use: what did not fit beside that is `not run`)" : ""}. ${loads}`);
+  else L.push(`- ${loads}`);
+  if (m.r.note) L.push(`- ${m.r.note}`);
   for (const s of SIZES) {
     const z = size(m, s);
     if (!z) continue;

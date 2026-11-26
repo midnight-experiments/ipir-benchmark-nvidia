@@ -47,6 +47,7 @@ load it. A full run takes over an hour, so start it inside `tmux` or `screen`, o
 | `./bench.sh` | Setup, the quick check, the full run on this host's GPU, the site file, the bundle |
 | `./bench.sh --cpu` | The same, then the full run again with the answers on the CPU (about 1.5 hours more) |
 | `./bench.sh --cpu-only` | The CPU backend alone, also on a host with no GPU |
+| `./bench.sh --report` | Only the report's measurements (`REPORT.md`), about 35 minutes; add `--cuda` on an NVIDIA host, `--quick` for a short check |
 | `./bench.sh --cuda` | Also upstream's CUDA kernel: a whole answer against the WebGPU path, in the full run's results, and upstream's own first-pass benchmark (NVIDIA; needs the CUDA driver library and NVRTC) |
 
 Other options: `--install-deps` installs what is missing (the apt packages `build-essential curl unzip git patch
@@ -69,6 +70,23 @@ To send the results back, either push them from the machine
 (`git checkout -b results/box && git add results site && git commit -s -m "Results from box" && git push -u origin HEAD`),
 or copy the bundle off it (`scp`) and unpack it at the top of a clone. The `.md` summary alone is enough to read the
 numbers; the `.json` holds the per-call and per-block data.
+
+## The report
+
+**[`REPORT.md`](REPORT.md)** has the figures in one layout: a table's four operations (build from scratch, update,
+fetch 1, fetch 32) at 1 million and 10 million values, on the CPU, on WebGPU on the three GPUs and with upstream's
+CUDA kernel, and the GPU memory each operation needs. It is written from result files, not by hand:
+
+```sh
+./bench.sh --report --cuda --host <short name> --label "<GPU> + <CPU>"   # about 35 minutes; without --cuda on a Mac
+deno run --allow-read --allow-write bench/summary.ts --out REPORT.md --cpu M4 \
+  "results/m4-max-2026-11-26-report.json=M4" "results/pop-os-2026-11-26-report.json=RTX 20" "results/rtx4090-2026-11-26-report.json=RTX 40"
+```
+
+`--report` runs `bench/report-run.ts`: `bench/table-build.ts` (a whole table built on the CPU and on the GPU, and the
+same while another table answers), the single-block and six-table updates, and the fetches of `bench/cuda-compare.ts`.
+Every GPU-built table and every answer is compared with the CPU's. The sections below are the earlier, longer
+account at the chain's current size and at 10 million outputs.
 
 ## Results so far
 

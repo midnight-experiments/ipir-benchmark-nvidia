@@ -178,6 +178,10 @@ for (const size of sizes) {
 }
 
 result.ended = new Date().toISOString();
+// The load at the end: a shared machine may have become busy during the run.
+try {
+  result.loadavgEnd = JSON.parse((await deno("sysinfo.ts", ["--no-adapter"])).lines.join("\n")).loadavg ?? null;
+} catch { /* unknown */ }
 await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
 await Deno.remove(tmp, { recursive: true }).catch(() => {});
 log(`wrote ${out}`);
