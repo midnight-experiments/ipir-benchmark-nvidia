@@ -67,7 +67,7 @@ The only differences reported are `Only in fresh/…` for the files listed under
 
 ## In ipir-benchmark-nvidia
 
-This folder was copied from UmbraDB's `examples/private-shielded-sync/ipir/vendor/` (commit `4f362386`). Three things
+This folder was copied from UmbraDB's `examples/private-shielded-sync/ipir/vendor/` (commit `4f362386`). Five things
 differ from what is written above:
 
 - `ipir-native-client/src/lib.rs` has patch `../patches/0001-setup-without-columns.patch` applied
@@ -75,7 +75,13 @@ differ from what is written above:
 - Patch `../patches/0002-faster-block-compile.patch` changes
   `reinspiring/src/{compile,lib,lift_ntt,native,native_matrix}.rs` and `reinspiring/tests/compile_unit.rs`, and adds
   `reinspiring/src/lazy_ntt.rs`. It makes the CPU block compile faster with the same output words and adds one
-  read-only accessor for the equality check. No other copied file is changed.
+  read-only accessor for the equality check.
+- Patch `../patches/0003-gpu-build-accessors.patch` adds read-only accessors to `reinspiring/src/lift_ntt.rs` and
+  `reinspiring/src/native.rs`, for a build of a column block on the GPU. No computation changes.
+- Patch `../patches/0004-first-pass-hook.patch` adds `NativeServer::respond_with_first_pass` to
+  `ipir-sp/src/native.rs` and `CudaKernel::multiply_power_of_two_timed` to `simplepir-kernel/src/cuda.rs`, for timing
+  a whole answer with the CUDA kernel, and makes the CUDA release of the bindings a build feature in
+  `simplepir-kernel/Cargo.toml` (`cuda-12`, `cuda-13`). No other copied file is changed.
 - The workspace (`../Cargo.toml`) holds these five crates and the benchmark crate `../bench` only; there is no
   `core`, `node` or `wasm` here, and `../Cargo.lock` keeps the versions of the proof of concept's lock for every
   package still used.
