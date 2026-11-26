@@ -4,7 +4,7 @@
  "date": "2026-11-25",
  "source": {
   "repo": "midnight-experiments/ipir-benchmark-nvidia",
-  "commit": "cbb7cd9dcc98c74046496a8d0805423f7f82b4a3",
+  "commit": "e9b2979e7996472137f2f743f39551d09c2c71f2",
   "results": [
    "results/pop-os-2026-11-25-nvidia-no-bar.json"
   ]
