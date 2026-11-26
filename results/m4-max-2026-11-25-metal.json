@@ -19,7 +19,10 @@
    "power": "AC Power"
   },
   "started": "2026-11-25T15:37:19Z",
-  "seconds": 4672
+  "seconds": 4672,
+  "gpuCompile": true,
+  "gpuCompileSteps": "compile,budget",
+  "budgetSets": "today,10m"
  },
  "backend": {
   "name": "metal",
@@ -366,7 +369,592 @@
    }
   ]
  },
- "gpuCompile": null,
+ "gpuCompile": {
+  "check": {
+   "gpu": "Apple M4 Max",
+   "checks": [
+    {
+     "set": "today",
+     "table": 0,
+     "rows": 2048,
+     "seed": 100,
+     "equal": true,
+     "digest": "2f4bb2a40e5f89e8c5ef8a4971365a28e4e4812825aecabeceda18072ea67ed7",
+     "expected": "2f4bb2a40e5f89e8c5ef8a4971365a28e4e4812825aecabeceda18072ea67ed7",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "today",
+     "table": 1,
+     "rows": 2048,
+     "seed": 101,
+     "equal": true,
+     "digest": "61ee9c36a18f1854454963dc319827624cf8232c32c34e2bd531dc40e6f387f3",
+     "expected": "61ee9c36a18f1854454963dc319827624cf8232c32c34e2bd531dc40e6f387f3",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "today",
+     "table": 2,
+     "rows": 2048,
+     "seed": 102,
+     "equal": true,
+     "digest": "79eac88902b9c01b286c67a23b9a25c58e2e7d2825ba5d9e15fb76615e82bbbd",
+     "expected": "79eac88902b9c01b286c67a23b9a25c58e2e7d2825ba5d9e15fb76615e82bbbd",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "today",
+     "table": 3,
+     "rows": 6144,
+     "seed": 103,
+     "equal": true,
+     "digest": "7f44ccab646b121acd53e071b5691ffa5f5f9887ce14cfe071f9ec67377e37d7",
+     "expected": "7f44ccab646b121acd53e071b5691ffa5f5f9887ce14cfe071f9ec67377e37d7",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "today",
+     "table": 4,
+     "rows": 2048,
+     "seed": 104,
+     "equal": true,
+     "digest": "f15838b294a527885471d5c965c0a52d7741bce500870d65a8f89fec02381b2c",
+     "expected": "f15838b294a527885471d5c965c0a52d7741bce500870d65a8f89fec02381b2c",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "today",
+     "table": 5,
+     "rows": 2048,
+     "seed": 105,
+     "equal": true,
+     "digest": "4663c8bf08ef4ebcad95ddcf5973d982bcce88d8c6e3b40c143ac891cdc54069",
+     "expected": "4663c8bf08ef4ebcad95ddcf5973d982bcce88d8c6e3b40c143ac891cdc54069",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 0,
+     "rows": 14336,
+     "seed": 100,
+     "equal": true,
+     "digest": "5c0f03787675e6a98b1d94af20b171fc842c30e90b4b2cd1c69fefd3f365e68c",
+     "expected": "5c0f03787675e6a98b1d94af20b171fc842c30e90b4b2cd1c69fefd3f365e68c",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 1,
+     "rows": 16384,
+     "seed": 101,
+     "equal": true,
+     "digest": "1a2fe8cca7ac85c648fac113aface3e6231ee245534d7d0a7af99079990fd014",
+     "expected": "1a2fe8cca7ac85c648fac113aface3e6231ee245534d7d0a7af99079990fd014",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 2,
+     "rows": 8192,
+     "seed": 102,
+     "equal": true,
+     "digest": "c5ba3ee09ceba62c68d2a8dcdd0a4ed74193f85331d047f7ae2d87bda0ba6495",
+     "expected": "c5ba3ee09ceba62c68d2a8dcdd0a4ed74193f85331d047f7ae2d87bda0ba6495",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 3,
+     "rows": 6144,
+     "seed": 103,
+     "equal": true,
+     "digest": "7f44ccab646b121acd53e071b5691ffa5f5f9887ce14cfe071f9ec67377e37d7",
+     "expected": "7f44ccab646b121acd53e071b5691ffa5f5f9887ce14cfe071f9ec67377e37d7",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 4,
+     "rows": 2048,
+     "seed": 104,
+     "equal": true,
+     "digest": "f15838b294a527885471d5c965c0a52d7741bce500870d65a8f89fec02381b2c",
+     "expected": "f15838b294a527885471d5c965c0a52d7741bce500870d65a8f89fec02381b2c",
+     "cpuStorage": "i32"
+    },
+    {
+     "set": "10m",
+     "table": 5,
+     "rows": 2048,
+     "seed": 105,
+     "equal": true,
+     "digest": "4663c8bf08ef4ebcad95ddcf5973d982bcce88d8c6e3b40c143ac891cdc54069",
+     "expected": "4663c8bf08ef4ebcad95ddcf5973d982bcce88d8c6e3b40c143ac891cdc54069",
+     "cpuStorage": "i32"
+    },
+    {
+     "rows": 2048,
+     "seed": 1,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "ea0cb8feb2631a96e6ca8f6de4f4ee395cc3dc6e6461912974a3e5a02087c316",
+     "expected": "ea0cb8feb2631a96e6ca8f6de4f4ee395cc3dc6e6461912974a3e5a02087c316",
+     "cpuStorage": "i32",
+     "wallMs": 74.1,
+     "setupMs": 22
+    },
+    {
+     "rows": 2048,
+     "seed": 2,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "8612b78d537c9f51d22b806dd2287a4185af950ddd25489e875462196bfc130d",
+     "expected": "8612b78d537c9f51d22b806dd2287a4185af950ddd25489e875462196bfc130d",
+     "cpuStorage": "i32",
+     "wallMs": 72.8,
+     "setupMs": 22
+    },
+    {
+     "rows": 2048,
+     "seed": 3,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "afd4b1f65d598e48f1d6312933a8c78afe70ab4ac39a274e155d74f2cca4f4c7",
+     "expected": "afd4b1f65d598e48f1d6312933a8c78afe70ab4ac39a274e155d74f2cca4f4c7",
+     "cpuStorage": "i32",
+     "wallMs": 64,
+     "setupMs": 22
+    },
+    {
+     "rows": 8192,
+     "seed": 1,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "4fb3939721e0773395456d54973aca8e69d5a5203d78d179a1c742cdcba70fd9",
+     "expected": "4fb3939721e0773395456d54973aca8e69d5a5203d78d179a1c742cdcba70fd9",
+     "cpuStorage": "i32",
+     "wallMs": 74.2,
+     "setupMs": 96
+    },
+    {
+     "rows": 8192,
+     "seed": 2,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "680e4da08d2ac9d1138d9bd3d1ef73d7e73d65638f30d68dae2bc4c4c0fcb81d",
+     "expected": "680e4da08d2ac9d1138d9bd3d1ef73d7e73d65638f30d68dae2bc4c4c0fcb81d",
+     "cpuStorage": "i32",
+     "wallMs": 70.7,
+     "setupMs": 96
+    },
+    {
+     "rows": 8192,
+     "seed": 3,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "963072de15912619129cb08ccf4703254d5ff3e61198e92c96400babda2c41f6",
+     "expected": "963072de15912619129cb08ccf4703254d5ff3e61198e92c96400babda2c41f6",
+     "cpuStorage": "i32",
+     "wallMs": 71.8,
+     "setupMs": 96
+    },
+    {
+     "rows": 16384,
+     "seed": 1,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "e9e5e33878c236abd92d6dc3c1779d01abcbe7bbeb944eb66d0e4b156a387777",
+     "expected": "e9e5e33878c236abd92d6dc3c1779d01abcbe7bbeb944eb66d0e4b156a387777",
+     "cpuStorage": "i32",
+     "wallMs": 81.6,
+     "setupMs": 100
+    },
+    {
+     "rows": 16384,
+     "seed": 2,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "410e6747772349c526fa46deec11bfd6aa89c4793e294ce0dc15d20d9aa09896",
+     "expected": "410e6747772349c526fa46deec11bfd6aa89c4793e294ce0dc15d20d9aa09896",
+     "cpuStorage": "i32",
+     "wallMs": 80.1,
+     "setupMs": 100
+    },
+    {
+     "rows": 16384,
+     "seed": 3,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "cef0b59e10295747ace4a019ab45d4bb4ddada7f154aecdddebe75e5ae3b6107",
+     "expected": "cef0b59e10295747ace4a019ab45d4bb4ddada7f154aecdddebe75e5ae3b6107",
+     "cpuStorage": "i32",
+     "wallMs": 70,
+     "setupMs": 100
+    },
+    {
+     "rows": 32768,
+     "seed": 1,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "a424cc50e6a0670e0e34e20ab255491d1a83b214cd491008c495b0cfeee3b7d2",
+     "expected": "a424cc50e6a0670e0e34e20ab255491d1a83b214cd491008c495b0cfeee3b7d2",
+     "cpuStorage": "i32",
+     "wallMs": 89.3,
+     "setupMs": 133
+    },
+    {
+     "rows": 32768,
+     "seed": 2,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "9f660f206a4634c94a92cd4c338d3c3834e7076c5aa227c8cd85d9539b361c80",
+     "expected": "9f660f206a4634c94a92cd4c338d3c3834e7076c5aa227c8cd85d9539b361c80",
+     "cpuStorage": "i32",
+     "wallMs": 90,
+     "setupMs": 133
+    },
+    {
+     "rows": 32768,
+     "seed": 3,
+     "equal": true,
+     "hintsEqual": true,
+     "packingEqual": true,
+     "digest": "411f6229620fe037dc6fb2d480fdabb0e4de205fce3191835bcd51ed37e53b98",
+     "expected": "411f6229620fe037dc6fb2d480fdabb0e4de205fce3191835bcd51ed37e53b98",
+     "cpuStorage": "i32",
+     "wallMs": 82.8,
+     "setupMs": 133
+    }
+   ]
+  },
+  "timing": {
+   "ok": true,
+   "reps": 5,
+   "setReps": 10,
+   "pauseMs": 0,
+   "keepWarmMs": 0,
+   "idleMs": 6000,
+   "idleReps": 5,
+   "gpu": "Apple M4 Max",
+   "timestampQuery": true,
+   "sets": [
+    {
+     "set": "today",
+     "rows": [
+      2048,
+      2048,
+      2048,
+      6144,
+      2048,
+      2048
+     ],
+     "tables": 6,
+     "setupMs": 30.918542000000002,
+     "scratchBytes": 941293744,
+     "cellsBytes": 67108864,
+     "wallMs": {
+      "min": 130.811875,
+      "median": 134.69206249999996,
+      "max": 142.72270800000024,
+      "n": 10
+     },
+     "execMs": {
+      "min": 111.63,
+      "median": 111.63,
+      "max": 111.63,
+      "n": 1
+     },
+     "stagesExecMedianMs": null,
+     "afterIdle": {
+      "idleMs": 6000,
+      "wallMs": {
+       "min": 153.35491699999693,
+       "median": 166.44129199999952,
+       "max": 211.89337499999965,
+       "n": 5
+      },
+      "execMs": {
+       "min": 130.570083,
+       "median": 130.570083,
+       "max": 130.570083,
+       "n": 1
+      },
+      "failed": false,
+      "error": null
+     }
+    },
+    {
+     "set": "10m",
+     "rows": [
+      14336,
+      16384,
+      8192,
+      6144,
+      2048,
+      2048
+     ],
+     "tables": 6,
+     "setupMs": 50.82325000000128,
+     "scratchBytes": 942080176,
+     "cellsBytes": 201326592,
+     "wallMs": {
+      "min": 155.84691599999496,
+      "median": 165.109187500002,
+      "max": 173.68754199999967,
+      "n": 10
+     },
+     "execMs": null,
+     "stagesExecMedianMs": null,
+     "afterIdle": {
+      "idleMs": 6000,
+      "wallMs": {
+       "min": 183.74449999999342,
+       "median": 195.63050000000658,
+       "max": 198.80695800000103,
+       "n": 5
+      },
+      "execMs": {
+       "min": 134.877333,
+       "median": 134.877333,
+       "max": 134.877333,
+       "n": 1
+      },
+      "failed": false,
+      "error": null
+     }
+    }
+   ],
+   "shapes": [
+    {
+     "rows": 2048,
+     "tables": 1,
+     "setupMs": 27.70783400000073,
+     "scratchBytes": 268714160,
+     "cellsBytes": 8388608,
+     "wallMs": {
+      "min": 59.21799999999348,
+      "median": 59.846916000009514,
+      "max": 60.6751660000009,
+      "n": 5
+     },
+     "execMs": null,
+     "stagesExecMedianMs": {
+      "hints": 10.282666,
+      "aggregation": 1.585958,
+      "chains": 31.993583,
+      "compile": 10.1037705
+     },
+     "atOnce": [
+      {
+       "tables": 4,
+       "setupMs": 30.71929199999431,
+       "scratchBytes": 672202928,
+       "cellsBytes": 33554432,
+       "wallMs": {
+        "min": 99.84266700000444,
+        "median": 106.28437500000291,
+        "max": 109.13770900000236,
+        "n": 5
+       },
+       "execMs": {
+        "min": 84.476583,
+        "median": 84.49852050000001,
+        "max": 84.520458,
+        "n": 2
+       },
+       "stagesExecMedianMs": null
+      },
+      {
+       "tables": 6,
+       "setupMs": 24.506457999988925,
+       "scratchBytes": 941195440,
+       "cellsBytes": 50331648,
+       "wallMs": {
+        "min": 128.73170899999968,
+        "median": 133.13779100000102,
+        "max": 141.50337500000023,
+        "n": 5
+       },
+       "execMs": null,
+       "stagesExecMedianMs": null
+      }
+     ]
+    },
+    {
+     "rows": 8192,
+     "tables": 1,
+     "setupMs": 30.961874999993597,
+     "scratchBytes": 268861616,
+     "cellsBytes": 33554432,
+     "wallMs": {
+      "min": 62.615583000006154,
+      "median": 64.34829100000206,
+      "max": 64.78429199999664,
+      "n": 5
+     },
+     "execMs": null,
+     "stagesExecMedianMs": {
+      "hints": 12.163542,
+      "aggregation": 1.573166,
+      "chains": 31.949625,
+      "compile": 12.163542
+     },
+     "atOnce": [
+      {
+       "tables": 4,
+       "setupMs": 33.5252499999915,
+       "scratchBytes": 672792752,
+       "cellsBytes": 134217728,
+       "wallMs": {
+        "min": 118.02516600000672,
+        "median": 127.05816699999559,
+        "max": 134.00354199999128,
+        "n": 5
+       },
+       "execMs": {
+        "min": 93.543875,
+        "median": 93.543875,
+        "max": 93.543875,
+        "n": 1
+       },
+       "stagesExecMedianMs": null
+      },
+      {
+       "tables": 6,
+       "setupMs": 33.514583000011044,
+       "scratchBytes": 942080176,
+       "cellsBytes": 201326592,
+       "wallMs": {
+        "min": 152.3015000000014,
+        "median": 163.377542000002,
+        "max": 170.89208399999188,
+        "n": 5
+       },
+       "execMs": null,
+       "stagesExecMedianMs": null
+      }
+     ]
+    },
+    {
+     "rows": 16384,
+     "tables": 1,
+     "setupMs": 33.569209000008414,
+     "scratchBytes": 269058224,
+     "cellsBytes": 67108864,
+     "wallMs": {
+      "min": 68.46945800000685,
+      "median": 68.81304199999431,
+      "max": 69.92075000000477,
+      "n": 5
+     },
+     "execMs": null,
+     "stagesExecMedianMs": {
+      "hints": 15.365542,
+      "aggregation": 1.560625,
+      "chains": 32.001,
+      "compile": 15.365542
+     },
+     "atOnce": [
+      {
+       "tables": 4,
+       "setupMs": 34.30679200000304,
+       "scratchBytes": 673579184,
+       "cellsBytes": 268435456,
+       "wallMs": {
+        "min": 140.74141699999745,
+        "median": 148.5929579999938,
+        "max": 165.0532499999972,
+        "n": 5
+       },
+       "execMs": null,
+       "stagesExecMedianMs": null
+      },
+      {
+       "tables": 6,
+       "setupMs": 35.46766699998989,
+       "scratchBytes": 943259824,
+       "cellsBytes": 402653184,
+       "wallMs": {
+        "min": 197.80779200000688,
+        "median": 198.82545800000662,
+        "max": 209.78662499999336,
+        "n": 5
+       },
+       "execMs": null,
+       "stagesExecMedianMs": null
+      }
+     ]
+    },
+    {
+     "rows": 32768,
+     "tables": 1,
+     "setupMs": 43.10620799999742,
+     "scratchBytes": 269451440,
+     "cellsBytes": 134217728,
+     "wallMs": {
+      "min": 80.90275000000838,
+      "median": 83.87574999999197,
+      "max": 88.18083299999125,
+      "n": 5
+     },
+     "execMs": null,
+     "stagesExecMedianMs": {
+      "hints": 22.045917,
+      "aggregation": 1.577834,
+      "chains": 31.962667,
+      "compile": 22.045917
+     },
+     "atOnce": [
+      {
+       "tables": 4,
+       "setupMs": 23.664707999996608,
+       "scratchBytes": 675152048,
+       "cellsBytes": 536870912,
+       "wallMs": {
+        "min": 200.09658299999137,
+        "median": 204.42995799999335,
+        "max": 212.9610829999874,
+        "n": 5
+       },
+       "execMs": null,
+       "stagesExecMedianMs": null
+      },
+      {
+       "tables": 6,
+       "setupMs": 24.9366660000087,
+       "scratchBytes": 945619120,
+       "cellsBytes": 805306368,
+       "wallMs": {
+        "min": 290.9517499999929,
+        "median": 294.89254199998686,
+        "max": 309.6573749999952,
+        "n": 5
+       },
+       "execMs": {
+        "min": 182.101042,
+        "median": 182.101042,
+        "max": 182.101042,
+        "n": 1
+       },
+       "stagesExecMedianMs": null
+      }
+     ]
+    }
+   ]
+  }
+ },
  "fetch": {
   "backend": "gpu",
   "runs": 9,
@@ -50936,10 +51524,2045 @@
    }
   },
   "gpu": {
-   "today": null,
-   "10m": null
+   "today": {
+    "set": "today",
+    "outputs": null,
+    "tables": [
+     {
+      "name": "read",
+      "rows": 2048,
+      "cols": 2048
+     },
+     {
+      "name": "nullifier",
+      "rows": 2048,
+      "cols": 2048
+     },
+     {
+      "name": "shielded groups",
+      "rows": 2048,
+      "cols": 4096
+     },
+     {
+      "name": "Dust groups",
+      "rows": 6144,
+      "cols": 28672
+     },
+     {
+      "name": "first coins",
+      "rows": 2048,
+      "cols": 2048
+     },
+     {
+      "name": "generation groups",
+      "rows": 2048,
+      "cols": 4096
+     }
+    ],
+    "rates": [
+     2,
+     5,
+     10
+    ],
+    "modes": [
+     "gpu"
+    ],
+    "blocks": 30,
+    "intervalMs": 6000,
+    "baselineS": 20,
+    "budgetMs": 3000,
+    "goalMs": 1000,
+    "residentBytes": 1115684864,
+    "answer": "gpu",
+    "note": "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+    "gpu": "Apple M4 Max",
+    "gpuBuild": {
+     "setupMs": 164.62391699999898,
+     "scratchBytes": 773521584,
+     "cellsBytes": 67108864
+    },
+    "ok": true,
+    "runs": [
+     {
+      "rate": 2,
+      "mode": "none",
+      "issued": 41,
+      "calls": 41,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 41,
+       "min": 16.508,
+       "p50": 26.03,
+       "p90": 68.725,
+       "p99": 83.253,
+       "max": 83.253
+      }
+     },
+     {
+      "rate": 2,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 239.915,
+       "p50": 257.779,
+       "p90": 268.066,
+       "p99": 280.182,
+       "max": 280.182
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 150.837,
+       "p50": 164.122,
+       "p90": 167.432,
+       "p99": 173.107,
+       "max": 173.107
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 87.195,
+       "p50": 91.571,
+       "p90": 104.69,
+       "p99": 107.075,
+       "max": 107.075
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 353,
+      "calls": 353,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 353,
+        "min": 16.415,
+        "p50": 27.61,
+        "p90": 82.152,
+        "p99": 170.517,
+        "max": 175.671
+       },
+       "duringBlockWork": {
+        "n": 30,
+        "min": 150.731,
+        "p50": 167.032,
+        "p90": 170.517,
+        "p99": 175.671,
+        "max": 175.671
+       },
+       "outsideBlockWork": {
+        "n": 323,
+        "min": 16.415,
+        "p50": 26.744,
+        "p90": 68.253,
+        "p99": 95.149,
+        "max": 110.408
+       }
+      },
+      "work": [
+       {
+        "compileMs": 173.1069580000003,
+        "uploadMs": 107.07520799999838,
+        "workMs": 280.1821659999987,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 167.99124999999913,
+        "uploadMs": 97.10691700000461,
+        "workMs": 265.09816700000374,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.723708000005,
+        "uploadMs": 105.68000000000029,
+        "workMs": 270.4037080000053,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 157.8287909999999,
+        "uploadMs": 104.69029199999932,
+        "workMs": 262.5190829999992,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.86229100000492,
+        "uploadMs": 89.01412500000151,
+        "workMs": 252.87641600000643,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 166.12054199999693,
+        "uploadMs": 89.58291600000666,
+        "workMs": 255.7034580000036,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.32424999999785,
+        "uploadMs": 92.26687500000116,
+        "workMs": 254.591124999999,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.12170800000604,
+        "uploadMs": 90.97579199999745,
+        "workMs": 255.0975000000035,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.80766700000095,
+        "uploadMs": 90.71479199999885,
+        "workMs": 254.5224589999998,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 157.8787500000035,
+        "uploadMs": 87.19512499999837,
+        "workMs": 245.07387500000186,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.1342500000028,
+        "uploadMs": 90.87458299999707,
+        "workMs": 253.00883299999987,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 151.54529199999524,
+        "uploadMs": 88.36925000000338,
+        "workMs": 239.91454199999862,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.27245799999218,
+        "uploadMs": 90.84354200000234,
+        "workMs": 253.11599999999453,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.08641699999862,
+        "uploadMs": 88.94408299999486,
+        "workMs": 254.03049999999348,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.50887499999953,
+        "uploadMs": 92.27033299999312,
+        "workMs": 257.77920799999265,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 166.6330830000079,
+        "uploadMs": 97.44587499999034,
+        "workMs": 264.07895799999824,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 150.83733300000313,
+        "uploadMs": 90.75504200000432,
+        "workMs": 241.59237500000745,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.48208299999533,
+        "uploadMs": 90.99204199999804,
+        "workMs": 256.47412499999336,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 166.44295799999963,
+        "uploadMs": 91.41779200002202,
+        "workMs": 257.86075000002165,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.15216699999291,
+        "uploadMs": 96.45812500000466,
+        "workMs": 261.61029199999757,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.2035840000026,
+        "uploadMs": 104.88270799999009,
+        "workMs": 268.0862919999927,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 168.50224999999045,
+        "uploadMs": 88.69825000001583,
+        "workMs": 257.2005000000063,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 153.57179099999485,
+        "uploadMs": 91.09025000000838,
+        "workMs": 244.66204100000323,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.69416600000113,
+        "uploadMs": 98.89274999999907,
+        "workMs": 261.5869160000002,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.23029199999291,
+        "uploadMs": 95.73904200000106,
+        "workMs": 257.969333999994,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.47008299999288,
+        "uploadMs": 99.09675000002608,
+        "workMs": 262.56683300001896,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.3556250000256,
+        "uploadMs": 102.71037499999511,
+        "workMs": 268.0660000000207,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.32212499997695,
+        "uploadMs": 99.92720900001586,
+        "workMs": 264.2493339999928,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.35491700001876,
+        "uploadMs": 98.68437499998254,
+        "workMs": 264.0392920000013,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 167.43204200000037,
+        "uploadMs": 91.5710830000171,
+        "workMs": 259.00312500001746,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 5,
+      "mode": "none",
+      "issued": 101,
+      "calls": 101,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 101,
+       "min": 18.761,
+       "p50": 25.234,
+       "p90": 78.906,
+       "p99": 99.959,
+       "max": 103.562
+      }
+     },
+     {
+      "rate": 5,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 233.154,
+       "p50": 254.892,
+       "p90": 273.295,
+       "p99": 308.834,
+       "max": 308.834
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 140.395,
+       "p50": 164.445,
+       "p90": 171.984,
+       "p99": 209.71,
+       "max": 209.71
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 88.853,
+       "p50": 92.463,
+       "p90": 101.52,
+       "p99": 107.08,
+       "max": 107.08
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 882,
+      "calls": 882,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 882,
+        "min": 15.269,
+        "p50": 25.664,
+        "p90": 78.35,
+        "p99": 170.553,
+        "max": 221.443
+       },
+       "duringBlockWork": {
+        "n": 60,
+        "min": 15.349,
+        "p50": 33.532,
+        "p90": 171.627,
+        "p99": 221.443,
+        "max": 221.443
+       },
+       "outsideBlockWork": {
+        "n": 822,
+        "min": 15.269,
+        "p50": 25.641,
+        "p90": 67.149,
+        "p99": 100.531,
+        "max": 115.314
+       }
+      },
+      "work": [
+       {
+        "compileMs": 180.70404099998996,
+        "uploadMs": 92.5907920000027,
+        "workMs": 273.29483299999265,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 152.41495799997938,
+        "uploadMs": 101.78174999999464,
+        "workMs": 254.19670799997402,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.29233299999032,
+        "uploadMs": 89.60016699999687,
+        "workMs": 254.8924999999872,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.5839589999814,
+        "uploadMs": 107.07975000000442,
+        "workMs": 272.66370899998583,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 209.71033300002455,
+        "uploadMs": 99.12329199997475,
+        "workMs": 308.8336249999993,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.815042000002,
+        "uploadMs": 90.76116700001876,
+        "workMs": 256.57620900002075,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.49287499999627,
+        "uploadMs": 101.5197089999856,
+        "workMs": 267.01258399998187,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.98441600002116,
+        "uploadMs": 101.89387500000885,
+        "workMs": 273.87829100003,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 154.69275000004563,
+        "uploadMs": 92.81341699999757,
+        "workMs": 247.5061670000432,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.1327909999527,
+        "uploadMs": 93.27900000003865,
+        "workMs": 262.41179099999135,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 152.01041600003373,
+        "uploadMs": 91.14624999999069,
+        "workMs": 243.15666600002442,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 152.9196670000092,
+        "uploadMs": 91.49487499997485,
+        "workMs": 244.41454199998407,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 155.12612500000978,
+        "uploadMs": 90.87266699998872,
+        "workMs": 245.9987919999985,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 157.56191700004274,
+        "uploadMs": 92.36591699998826,
+        "workMs": 249.927834000031,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 167.48608399997465,
+        "uploadMs": 90.58316600002581,
+        "workMs": 258.06925000000047,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 206.76612499996554,
+        "uploadMs": 96.5767910000286,
+        "workMs": 303.34291599999415,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 155.11395899998024,
+        "uploadMs": 97.12370799999917,
+        "workMs": 252.2376669999794,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.53954099997645,
+        "uploadMs": 91.05487500003073,
+        "workMs": 260.5944160000072,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 155.41454199998407,
+        "uploadMs": 88.85283300001174,
+        "workMs": 244.2673749999958,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 155.39725000003818,
+        "uploadMs": 89.62079199997243,
+        "workMs": 245.0180420000106,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 156.22616700001527,
+        "uploadMs": 91.5925419999985,
+        "workMs": 247.81870900001377,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 170.0645829999703,
+        "uploadMs": 91.33775000000605,
+        "workMs": 261.40233299997635,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 140.39495899999747,
+        "uploadMs": 92.75895800004946,
+        "workMs": 233.15391700004693,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.12541700003203,
+        "uploadMs": 92.6040829999838,
+        "workMs": 263.72950000001583,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.9827079999959,
+        "uploadMs": 92.8585000000312,
+        "workMs": 257.8412080000271,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 159.38354200002505,
+        "uploadMs": 94.22808299999451,
+        "workMs": 253.61162500001956,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.44545899995137,
+        "uploadMs": 92.01112500001909,
+        "workMs": 256.45658399997046,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 157.1030829999945,
+        "uploadMs": 95.36304199998267,
+        "workMs": 252.46612499997718,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 166.8172500000219,
+        "uploadMs": 91.1390839999658,
+        "workMs": 257.9563339999877,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 160.32166600000346,
+        "uploadMs": 92.46299999998882,
+        "workMs": 252.78466599999228,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 10,
+      "mode": "none",
+      "issued": 201,
+      "calls": 201,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 201,
+       "min": 15.922,
+       "p50": 21.232,
+       "p90": 61.166,
+       "p99": 85.506,
+       "max": 94.006
+      }
+     },
+     {
+      "rate": 10,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 235.588,
+       "p50": 252.813,
+       "p90": 279.876,
+       "p99": 334.482,
+       "max": 334.482
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 145.023,
+       "p50": 157.273,
+       "p90": 181.351,
+       "p99": 198.737,
+       "max": 198.737
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 88.039,
+       "p50": 92.401,
+       "p90": 99.381,
+       "p99": 138.24,
+       "max": 138.24
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 1763,
+      "calls": 1763,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 1763,
+        "min": 15.552,
+        "p50": 22.5,
+        "p90": 63.938,
+        "p99": 155.084,
+        "max": 209.431
+       },
+       "duringBlockWork": {
+        "n": 91,
+        "min": 16.604,
+        "p50": 71.376,
+        "p90": 169.251,
+        "p99": 209.431,
+        "max": 209.431
+       },
+       "outsideBlockWork": {
+        "n": 1672,
+        "min": 15.552,
+        "p50": 22.414,
+        "p90": 59.282,
+        "p99": 87.819,
+        "max": 106.87
+       }
+      },
+      "work": [
+       {
+        "compileMs": 162.71504099998856,
+        "uploadMs": 90.09845900000073,
+        "workMs": 252.8134999999893,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.50312500004657,
+        "uploadMs": 88.03858299995773,
+        "workMs": 257.5417080000043,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 149.56520799995633,
+        "uploadMs": 95.48200000001816,
+        "workMs": 245.0472079999745,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 145.0232079999987,
+        "uploadMs": 90.56491700001061,
+        "workMs": 235.5881250000093,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 158.99916599999415,
+        "uploadMs": 88.95183400000678,
+        "workMs": 247.95100000000093,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 151.14429199998267,
+        "uploadMs": 98.18558300001314,
+        "workMs": 249.3298749999958,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 151.8764160000137,
+        "uploadMs": 92.40116700000362,
+        "workMs": 244.27758300001733,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 148.62199999997392,
+        "uploadMs": 90.5523750000284,
+        "workMs": 239.17437500000233,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 166.97220800002106,
+        "uploadMs": 91.82933400000911,
+        "workMs": 258.80154200003017,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 154.89387500000885,
+        "uploadMs": 91.82966599997599,
+        "workMs": 246.72354099998483,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 147.07387500000186,
+        "uploadMs": 98.6636250000447,
+        "workMs": 245.73750000004657,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 196.24233400000958,
+        "uploadMs": 138.24012499995297,
+        "workMs": 334.48245899996255,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 146.6310840000515,
+        "uploadMs": 90.1828749999986,
+        "workMs": 236.8139590000501,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.98875000001863,
+        "uploadMs": 94.84066599997459,
+        "workMs": 258.8294159999932,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 149.28262499999255,
+        "uploadMs": 89.99012500001118,
+        "workMs": 239.27275000000373,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.34779099997832,
+        "uploadMs": 95.3775420000311,
+        "workMs": 259.7253330000094,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 181.27979199995752,
+        "uploadMs": 91.93800000002375,
+        "workMs": 273.2177919999813,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 150.65100000001257,
+        "uploadMs": 90.58762499998556,
+        "workMs": 241.23862499999814,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.40662500006147,
+        "uploadMs": 94.03670799999963,
+        "workMs": 258.4433330000611,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 177.1840829999419,
+        "uploadMs": 102.69208399998024,
+        "workMs": 279.87616699992213,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 149.60895800008439,
+        "uploadMs": 91.22337499994319,
+        "workMs": 240.83233300002757,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 147.74970799998846,
+        "uploadMs": 99.3811670000432,
+        "workMs": 247.13087500003166,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 181.35083399992436,
+        "uploadMs": 94.08250000001863,
+        "workMs": 275.433333999943,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 150.29129199997988,
+        "uploadMs": 98.98379199998453,
+        "workMs": 249.2750839999644,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 184.77395800000522,
+        "uploadMs": 95.2779580000788,
+        "workMs": 280.051916000084,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 198.73704199993517,
+        "uploadMs": 88.90695800003596,
+        "workMs": 287.64399999997113,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.72262500005309,
+        "uploadMs": 88.28195800003596,
+        "workMs": 258.00458300008904,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 156.5875839999644,
+        "uploadMs": 98.48695799999405,
+        "workMs": 255.07454199995846,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 159.7395409999881,
+        "uploadMs": 99.17620900005568,
+        "workMs": 258.9157500000438,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 157.2733340000268,
+        "uploadMs": 111.95941600005608,
+        "workMs": 269.2327500000829,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "10m": {
+    "set": "10m",
+    "outputs": 10000000,
+    "tables": [
+     {
+      "name": "read",
+      "rows": 14336,
+      "cols": 34816
+     },
+     {
+      "name": "nullifier",
+      "rows": 16384,
+      "cols": 18432
+     },
+     {
+      "name": "shielded groups",
+      "rows": 8192,
+      "cols": 20480
+     },
+     {
+      "name": "Dust groups",
+      "rows": 6144,
+      "cols": 28672
+     },
+     {
+      "name": "first coins",
+      "rows": 2048,
+      "cols": 2048
+     },
+     {
+      "name": "generation groups",
+      "rows": 2048,
+      "cols": 4096
+     }
+    ],
+    "rates": [
+     2,
+     5,
+     10
+    ],
+    "modes": [
+     "gpu"
+    ],
+    "blocks": 30,
+    "intervalMs": 6000,
+    "baselineS": 20,
+    "budgetMs": 3000,
+    "goalMs": 1000,
+    "residentBytes": 4093640704,
+    "answer": "gpu",
+    "note": "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+    "gpu": "Apple M4 Max",
+    "gpuBuild": {
+     "setupMs": 378.1859170000025,
+     "scratchBytes": 774308016,
+     "cellsBytes": 201326592
+    },
+    "ok": true,
+    "runs": [
+     {
+      "rate": 2,
+      "mode": "none",
+      "issued": 41,
+      "calls": 41,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 41,
+       "min": 20.622,
+       "p50": 75.099,
+       "p90": 123.99,
+       "p99": 139.63,
+       "max": 139.63
+      }
+     },
+     {
+      "rate": 2,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 262.948,
+       "p50": 271.005,
+       "p90": 275.347,
+       "p99": 280.783,
+       "max": 280.783
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 167.571,
+       "p50": 172.9,
+       "p90": 176.405,
+       "p99": 182.823,
+       "max": 182.823
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 90.59,
+       "p50": 97.997,
+       "p90": 100.032,
+       "p99": 102.307,
+       "max": 102.307
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 353,
+      "calls": 353,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 353,
+        "min": 18.789,
+        "p50": 63.863,
+        "p90": 126.915,
+        "p99": 284.516,
+        "max": 304.472
+       },
+       "duringBlockWork": {
+        "n": 29,
+        "min": 264.074,
+        "p50": 272.303,
+        "p90": 285.45,
+        "p99": 304.472,
+        "max": 304.472
+       },
+       "outsideBlockWork": {
+        "n": 324,
+        "min": 18.789,
+        "p50": 60.186,
+        "p90": 104.184,
+        "p99": 129.939,
+        "max": 147.085
+       }
+      },
+      "work": [
+       {
+        "compileMs": 182.82325000000128,
+        "uploadMs": 97.29266700000153,
+        "workMs": 280.1159170000028,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 168.47445799999696,
+        "uploadMs": 96.27649999999994,
+        "workMs": 264.7509579999969,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.81495799999539,
+        "uploadMs": 95.51016700000037,
+        "workMs": 265.32512499999575,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 178.8159999999989,
+        "uploadMs": 99.00495899999805,
+        "workMs": 277.82095899999695,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 178.81270799999766,
+        "uploadMs": 101.97041699998954,
+        "workMs": 280.7831249999872,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 173.17162500000268,
+        "uploadMs": 97.14708399999654,
+        "workMs": 270.3187089999992,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 172.40995800000383,
+        "uploadMs": 99.13241700000071,
+        "workMs": 271.54237500000454,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.63058399999863,
+        "uploadMs": 99.75470799999312,
+        "workMs": 271.38529199999175,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 176.03387500000827,
+        "uploadMs": 94.81220899999607,
+        "workMs": 270.84608400000434,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 175.9750420000055,
+        "uploadMs": 99.02825000000303,
+        "workMs": 275.0032920000085,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 174.98608400000376,
+        "uploadMs": 97.12695799999346,
+        "workMs": 272.1130419999972,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 175.31495800000266,
+        "uploadMs": 100.03220800000418,
+        "workMs": 275.34716600000684,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.09187499999825,
+        "uploadMs": 99.88966699999582,
+        "workMs": 270.9815419999941,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.86362499999814,
+        "uploadMs": 98.87162499999977,
+        "workMs": 270.7352499999979,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 176.40533300000243,
+        "uploadMs": 97.26420900000085,
+        "workMs": 273.6695420000033,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.8352919999743,
+        "uploadMs": 95.61129100000835,
+        "workMs": 267.44658299998264,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 172.90012499998556,
+        "uploadMs": 99.89550000001327,
+        "workMs": 272.79562499999884,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.73912499999278,
+        "uploadMs": 101.21691700001247,
+        "workMs": 270.95604200000525,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 171.31554199999664,
+        "uploadMs": 94.98758300000918,
+        "workMs": 266.3031250000058,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 172.35779199999524,
+        "uploadMs": 90.59020800000872,
+        "workMs": 262.94800000000396,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 173.36320800002431,
+        "uploadMs": 97.99699999997392,
+        "workMs": 271.36020799999824,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 175.3461659999739,
+        "uploadMs": 99.7270000000135,
+        "workMs": 275.0731659999874,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 174.40029200000572,
+        "uploadMs": 99.61808300000848,
+        "workMs": 274.0183750000142,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 169.1449169999978,
+        "uploadMs": 96.4377079999831,
+        "workMs": 265.5826249999809,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 173.03362500001094,
+        "uploadMs": 102.3065409999981,
+        "workMs": 275.34016600000905,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 174.56016700001783,
+        "uploadMs": 95.71008299998357,
+        "workMs": 270.2702500000014,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 172.8432080000057,
+        "uploadMs": 93.40720800001873,
+        "workMs": 266.2504160000244,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 173.7805829999852,
+        "uploadMs": 99.60587500000838,
+        "workMs": 273.3864579999936,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 167.5711659999797,
+        "uploadMs": 96.80470900001819,
+        "workMs": 264.3758749999979,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 172.3504590000084,
+        "uploadMs": 98.65441600000486,
+        "workMs": 271.00487500001327,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 5,
+      "mode": "none",
+      "issued": 101,
+      "calls": 101,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 101,
+       "min": 18.445,
+       "p50": 51.308,
+       "p90": 103.282,
+       "p99": 132.388,
+       "max": 133.339
+      }
+     },
+     {
+      "rate": 5,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 292.707,
+       "p50": 309.037,
+       "p90": 350.384,
+       "p99": 356.247,
+       "max": 356.247
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 197.885,
+       "p50": 213.116,
+       "p90": 229.636,
+       "p99": 242.311,
+       "max": 242.311
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 89.823,
+       "p50": 95.273,
+       "p90": 119.365,
+       "p99": 128.326,
+       "max": 128.326
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 883,
+      "calls": 883,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 883,
+        "min": 14.548,
+        "p50": 52.237,
+        "p90": 100.215,
+        "p99": 302.65,
+        "max": 343.554
+       },
+       "duringBlockWork": {
+        "n": 67,
+        "min": 40.806,
+        "p50": 135.171,
+        "p90": 310.298,
+        "p99": 343.554,
+        "max": 343.554
+       },
+       "outsideBlockWork": {
+        "n": 816,
+        "min": 14.548,
+        "p50": 51.245,
+        "p90": 87.695,
+        "p99": 115.865,
+        "max": 157.44
+       }
+      },
+      "work": [
+       {
+        "compileMs": 221.43204200000037,
+        "uploadMs": 98.45837499998743,
+        "workMs": 319.8904169999878,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 231.515625,
+        "uploadMs": 124.73124999998254,
+        "workMs": 356.24687499998254,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 214.6382079999894,
+        "uploadMs": 113.57241699998849,
+        "workMs": 328.2106249999779,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 226.88262499999837,
+        "uploadMs": 128.32612499999232,
+        "workMs": 355.2087499999907,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 215.77866700000595,
+        "uploadMs": 119.29300000000512,
+        "workMs": 335.0716670000111,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 208.79416699998546,
+        "uploadMs": 94.38099999999395,
+        "workMs": 303.1751669999794,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 215.752208000049,
+        "uploadMs": 94.13454199995613,
+        "workMs": 309.8867500000051,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 213.11645900004078,
+        "uploadMs": 93.18183299998054,
+        "workMs": 306.2982920000213,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 200.88545799994608,
+        "uploadMs": 91.8214170000283,
+        "workMs": 292.7068749999744,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 208.4730420000269,
+        "uploadMs": 100.56358299998101,
+        "workMs": 309.0366250000079,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 207.44183399999747,
+        "uploadMs": 91.88112500001444,
+        "workMs": 299.3229590000119,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 216.58733399998164,
+        "uploadMs": 91.52654099999927,
+        "workMs": 308.1138749999809,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 230.16649999999208,
+        "uploadMs": 120.21787499997299,
+        "workMs": 350.3843749999651,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 219.78229200001806,
+        "uploadMs": 91.18620799999917,
+        "workMs": 310.96850000001723,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 197.88504100003047,
+        "uploadMs": 102.43862500000978,
+        "workMs": 300.32366600004025,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 208.78495899995323,
+        "uploadMs": 92.74304100003792,
+        "workMs": 301.52799999999115,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 212.97254200000316,
+        "uploadMs": 103.56395799998427,
+        "workMs": 316.5364999999874,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 206.63033400004497,
+        "uploadMs": 91.04320799995912,
+        "workMs": 297.6735420000041,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 229.63620900001843,
+        "uploadMs": 100.27695799997309,
+        "workMs": 329.9131669999915,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 242.31099999998696,
+        "uploadMs": 113.2337079999852,
+        "workMs": 355.54470799997216,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 211.45695800002431,
+        "uploadMs": 89.82287500001257,
+        "workMs": 301.2798330000369,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 210.1914589999942,
+        "uploadMs": 104.42379099997925,
+        "workMs": 314.61524999997346,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 213.88229099998716,
+        "uploadMs": 91.73070900002494,
+        "workMs": 305.6130000000121,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 223.62216600001557,
+        "uploadMs": 91.85083400004078,
+        "workMs": 315.47300000005635,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 198.57408300001407,
+        "uploadMs": 97.15241699997569,
+        "workMs": 295.72649999998976,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 210.25037500000326,
+        "uploadMs": 91.96433300001081,
+        "workMs": 302.21470800001407,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 210.68245800002478,
+        "uploadMs": 91.67866699997103,
+        "workMs": 302.3611249999958,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 207.99983300000895,
+        "uploadMs": 95.6191669999971,
+        "workMs": 303.61900000000605,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 219.08695800002897,
+        "uploadMs": 95.27324999996927,
+        "workMs": 314.36020799999824,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 227.46483299997635,
+        "uploadMs": 119.36512500001118,
+        "workMs": 346.8299579999875,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 10,
+      "mode": "none",
+      "issued": 201,
+      "calls": 201,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 201,
+       "min": 19.164,
+       "p50": 50.056,
+       "p90": 83.735,
+       "p99": 86.713,
+       "max": 88.784
+      }
+     },
+     {
+      "rate": 10,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 332.931,
+       "p50": 359.442,
+       "p90": 370.128,
+       "p99": 392.122,
+       "max": 392.122
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 218.037,
+       "p50": 267.792,
+       "p90": 273.755,
+       "p99": 297.111,
+       "max": 297.111
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 88.843,
+       "p50": 92.895,
+       "p90": 118.173,
+       "p99": 123.629,
+       "max": 123.629
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 1765,
+      "calls": 1765,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 1765,
+        "min": 14.461,
+        "p50": 48.701,
+        "p90": 84.006,
+        "p99": 334.206,
+        "max": 345.56
+       },
+       "duringBlockWork": {
+        "n": 149,
+        "min": 14.461,
+        "p50": 136.204,
+        "p90": 334.677,
+        "p99": 340.929,
+        "max": 345.56
+       },
+       "outsideBlockWork": {
+        "n": 1616,
+        "min": 15.068,
+        "p50": 48.428,
+        "p90": 82.721,
+        "p99": 86.086,
+        "max": 238.404
+       }
+      },
+      "work": [
+       {
+        "compileMs": 272.71537500002887,
+        "uploadMs": 96.24079199996777,
+        "workMs": 368.95616699999664,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 227.9782079999568,
+        "uploadMs": 120.2880839999998,
+        "workMs": 348.2662919999566,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 278.7422919999808,
+        "uploadMs": 92.89504199998919,
+        "workMs": 371.63733399997,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 220.7899590000161,
+        "uploadMs": 123.62937500001863,
+        "workMs": 344.4193340000347,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 266.65400000003865,
+        "uploadMs": 95.69670799997402,
+        "workMs": 362.3507080000127,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 267.5015419999836,
+        "uploadMs": 91.94012500002282,
+        "workMs": 359.4416670000064,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 218.03700000001118,
+        "uploadMs": 114.89383299998008,
+        "workMs": 332.93083299999125,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 222.02083299995866,
+        "uploadMs": 118.17283300001873,
+        "workMs": 340.1936659999774,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 218.93470800004434,
+        "uploadMs": 121.87095799995586,
+        "workMs": 340.8056660000002,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 268.10162500001024,
+        "uploadMs": 92.15895799995633,
+        "workMs": 360.2605829999666,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 229.04550000000745,
+        "uploadMs": 109.66141699999571,
+        "workMs": 338.70691700000316,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 267.1586670000106,
+        "uploadMs": 92.45412499998929,
+        "workMs": 359.6127919999999,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 271.44008299999405,
+        "uploadMs": 92.95466700004181,
+        "workMs": 364.39475000003586,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 269.70362499996554,
+        "uploadMs": 90.9579580000136,
+        "workMs": 360.66158299997915,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 269.6299580000341,
+        "uploadMs": 88.84279199998127,
+        "workMs": 358.47275000001537,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 273.7547079999931,
+        "uploadMs": 93.12649999989662,
+        "workMs": 366.88120799988974,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 268.9477500000503,
+        "uploadMs": 90.02204199996777,
+        "workMs": 358.96979200001806,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 235.51049999997485,
+        "uploadMs": 110.12387500004843,
+        "workMs": 345.6343750000233,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 270.82916700001806,
+        "uploadMs": 100.03895799990278,
+        "workMs": 370.86812499992084,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 263.5544590000063,
+        "uploadMs": 90.8695000000298,
+        "workMs": 354.4239590000361,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 267.7924590000184,
+        "uploadMs": 91.16533299989533,
+        "workMs": 358.95779199991375,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 266.5044159999816,
+        "uploadMs": 89.92324999999255,
+        "workMs": 356.4276659999741,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 270.6320410000626,
+        "uploadMs": 90.23295899992809,
+        "workMs": 360.8649999999907,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 267.67404199996963,
+        "uploadMs": 90.89916599995922,
+        "workMs": 358.57320799992885,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 268.23187499993946,
+        "uploadMs": 92.0462080000434,
+        "workMs": 360.27808299998287,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 269.37054100004025,
+        "uploadMs": 91.95845899998676,
+        "workMs": 361.329000000027,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 274.96395799994934,
+        "uploadMs": 95.16445899999235,
+        "workMs": 370.1284169999417,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 269.42712500004563,
+        "uploadMs": 91.59049999993294,
+        "workMs": 361.0176249999786,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 297.11141699994914,
+        "uploadMs": 95.0103329999838,
+        "workMs": 392.12174999993294,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 233.10533299995586,
+        "uploadMs": 111.6076250000624,
+        "workMs": 344.71295800001826,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     }
+    ]
+   }
   }
  },
+ "cuda": null,
  "sysinfoStart": {
   "date": "2026-11-25T15:37:19.144Z",
   "hostname": "m4-max",

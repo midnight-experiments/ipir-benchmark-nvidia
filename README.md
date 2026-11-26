@@ -78,7 +78,7 @@ the overview page reads.
 | Machine | Backend | GPU | CPU | Results |
 |---|---|---|---|---|
 | RTX 2060 desktop | `nvidia-no-bar` | GeForce RTX 2060, 6 GB, no resizable BAR (Vulkan layer loaded) | Ryzen 7 2700X, 8 cores / 16 threads | `results/pop-os-2026-11-25-nvidia-no-bar.md`: a full run, on a desktop in use (load average about 3; `results/pop-os-notes.md`) |
-| M4 Max | `metal` | Apple M4 Max, 40-core GPU | Apple M4 Max, 16 cores | `results/m4-max-2026-11-25-metal.md`; it predates the GPU build of the blocks |
+| M4 Max | `metal` | Apple M4 Max, 40-core GPU | Apple M4 Max, 16 cores | `results/m4-max-2026-11-25-metal.md`; the GPU build of the blocks (steps 2b and 3) was measured on 2026-11-26 into the same results, with the machine in use (load average 7 at the start) |
 | RTX 4090 host | `nvidia` | GeForce RTX 4090, 24 GB, resizable BAR on | Ryzen 7 7700X, 8 cores / 16 threads | `results/rtx4090-2026-11-25-nvidia.md`: a full run on a quiet machine, but with 3 GiB of the card free, so without the 10-million-output tables (`results/rtx4090-notes.md`) |
 
 **Answering a call of 32 requests** (step 1): wall time, and in brackets the GPU's own time, in ms.
@@ -97,16 +97,17 @@ the overview page reads.
 | On the CPU, stock crates, 2,048 rows | 1,174 | 337 | 586 |
 | On the CPU, patch 0002, 2,048 rows | 397 | 94 | 221 |
 | On the CPU, patch 0002, 32,768 rows | 806 | 189 | 478 |
-| On the GPU, 2,048 rows | 57 | not run yet | 41 |
-| On the GPU, 32,768 rows | 96 | not run yet | 50 |
+| On the GPU, 2,048 rows | 57 | 60 | 41 |
+| On the GPU, 32,768 rows | 96 | 84 | 50 |
 
 The GPU figures are the wall time from the block's cells in host memory to the end of the build. On the RTX 4090, of
 the 50 ms at 32,768 rows, 29 ms are the GPU computing (the two chains 25.3 ms at every table height, the hints 0.4
 to 2.9 ms, the aggregation 0.5 ms, the matrix compilation 0.3 ms), about 10 ms are writing the 128 MiB of cells to
 the GPU, and about 12 ms are this harness's fixed cost of submitting work and noticing its end (the same gap as in a
 call's answer). On the RTX 2060 the GPU computes for 44 to 60 ms: the chains 35.7 ms, the hints 2.1 to 17.8 ms, the
-aggregation 3.2 ms, the matrix compilation 2.7 ms. The GPU build's output equals the CPU's in 24 of 24 checked blocks
-on each of the two cards.
+aggregation 3.2 ms, the matrix compilation 2.7 ms. On the M4 Max only wall times are given: Metal returned
+the GPU's timestamps for few of the builds, and its per-stage times are not consistent.
+The GPU build's output equals the CPU's in 24 of 24 checked blocks on each of the three GPUs.
 
 **One chain block: one column block of each of six tables** (steps 2b and 3), at today's shapes and at the
 10-million-output shapes. A block arrives every 6 s, and its work is time the server does not have for answering at
@@ -118,8 +119,8 @@ The compile of the six column blocks alone, in seconds:
 |---|---|---|---|
 | On the CPU, stock crates (one after another, p50) | 6.80 / 8.08 | 2.05 / 2.25 | 3.45 / not run |
 | On the CPU, patch 0002 (one after another, p50) | 2.33 / 2.79 | 0.63 / 0.68 | 1.35 / not run |
-| On the GPU, one build right after another (wall; GPU time in brackets) | 0.11 (0.087) / 0.15 (0.104) | not run yet | 0.05 (0.033) / 0.07 (0.036) |
-| On the GPU, 6 s after the last build (wall; GPU time in brackets) | 0.39 (0.34) / 0.42 (0.32) | not run yet | 0.25 (0.21) / 0.32 (0.22) |
+| On the GPU, one build right after another (wall; GPU time in brackets) | 0.11 (0.087) / 0.15 (0.104) | 0.13 / 0.17 (wall only) | 0.05 (0.033) / 0.07 (0.036) |
+| On the GPU, 6 s after the last build (wall; GPU time in brackets) | 0.39 (0.34) / 0.42 (0.32) | 0.17 / 0.20 (wall only) | 0.25 (0.21) / 0.32 (0.22) |
 
 A block's whole work (the compile of the six column blocks, then their upload and layout for the answer) while the
 GPU answers 2 calls a second: seconds at p50, and in brackets its share of the 6 s between two blocks.
@@ -130,16 +131,18 @@ GPU answers 2 calls a second: seconds at p50, and in brackets its share of the 6
 | CPU compile, stock crates, low-priority pool | 3.80 (63 %) / 5.01 (84 %) | 1.13 (19 %) / 1.64 (27 %) | 2.12 (35 %) / not run |
 | CPU compile, patch 0002, one after another | 2.51 (42 %) / 3.15 (52 %) | 0.76 (13 %) / 0.83 (14 %) | 1.61 (27 %) / not run |
 | CPU compile, patch 0002, low-priority pool | 1.94 (32 %) / 2.18 (36 %) | 0.54 (9 %) / 0.68 (11 %) | 1.43 (24 %) / not run |
-| Blocks built on the GPU that is answering | 0.28 (5 %) / does not fit | not run yet | 0.36 (6 %) / not run |
+| Blocks built on the GPU that is answering | 0.28 (5 %) / does not fit | 0.26 (4 %) / 0.27 (5 %) | 0.36 (6 %) / not run |
 | The same at 8 million outputs, the largest tables the RTX 2060 keeps while it builds | 0.26 (4 %) | | |
 
-- **Under the 1 s goal:** the M4 Max with patch 0002 (9 to 14 % of the 6 s; 0 to 4 of 30 blocks over 1 s), and both
-  NVIDIA cards with the blocks built on the GPU (5 % on the RTX 2060, 6 % on the RTX 4090; no block over 1 s). **Not
+- **Under the 1 s goal:** all three GPUs with the blocks built on the GPU (5 % of the 6 s on the RTX 2060, 4 to 5 %
+  on the M4 Max, 6 % on the RTX 4090; no block over 1 s), and the M4 Max's CPU with patch 0002 (9 to 14 %; 0 to 4 of
+  30 blocks over 1 s). On the M4 Max the GPU build takes the work from 0.54 to 0.26 s at today's shapes and from 0.68
+  to 0.27 s at the 10-million-output shapes; there the share rises with the call rate, to 6.0 % at 10 calls/s. **Not
   under it:** every CPU compile on the RTX 2060 host and on the RTX 4090 host (24 % of the 6 s at best), and the M4
   Max with the stock crates.
 - **Almost all of it is the compile of the column blocks.** The upload and layout are 2 to 4 % of the 6 s on every
-  machine (0.12 to 0.26 s); with the blocks built on the GPU they are 1.7 % on the RTX 4090 (0.10 s) and 2.4 % on
-  the RTX 2060 (0.14 s), since the matrix does not cross from the host.
+  machine (0.12 to 0.26 s); with the blocks built on the GPU they are 1.7 % on the RTX 4090 (0.10 s), 1.5 % on the
+  M4 Max (0.09 s) and 2.4 % on the RTX 2060 (0.14 s), since the matrix does not cross from the host.
 - With the stock crates the RTX 2060 host's work does not fit in the 6 s at all when the blocks are compiled one
   after another (117 and 139 %). With patch 0002 it is over the 3 s ceiling in 28 of 30 blocks at the
   10-million-output shapes when compiled one after another, and in none on the pool.
@@ -148,7 +151,7 @@ GPU answers 2 calls a second: seconds at p50, and in brackets its share of the 6
   clocks when idle. A small dispatch every 20 ms during the idle time brings it to 114 ms, not to 33 ms. In the block
   budget, where blocks are 6 s apart, the build takes 0.23 to 0.26 s for that reason; without it the block's work
   would be about 0.15 s, 2.5 % of the 6 s. The driver's power setting (maximum performance) is the likely remedy; it
-  was not tried, as it needs rights this run did not have. The RTX 2060 shows the same when it is measured alone
+  was not tried, as it needs rights this run did not have. The M4 Max slows less (0.13 to 0.17 s of wall time at today's shapes). The RTX 2060 shows the same as the RTX 4090 when it is measured alone
   (87 ms of GPU time right after another build, 341 ms after 6 s of idle), but not in its block budget, where the
   build took 0.13 s: there the card was also answering calls that take it tens of milliseconds each, and driving a
   desktop.
@@ -520,13 +523,14 @@ The GPU build of the blocks (step 2b) was written against an RTX 2060 through Vu
 (hint masks, slots before and after the chains, digits, matrix). `./bench.sh --quick` ran there from start to end,
 which is the first run of the backends' code on Linux. It was then run on an RTX 4090 with resizable BAR
 (`results/rtx4090-notes.md`): the backend is detected as `nvidia`, the Vulkan layer is not needed, 24 of 24 blocks
-equal the CPU's, and `./bench.sh --skip-quick --budget-sets today` ran from start to end. On macOS its kernels compile
-on Metal; they have not been run there yet.
+equal the CPU's, and `./bench.sh --skip-quick --budget-sets today` ran from start to end. On macOS (Metal, M4 Max) it ran
+on 2026-11-26: 24 of 24 blocks equal the CPU's, and the block budget ran at both shape sets.
 
 A full run with the GPU build was then made on each of the two NVIDIA hosts (the "Results so far" section).
 
-Not run yet anywhere: the block budget at the 10-million-output shapes with the blocks built on the GPU (it needs
-more than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead), the GPU build on Metal, and the container check in `setup.sh`. Checked on macOS without a benchmark run:
+Not run yet: the block budget at the 10-million-output shapes with the blocks built on an NVIDIA GPU (it needs more
+than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead, and the RTX 4090's memory was
+held by another user; on the M4 Max it ran), and the container check in `setup.sh`. Checked on macOS without a benchmark run:
 `bench/check-run.ts` and the export against the committed Metal run and against copies of it renamed to `nvidia`,
 `nvidia-no-bar` and `nvidia-unknown-bar`; resizable BAR detection against `nvidia-smi -q -d MEMORY` reports with
 BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of steps, with stand-ins for `setup.sh`,

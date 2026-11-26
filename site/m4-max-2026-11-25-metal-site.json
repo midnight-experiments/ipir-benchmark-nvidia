@@ -4,7 +4,7 @@
  "date": "2026-11-25",
  "source": {
   "repo": "midnight-experiments/ipir-benchmark-nvidia",
-  "commit": "4ca7df966812a460aede6a08d749265cc054b9c2",
+  "commit": "8c96a79d7ec7ff1508776c81d50b86d264df7e8a",
   "results": [
    "results/m4-max-2026-11-25-metal.json"
   ]
@@ -366,7 +366,120 @@
    }
   ]
  },
- "gpuCompile": null,
+ "gpuCompile": {
+  "check": {
+   "blocks": 24,
+   "equal": 24
+  },
+  "one": [
+   {
+    "rows": 2048,
+    "wallMs": 59.85,
+    "execMs": null,
+    "hintsMs": 10.28,
+    "aggregationMs": 1.59,
+    "chainsMs": 31.99,
+    "compileMs": 10.1
+   },
+   {
+    "rows": 8192,
+    "wallMs": 64.35,
+    "execMs": null,
+    "hintsMs": 12.16,
+    "aggregationMs": 1.57,
+    "chainsMs": 31.95,
+    "compileMs": 12.16
+   },
+   {
+    "rows": 16384,
+    "wallMs": 68.81,
+    "execMs": null,
+    "hintsMs": 15.37,
+    "aggregationMs": 1.56,
+    "chainsMs": 32,
+    "compileMs": 15.37
+   },
+   {
+    "rows": 32768,
+    "wallMs": 83.88,
+    "execMs": null,
+    "hintsMs": 22.05,
+    "aggregationMs": 1.58,
+    "chainsMs": 31.96,
+    "compileMs": 22.05
+   }
+  ],
+  "atOnce": [
+   {
+    "rows": 2048,
+    "tables": 4,
+    "wallMs": 106.28,
+    "execMs": 84.5
+   },
+   {
+    "rows": 2048,
+    "tables": 6,
+    "wallMs": 133.14,
+    "execMs": null
+   },
+   {
+    "rows": 8192,
+    "tables": 4,
+    "wallMs": 127.06,
+    "execMs": 93.54
+   },
+   {
+    "rows": 8192,
+    "tables": 6,
+    "wallMs": 163.38,
+    "execMs": null
+   },
+   {
+    "rows": 16384,
+    "tables": 4,
+    "wallMs": 148.59,
+    "execMs": null
+   },
+   {
+    "rows": 16384,
+    "tables": 6,
+    "wallMs": 198.83,
+    "execMs": null
+   },
+   {
+    "rows": 32768,
+    "tables": 4,
+    "wallMs": 204.43,
+    "execMs": null
+   },
+   {
+    "rows": 32768,
+    "tables": 6,
+    "wallMs": 294.89,
+    "execMs": 182.1
+   }
+  ],
+  "sets": [
+   {
+    "shapes": "today",
+    "wallMs": 134.69,
+    "execMs": 111.63,
+    "idleMs": 6000,
+    "afterIdleWallMs": 166.44,
+    "afterIdleExecMs": 130.57,
+    "gpuMemoryMiB": 898
+   },
+   {
+    "shapes": "10m",
+    "wallMs": 165.11,
+    "execMs": null,
+    "idleMs": 6000,
+    "afterIdleWallMs": 195.63,
+    "afterIdleExecMs": 134.88,
+    "gpuMemoryMiB": 898
+   }
+  ]
+ },
  "budget": {
   "stock": [
    {
@@ -732,6 +845,98 @@
     "blocks": 30
    }
   ],
-  "gpu": []
- }
+  "gpu": [
+   {
+    "shapes": "today",
+    "callsPerSec": 2,
+    "mode": "gpu",
+    "blockWorkP50S": 0.258,
+    "blockWorkP99S": 0.28,
+    "compileP50S": 0.164,
+    "uploadP50Ms": 91.57,
+    "windowPct": 4.3,
+    "compilePct": 2.7,
+    "uploadPct": 1.5,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   },
+   {
+    "shapes": "today",
+    "callsPerSec": 5,
+    "mode": "gpu",
+    "blockWorkP50S": 0.255,
+    "blockWorkP99S": 0.309,
+    "compileP50S": 0.164,
+    "uploadP50Ms": 92.46,
+    "windowPct": 4.2,
+    "compilePct": 2.7,
+    "uploadPct": 1.5,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   },
+   {
+    "shapes": "today",
+    "callsPerSec": 10,
+    "mode": "gpu",
+    "blockWorkP50S": 0.253,
+    "blockWorkP99S": 0.334,
+    "compileP50S": 0.157,
+    "uploadP50Ms": 92.4,
+    "windowPct": 4.2,
+    "compilePct": 2.6,
+    "uploadPct": 1.5,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   },
+   {
+    "shapes": "10m",
+    "callsPerSec": 2,
+    "mode": "gpu",
+    "blockWorkP50S": 0.271,
+    "blockWorkP99S": 0.281,
+    "compileP50S": 0.173,
+    "uploadP50Ms": 98,
+    "windowPct": 4.5,
+    "compilePct": 2.9,
+    "uploadPct": 1.6,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   },
+   {
+    "shapes": "10m",
+    "callsPerSec": 5,
+    "mode": "gpu",
+    "blockWorkP50S": 0.309,
+    "blockWorkP99S": 0.356,
+    "compileP50S": 0.213,
+    "uploadP50Ms": 95.27,
+    "windowPct": 5.2,
+    "compilePct": 3.6,
+    "uploadPct": 1.6,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   },
+   {
+    "shapes": "10m",
+    "callsPerSec": 10,
+    "mode": "gpu",
+    "blockWorkP50S": 0.359,
+    "blockWorkP99S": 0.392,
+    "compileP50S": 0.268,
+    "uploadP50Ms": 92.9,
+    "windowPct": 6,
+    "compilePct": 4.5,
+    "uploadPct": 1.5,
+    "over1s": 0,
+    "over3s": 0,
+    "blocks": 30
+   }
+  ]
+ },
+ "budgetLargest": null
 }
