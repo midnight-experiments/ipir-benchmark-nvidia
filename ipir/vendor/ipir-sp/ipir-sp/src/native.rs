@@ -471,6 +471,105 @@ impl NativeServer {
             },
         ))
     }
+    /// As `respond`, with the first pass (the table times the request) computed by `first_pass` and not by this
+    /// server's CPU kernel (patch 0004, to time a first pass on another device with the packing on the CPU).
+    /// `first_pass` receives the request's words modulo q, and q, and returns one word modulo q per column;
+    /// `matrix_vector` of the timing is the time it took. Not part of the API.
+    #[doc(hidden)]
+    pub fn respond_with_first_pass(
+        &self,
+        bytes: &[u8],
+        first_pass: impl FnOnce(&[u64], u64) -> Result<Vec<u64>, ReinspiringError>,
+    ) -> Result<(Vec<u8>, NativeTiming), ReinspiringError> {
+        let p = self.setup.profile();
+        let q = p.packing().q();
+        let d = p.packing().d();
+        let start = Instant::now();
+        let half = p.packing().ell() * d;
+        let kg_len = packed_len(half, q.trailing_zeros() as usize);
+        let keys_len = if p.is_two_mask() {
+            kg_len
+        } else if p.request_magic() == b"RNQ1" {
+            packed_len(2 * half, p.kh_bits())
+        } else {
+            kg_len + packed_len(half, p.kh_bits())
+        };
+        if bytes.len() != 36 + keys_len + packed_len(p.rows(), p.query_bits())
+            || &bytes[..4] != p.request_magic()
+            || bytes[4..36] != self.setup.id()
+        {
+            return Err(err("request/profile/setup mismatch"));
+        }
+        let words = if p.is_two_mask() {
+            decode(&bytes[36..36 + keys_len], half, q.trailing_zeros() as usize)?
+        } else if p.request_magic() == b"RNQ1" {
+            decode(&bytes[36..36 + keys_len], 2 * half, p.kh_bits())?
+        } else {
+            let mut words = decode(&bytes[36..36 + kg_len], half, q.trailing_zeros() as usize)?;
+            words.extend(up(
+                &decode(&bytes[36 + kg_len..36 + keys_len], half, p.kh_bits())?,
+                q,
+                p.kh_bits(),
+            ));
+            words
+        };
+        let keys = if p.is_two_mask() {
+            NativeKeys::from_kg_words(self.setup.packing_setup(), &words)?
+        } else {
+            NativeKeys::from_words(self.setup.packing_setup(), &words)?
+        };
+        let query = up(
+            &decode(&bytes[36 + keys_len..], p.rows(), p.query_bits())?,
+            q,
+            p.query_bits(),
+        );
+        let deserialize = start.elapsed();
+        let t = Instant::now();
+        let intermediate = first_pass(&query, q)?;
+        if intermediate.len() != p.cols() {
+            return Err(err("first pass: one word per column expected"));
+        }
+        let matrix_vector = t.elapsed();
+        let t = Instant::now();
+        let prepared_keys = self.pre[0].prepare_keys(&keys)?;
+        let bodies: Result<Vec<Vec<u64>>, _> = self
+            .pre
+            .par_iter()
+            .zip(intermediate.par_chunks_exact(d))
+            .map(|(pre, b)| -> Result<Vec<u64>, ReinspiringError> {
+                let pending = pre.prepare_pack(&prepared_keys)?;
+                if p.is_two_mask() {
+                    Ok(pending.finish_two_mask(b)?.rows().2.to_vec())
+                } else {
+                    Ok(pending.finish(b)?.rows().1.to_vec())
+                }
+            })
+            .collect();
+        let bodies = bodies?;
+        let packing = t.elapsed();
+        let t = Instant::now();
+        let bodies: Vec<_> = bodies.into_iter().flatten().collect();
+        let mut out = if p.is_two_mask() {
+            b"RNR2".to_vec()
+        } else {
+            b"RNR1".to_vec()
+        };
+        out.extend(self.setup.id());
+        out.extend(Sha256::digest(bytes));
+        out.extend(encode(
+            &down(&bodies, q, p.response_bits()),
+            p.response_bits(),
+        ));
+        Ok((
+            out,
+            NativeTiming {
+                deserialize,
+                matrix_vector,
+                packing,
+                serialization: t.elapsed(),
+            },
+        ))
+    }
 }
 
 fn err(s: &str) -> ReinspiringError {

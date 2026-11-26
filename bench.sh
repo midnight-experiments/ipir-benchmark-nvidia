@@ -8,7 +8,8 @@
 # More options:
 #   --cpu          after the GPU run, the same benchmark with the answers on the CPU (about 1.5 hours more)
 #   --cpu-only     no GPU run: the CPU backend alone (also for a host with no GPU)
-#   --cuda         also upstream's CUDA first-pass benchmark (NVIDIA, with the CUDA driver library and NVRTC)
+#   --cuda         also upstream's CUDA kernel: a whole answer against the WebGPU path (in the full run's results),
+#                  and upstream's own first-pass benchmark (NVIDIA, with the CUDA driver library and NVRTC)
 #   --skip-quick   go straight to the full run
 #   --budget-sets today   only today's shapes in the block budget: the 10-million-output tables need about 4 GiB of
 #                  GPU memory (default: today,10m)
@@ -41,7 +42,7 @@ while [[ $# -gt 0 ]]; do
     --install-deps) INSTALL=1 ;;
     --cpu) WITH_CPU=1 ;;
     --cpu-only) CPU_ONLY=1 ;;
-    --cuda) CUDA=1 ;;
+    --cuda) CUDA=1; FULL_ARGS+=(--cuda) ;;
     --budget-sets) FULL_ARGS+=(--budget-sets "$2"); shift ;;
     --host) export IPIR_BENCH_HOST="$2"; shift ;;
     --label) LABEL="$2"; shift ;;
@@ -192,10 +193,15 @@ if [[ $CUDA == 1 ]]; then
   FILES+=("$CUDA_OUT")
   if (
     cd ipir || exit 1
-    for shape in "14336 34816" "32768 32768"; do
-      echo "== cuda_bench $shape 100"
+    # The bindings follow the installed NVRTC library, as in run-all.sh.
+    feature=${IPIR_CUDA_FEATURE:-}
+    if [[ -z "$feature" ]]; then
+      if ldconfig -p 2>/dev/null | grep -q 'libnvrtc\.so\.13'; then feature=cuda-13; else feature=cuda-12; fi
+    fi
+    for shape in "2048 2048" "12288 16384" "14336 34816" "32768 32768"; do
+      echo "== cuda_bench $shape 100 ($feature)"
       # shellcheck disable=SC2086
-      cargo run --release --locked -p simplepir-kernel --features cuda --example cuda_bench -- $shape 100 || exit 1
+      cargo run --release --locked -p simplepir-kernel --features "$feature" --example cuda_bench -- $shape 100 || exit 1
     done
   ) 2>&1 | tee "$CUDA_OUT"; then
     :

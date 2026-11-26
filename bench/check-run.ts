@@ -114,6 +114,27 @@ if (r.meta?.gpuCompile && String(r.meta?.gpuCompileSteps ?? "").includes("budget
   else if (r.budget?.gpu?.["10m"]?.doesNotFit && !quick) say(false, "budget, largest tables that fit with the blocks built on the GPU: missing");
 }
 
+// Upstream's CUDA kernel against the WebGPU path. A shape that does not fit on one path is a result in a full run.
+if (r.meta?.cuda) {
+  const shapes: Any[] = r.cuda?.shapes ?? [];
+  say(shapes.length > 0, `CUDA against WebGPU: ${shapes.length} shape(s)`);
+  for (const x of shapes) {
+    const name = `CUDA against WebGPU, ${x.rows}x${x.cols}`;
+    if (x.error) {
+      say(false, `${name}: ${String(x.error).slice(0, 300)}`);
+      continue;
+    }
+    for (const [path, v] of [["CUDA", x.cuda], ["WebGPU", x.webgpu]] as [string, Any][]) {
+      if (v?.ok) continue;
+      const text = `${name}, ${path}: ${v?.doesNotFit ? "does not fit" : "failed"} (${String(v?.error ?? "answers differ from the CPU's").slice(0, 200)})`;
+      if (v?.doesNotFit && !quick) console.log(`note    ${text}`);
+      else say(false, text);
+    }
+  }
+  const both = shapes.filter((x) => x.cuda?.ok && x.webgpu?.ok).length;
+  say(both > 0, `CUDA against WebGPU: ${both} shape(s) answered on both paths, every answer equal to the CPU's`);
+}
+
 if (problems.length) {
   console.log(`\n${problems.length} problem(s) in ${path}`);
   Deno.exit(1);

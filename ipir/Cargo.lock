@@ -1204,6 +1204,7 @@ dependencies = [
  "rayon",
  "reinspiring",
  "sha2",
+ "simplepir-kernel",
 ]
 
 [[package]]

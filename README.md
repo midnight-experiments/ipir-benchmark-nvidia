@@ -47,7 +47,7 @@ load it. A full run takes over an hour, so start it inside `tmux` or `screen`, o
 | `./bench.sh` | Setup, the quick check, the full run on this host's GPU, the site file, the bundle |
 | `./bench.sh --cpu` | The same, then the full run again with the answers on the CPU (about 1.5 hours more) |
 | `./bench.sh --cpu-only` | The CPU backend alone, also on a host with no GPU |
-| `./bench.sh --cuda` | Also upstream's CUDA first-pass benchmark (NVIDIA; needs the CUDA driver library and NVRTC) |
+| `./bench.sh --cuda` | Also upstream's CUDA kernel: a whole answer against the WebGPU path, in the full run's results, and upstream's own first-pass benchmark (NVIDIA; needs the CUDA driver library and NVRTC) |
 
 Other options: `--install-deps` installs what is missing (the apt packages `build-essential curl unzip git patch
 ca-certificates libvulkan1 vulkan-tools`, as root or with `sudo`, and Rust with rustup into `$HOME`); without it,
@@ -380,18 +380,31 @@ Then:
    ./bench.sh --skip-quick --host <short name> --label "<GPU> + <CPU>" --cpu --cuda   # or with that host's CPU and cuda_bench
    ```
    Then send back `results/<short name>-<date>-bundle.tar.gz`, or push (see "Run it").
-4. `--cuda` runs upstream's CUDA first-pass kernel, for comparison with the WebGPU scan (the production target is
-   CUDA). It needs the CUDA driver library and NVRTC (`sudo apt install cuda-nvrtc-12-8`, or the CUDA toolkit), and
-   loads them at run time. By hand:
+4. `--cuda` measures upstream's CUDA kernel (`simplepir-kernel`, `CudaKernel`) against the WebGPU path. The kernel
+   does the first pass of an answer on the GPU, one request at a time, and nothing else, so the comparison is a
+   whole answer two ways (`bench/cuda-compare.ts`, in the full run as step 4 of the report):
+   - CUDA: the first pass on the GPU and the packing of every column block on the host's CPU (`cuda_fetch`);
+   - WebGPU: both steps on the GPU;
+   - for the same table and the same 32 requests, with every answer compared with the CPU's, byte for byte.
+
+   It also times the upload of the table again, which is what a changed column block costs on the CUDA kernel,
+   against WebGPU's write of one block. `bench.sh --cuda` then runs upstream's own `cuda_bench` (one request's
+   first pass with another modulus; `results/<short name>-<date>-cuda-bench.txt`).
+
+   CUDA needs the driver library (`libcuda.so`, part of the NVIDIA driver) and NVRTC (`libnvrtc.so`, part of the
+   CUDA toolkit), loaded at run time:
+   - The bindings are built for CUDA 13 when `libnvrtc.so.13` is installed and for CUDA 12 otherwise
+     (`IPIR_CUDA_FEATURE=cuda-12` or `cuda-13` chooses outright). Upstream fixes CUDA 12.0, whose bindings do not
+     load with the NVRTC of CUDA 13 (`undefined symbol: nvrtcGetNVVM`); patch 0004 makes it a choice.
+   - NVRTC must not be newer than the driver: `nvidia-smi` prints the CUDA release the driver supports, and an NVRTC
+     of a later release compiles kernels the driver refuses (`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`).
+
+   By hand, on a results folder that exists:
    ```sh
-   cd ipir
-   cargo run --release --locked -p simplepir-kernel --features cuda --example cuda_bench -- 14336 34816 100
-   cargo run --release --locked -p simplepir-kernel --features cuda --example cuda_bench -- 32768 32768 100
+   (cd ipir && cargo build --release --locked -p ipir-bench --features cuda-13 --bin cuda_fetch)
+   deno run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/cuda-compare.ts --out results/raw/<run>/cuda-compare.json
+   deno run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/report.ts results/raw/<run> results/<run>.json results/<run>.md
    ```
-   It checks every GPU product against the CPU kernel and prints the upload time, the CPU time per query, and the GPU
-   wall, kernel and latency time per query with 1 and 4 callers. It times one query's first pass only (no packing,
-   no rounding), so it is not the same quantity as step 1's call of 32. `bench.sh` keeps its output in
-   `results/<short name>-<date>-cuda-bench.txt`.
 
 The results record: GPU name, driver, VRAM and VRAM in use (`nvidia-smi`); the Vulkan devices (`vulkaninfo
 --summary`); the WebGPU adapter Deno picked, and whether it has timestamp queries; CPU model, cores and threads; RAM;

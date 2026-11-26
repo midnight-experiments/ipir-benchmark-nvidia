@@ -12,7 +12,10 @@
 # Other options: --builds stock,patch0002 (which of the two), --skip-build, --skip-compile, --skip-fetch,
 # --skip-budget, --budget-sets today (which shape sets step 3 runs: today, 10m; the 10M tables need about 4 GiB of
 # GPU memory), --skip-gpu-compile (no GPU build of the blocks), --no-gpu-check (CPU backend: skip comparing its answers with the GPU's), --allow-non-nvidia (run on
-# a GPU that is not NVIDIA's), --name NAME (results file name instead of <host>-<date>-<backend>).
+# a GPU that is not NVIDIA's), --name NAME (results file name instead of <host>-<date>-<backend>), --cuda (NVIDIA: also
+# upstream's CUDA kernel against the WebGPU path for a whole answer, bench/cuda-compare.ts; it needs the CUDA driver
+# library and NVRTC, and builds `cuda_fetch` for CUDA 13 when `libnvrtc.so.13` is installed and for CUDA 12
+# otherwise; IPIR_CUDA_FEATURE=cuda-12|cuda-13 chooses outright).
 # Environment: DENO (the deno binary), DENO_WEBGPU_BACKEND (default "vulkan" on Linux), CARGO_BUILD_JOBS,
 # IPIR_BENCH_HOST (the host name in file names and results, instead of `hostname -s`), IPIR_BENCH_PREFLIGHT (a JSON
 # object recorded in the results as `meta.preflight`, for example the load and the wait before the run).
@@ -27,7 +30,7 @@ if [[ "$(uname)" == Darwin && -z "${IPIR_BENCH_CAFFEINATED:-}" ]] && command -v 
 fi
 
 QUICK=0 SKIP_BUILD=0 SKIP_COMPILE=0 SKIP_FETCH=0 SKIP_BUDGET=0 SKIP_GPU_COMPILE=0 ALLOW_NON_NVIDIA=0 NAME="" BACKEND_OPT=gpu
-BUILDS=stock,patch0002 GPU_CHECK=1 BUDGET_SETS_OPT=""
+BUILDS=stock,patch0002 GPU_CHECK=1 BUDGET_SETS_OPT="" CUDA=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) QUICK=1 ;;
@@ -40,6 +43,7 @@ while [[ $# -gt 0 ]]; do
     --skip-budget) SKIP_BUDGET=1 ;;
     --budget-sets) BUDGET_SETS_OPT="$2"; shift ;;
     --skip-gpu-compile) SKIP_GPU_COMPILE=1 ;;
+    --cuda) CUDA=1 ;;
     --allow-non-nvidia) ALLOW_NON_NVIDIA=1 ;;
     --name) NAME="$2"; shift ;;
     -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
@@ -96,6 +100,7 @@ if [[ $QUICK == 1 ]]; then
   BUDGET_ARGS=(--rates 2,5 --blocks 4 --baseline-s 5)
   GPU_CHECK_ARGS=(--rows 2048,8192 --seeds 1 --sets today)
   GPU_COMPILE_ARGS=(--rows 2048,8192 --reps 3 --at-once 4 --sets today --set-reps 3 --idle-ms 2000 --idle-reps 2)
+  CUDA_ARGS=(--shapes 2048x2048,6144x28672 --runs 3)
 else
   FETCH_ARGS=(--runs 9)
   COMPILE_ARGS=(2048,8192,16384,32768 3 1,4)
@@ -103,6 +108,7 @@ else
   BUDGET_ARGS=(--rates 2,5,10 --blocks 30 --baseline-s 20)
   GPU_CHECK_ARGS=(--rows 2048,8192,16384,32768 --seeds 1,2,3 --sets today,10m)
   GPU_COMPILE_ARGS=(--rows 2048,8192,16384,32768 --reps 5 --at-once 4,6 --sets today,10m --set-reps 10)
+  CUDA_ARGS=(--runs 9)
 fi
 
 if [[ -n "$BUDGET_SETS_OPT" ]]; then
@@ -161,7 +167,7 @@ VRAM_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/
 RAM_MIB=$("$DENO" eval 'const s=JSON.parse(Deno.readTextFileSync(Deno.args[0]));console.log(s.memTotalKiB?Math.floor(s.memTotalKiB/1024):"")' "$RAW/sysinfo-start.json")
 
 cat > "$RAW/meta.json" <<JSON
-{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"gpuCompile":$([[ $GPU_COMPILE == 1 ]] && echo true || echo false),"budgetSets":"$([[ $SKIP_BUDGET == 0 ]] && (IFS=,; echo -n "${BUDGET_SETS[*]}"))","gpuCompileSteps":"$([[ $SKIP_COMPILE == 0 ]] && echo -n compile)$([[ $SKIP_BUDGET == 0 ]] && echo -n ,budget)","repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
+{"name":"$NAME","date":"$DATE","quick":$([[ $QUICK == 1 ]] && echo true || echo false),"backend":"$BACKEND","answer":"$ANSWER","builds":"$BUILDS","gpuCheck":$([[ $GPU_CHECK == 1 && $ANSWER == cpu ]] && echo true || echo false),"gpuCompile":$([[ $GPU_COMPILE == 1 ]] && echo true || echo false),"budgetSets":"$([[ $SKIP_BUDGET == 0 ]] && (IFS=,; echo -n "${BUDGET_SETS[*]}"))","gpuCompileSteps":"$([[ $SKIP_COMPILE == 0 ]] && echo -n compile)$([[ $SKIP_BUDGET == 0 ]] && echo -n ,budget)","cuda":$([[ $CUDA == 1 && $BACKEND == nvidia* ]] && echo true || echo false),"repoCommit":"$(git rev-parse --short HEAD 2>/dev/null || echo unknown)","repoDirty":$([[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo true || echo false),"denoWebgpuBackend":"${DENO_WEBGPU_BACKEND:-}","preflight":${IPIR_BENCH_PREFLIGHT:-null},"started":"$(date -u +%FT%TZ)"}
 JSON
 
 # 3. compile (task 2), for each build.
@@ -227,6 +233,27 @@ if [[ $SKIP_BUDGET == 0 ]]; then
         done
       fi
     done
+  fi
+fi
+
+# 6. Upstream's CUDA kernel against the WebGPU path: a whole answer to a call of 32, the same table two ways.
+if [[ $CUDA == 1 ]]; then
+  if [[ $BACKEND != nvidia* ]]; then
+    echo "--cuda needs an NVIDIA GPU backend (this one is $BACKEND): skipped"
+  else
+    CUDA_FEATURE=${IPIR_CUDA_FEATURE:-}
+    if [[ -z "$CUDA_FEATURE" ]]; then
+      if ldconfig -p 2>/dev/null | grep -q 'libnvrtc\.so\.13'; then CUDA_FEATURE=cuda-13; else CUDA_FEATURE=cuda-12; fi
+    fi
+    echo "== CUDA against WebGPU: building cuda_fetch ($CUDA_FEATURE)"
+    if (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$CUDA_FEATURE" --bin cuda_fetch 2>/dev/null \
+        || cargo build --release --locked -p ipir-bench --features "$CUDA_FEATURE" --bin cuda_fetch; }); then
+      echo "== CUDA against WebGPU: a whole answer (${CUDA_ARGS[*]})"
+      "$DENO" run "${PERMS[@]}" bench/cuda-compare.ts --out "$RAW/cuda-compare.json" "${CUDA_ARGS[@]}" \
+        || echo "the CUDA comparison failed or found a difference" >&2
+    else
+      echo "cuda_fetch did not build" >&2
+    fi
   fi
 fi
 
