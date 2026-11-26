@@ -20,6 +20,12 @@
  *   path, and with `--cuda` upstream's CUDA kernel with the packing on the CPU. Every answer is compared with the
  *   CPU's.
  *
+ * - `metal` (macOS, when `metal/target/release/metal_report` is built) and `cudaBuild` (with `--cuda`, when
+ *   `cuda_build_report` is built): the computing of column blocks with native Metal or CUDA kernels, for the update
+ *   of one block, of the six tables' blocks, and for the whole table. Computing only: these paths have no fetch of
+ *   their own, so nothing is installed into a table that answers. Their output's digests are compared with the
+ *   CPU's (`pack_digest`).
+ *
  * Every step runs in its own process and a step that fails is recorded with its error (`doesNotFit` when the GPU's
  * memory ran out), so the run goes on. `--quick`: the 1M size only, few repetitions, to check that it works.
  */
@@ -79,6 +85,29 @@ function budget(set: string, mode: "gpu" | "pool"): Promise<Any> {
   if (mode === "gpu") args.push("--gpu-prep", `${bin}/gpu_build_prep`);
   else args.push("--worker", `${bin}/block_worker`);
   return fileStep("budget.ts", args);
+}
+
+/** A native build's report (`metal_report`, `cuda_build_report`) for a size, with its digests checked against the CPU's. */
+async function nativeBuild(program: string, rows: number, blocks: number, six: number[]): Promise<Any> {
+  try {
+    await Deno.stat(program);
+  } catch {
+    return null;
+  }
+  // The CPU's digests first: they name the CPU's matrix storage, which the digest hashes with the words.
+  const cpu = await run(`${bin}/pack_digest`, [String(rows), "1,2,3", "--parts"]);
+  const label = cpu.lines[0]?.match(/ storage=(\S+)/)?.[1];
+  if (label) Deno.env.set("IPIR_STORAGE_LABEL", label);
+  const r = await run(program, [String(rows), String(blocks), six.join(","), quick ? "2" : "5"]);
+  const j = lastJson(r.lines) ?? { ok: false, error: `${program} printed no result` };
+  if (j.ok && Array.isArray(j.digests)) {
+    j.cpuStorage = label ?? null;
+    const want = cpu.lines.map((l) => l.replace(/ storage=\S+/, "").trim());
+    j.digestsEqual = j.digests.filter((d: string) => want.includes(d.trim())).length;
+    j.digestsChecked = j.digests.length;
+    if (j.digestsEqual !== j.digestsChecked) j.ok = false, j.error = "the build's output differs from the CPU's";
+  }
+  return j;
 }
 
 const started = new Date().toISOString();
@@ -169,6 +198,19 @@ for (const size of sizes) {
   await save();
   log(`${size}: one chain block (six tables), blocks computed on the CPU's pool`);
   s.update6.cpu = await budget(size, "pool");
+  await save();
+
+  const six = tables.map((t) => t.rows);
+  if (Deno.build.os === "darwin") {
+    log(`${size}: column blocks computed with native Metal kernels`);
+    const m = await nativeBuild(`${here}../metal/target/release/metal_report`, rows, cols / 2048, six);
+    if (m) s.metal = m;
+  }
+  if (withCuda) {
+    log(`${size}: column blocks computed with CUDA kernels`);
+    const c = await nativeBuild(`${bin}/cuda_build_report`, rows, cols / 2048, six);
+    if (c) s.cudaBuild = c;
+  }
   await save();
 
   log(`${size}: fetch 1 and fetch 32 on the read table`);

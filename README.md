@@ -88,6 +88,13 @@ same while another table answers), the single-block and six-table updates, and t
 Every GPU-built table and every answer is compared with the CPU's. The sections below are the earlier, longer
 account at the chain's current size and at 10 million outputs.
 
+The report also has the block build with native kernels, beside the WebGPU one: on Metal (`metal/`, its own Rust
+crate, built on macOS by `./bench.sh --report`) and on CUDA (`ipir/bench/src/cuda_build.cu` and `cuda_build.rs`, built
+with `--cuda`; a port of the Metal kernels, not upstream's code, which has no build on the GPU). Both compute a
+column block's hint columns and packing matrix and are compared with the CPU's output by digest
+(`metal/target/release/gpu_digest`, `ipir/target/release/cuda_build_digest`, against `pack_digest --parts`). They are
+computing only: neither path has a fetch of its own, so nothing is installed into a table that answers.
+
 ## Results so far
 
 Three machines. Each figure comes from the results file named in the table; `site/` has the same figures in the form
@@ -640,6 +647,7 @@ It has also run on Linux, on one desktop with an RTX 2060 (6 GB, driver 580.159.
 | `site/` | The files for the overview page, one per backend | new |
 | `gpu/block-build.ts` | The GPU build of a column block in WebGPU (step 2b), and `pack_digest`'s digest of its output | new: a WGSL port of the Metal block build of spec 00065's question 21 |
 | `ipir/bench/src/gpu_prep.rs`, `rns32.rs`, `bin/gpu_build_prep.rs` | The GPU build's constant tables for a table shape (three 30-bit primes, prepared masks, chain exponents), and the CPU's stage outputs to check it against | `rns32.rs` and the replica from the Metal block build; the rest new |
+| `ipir/bench/src/cuda_build.rs`, `cuda_build.cu`, `bin/cuda_build_digest.rs`, `bin/cuda_build_report.rs` | The build of a column block in CUDA (feature `cuda-13` or `cuda-12`): the kernels, compiled at start with NVRTC, their host side, `pack_digest`'s digest of the output with a stage-by-stage comparison against the CPU, and the report's figures in `metal_report`'s format | new: a CUDA port of the native Metal block build in `metal/` |
 | `bench.sh` | The whole procedure in one command: tools, setup, the Vulkan layer when needed, the quick check, the full run, the site file, the bundle | new |
 | `bench/` | The Deno benchmark scripts | new, adapted from spec 00065's GPU answer-time harness |
 | `tools/hide-memory-budget-layer/` | A Vulkan layer that hides `VK_EXT_memory_budget` from wgpu, for NVIDIA GPUs without resizable BAR | new |

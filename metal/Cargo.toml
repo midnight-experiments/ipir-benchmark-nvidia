@@ -1,0 +1,33 @@
+# The build of a column block on the Apple GPU through Metal (macOS only): native Metal kernels, checked word for
+# word against the CPU build. Its own workspace, so nothing here is resolved or built on Linux; the IPIR+SP crates are
+# the benchmark's vendored copy (`../ipir/vendor/`, patches 0001 to 0004).
+[package]
+name = "mbb"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+description = "The per-block build of an IPIR+SP table (hints and packing state) on the Apple GPU through Metal"
+
+[workspace]
+
+[dependencies]
+ipir-sp = { path = "../ipir/vendor/ipir-sp/ipir-sp", features = ["native-reinspiring"] }
+reinspiring = { path = "../ipir/vendor/ipir-sp/reinspiring" }
+spiral-rs = { package = "valar-spiral-rs", version = "=0.5.3-rc.1" }
+rand_chacha = "0.3.1"
+rayon = "1"
+sha2 = "0.10"
+metal = "0.32"
+
+[dev-dependencies]
+rand = "0.8.5"
+
+# Upstream's release profile, as `../ipir/Cargo.toml`.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+
+[profile.dev.package.valar-spiral-rs]
+overflow-checks = false

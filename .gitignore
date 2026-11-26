@@ -4,3 +4,4 @@ results/raw/
 results/*-bundle.tar.gz
 .DS_Store
 tools/hide-memory-budget-layer/libhide_budget.so
+metal/target/
