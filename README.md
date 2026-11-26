@@ -252,18 +252,71 @@ before it.
 - **The first pass alone is slower too.** The device's time for the 32 first passes of the CUDA kernel is 1.2 to
   3.3 times the device's time for both steps on the WebGPU path: the kernel reads the table once per request, and
   the WebGPU kernels read it once for the 32.
-- A call of 1 request goes the other way at small tables: 0.3 to 22 ms on the CUDA path against 12 to 14 ms on WebGPU
-  on the RTX 4090, and 1.5 to 28 ms against 13 to 22 ms on the RTX 2060 (the CUDA path is the faster one up to the
-  Dust commitment table, WebGPU from the 10-million read table on). The WebGPU wall time has about 12 ms that do
-  not depend on the call (submitting the work and reading the answer back in this harness); its device time for the
-  call is 0.2 to 9 ms. A wallet always sends 32.
-- **A changed column block**: the CUDA kernel has no call for one block, so the table goes up again: 36 to 48 ms for
-  336 to 384 MiB of cells, 99 to 119 ms for 952 MiB, 212 to 269 ms for 2 GiB. WebGPU writes the one block, its cells and
-  its packing matrix, in 20 to 36 ms whatever the table's width (55 ms at 32,768 rows on the RTX 2060).
 - Upstream's own `cuda_bench` (one request's first pass with a 56-bit prime modulus, 100 requests) gives the same
   first-pass time per request as the comparison: 1.06 ms at 14336 × 34816 and 2.26 ms at 32768 × 32768 on the RTX
   4090, 5.2 and 10.3 ms on the RTX 2060 (`results/rtx4090-2026-11-26-cuda-bench.txt`,
   `results/pop-os-2026-11-26-cuda-bench.txt`).
+
+**The update when a chain block arrives.** Every 6 s one column block of each of the six tables changes: its hint
+columns and its packing matrix are computed again from its cells, and the new block is put where the answers read
+it. Three ways, in seconds at 2 calls a second (p50), with the share of the 6 s in brackets, at today's shapes / at
+the 10-million-output shapes:
+
+| The update of one chain block (six column blocks) | RTX 2060 host | RTX 4090 host |
+|---|---|---|
+| WebGPU, blocks computed on the GPU: computed there, then laid out for the answer | 0.28 (5 %) / does not fit; 0.26 (4 %) at 8 million outputs | 0.36 (6 %) / not run |
+| of which the computing | 0.13 / 0.16 at 8 million | 0.26 |
+| WebGPU, blocks computed on the CPU (patch 0002, pool): then the six blocks written to the GPU | 1.94 (32 %) / 2.18 (36 %) | 1.43 (24 %) / not run |
+| of which the computing on the CPU | 1.74 / 1.98 | 1.20 |
+| of which writing the six blocks to the GPU | 0.18 / 0.21 | 0.23 |
+| CUDA kernel: blocks computed on the CPU (it has no other way), then the six tables uploaded whole again | about 1.78 (30 %) / 2.21 (37 %), computed | about 1.25 (21 %), computed |
+| of which uploading the six tables again | about 0.04 / 0.23 | about 0.05 |
+
+- **Only the WebGPU path has the computing on the GPU**, and that is what brings the update from a quarter or a
+  third of the 6 s to 4 to 6 %. The CUDA kernel has no code for it: with that kernel the blocks are computed on the
+  CPU, as in the second row.
+- The CUDA row is computed, not measured as a set: the CPU computing of the second row, plus the six tables' cells
+  (392 MiB at today's shapes, 2,208 MiB at 10 million outputs) at the upload rate measured per table below. The
+  kernel has no call for one block, and it drops the table it holds before the new one is up
+  (`CudaKernel::try_prepare`), so the table does not answer during its upload.
+- Measured per table, a changed block on the device: the CUDA kernel uploads the table again in 36 to 48 ms for 336
+  to 384 MiB of cells, 99 to 119 ms for 952 MiB, 212 to 269 ms for 2 GiB (8 to 10 MiB a millisecond). WebGPU writes
+  the one block, its cells and its packing matrix, in 20 to 36 ms whatever the table's width (55 ms at 32,768 rows
+  on the RTX 2060).
+- One column block alone, computed again: the "Compiling one column block" table above (397 and 221 ms on the two
+  hosts' CPUs with patch 0002 at 2,048 rows, 57 and 41 ms on their GPUs).
+
+**A single answer: a call of 1 request.** The same tables and paths as the call of 32 above, in ms.
+
+RTX 4090 host:
+
+| rows × cols | CUDA first pass, device | Packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | CPU alone |
+|---|---|---|---|---|---|---|
+| 2048 × 2048 | 0.01 | 0.14 | 0.32 | 0.18 | 12.4 | 0.47 |
+| 12288 × 16384 | 0.43 | 8.5 | 9.4 | 0.96 | 13.2 | 24.9 |
+| 6144 × 28672 | 0.38 | 15.5 | 16.4 | 1.03 | 13.7 | 29.9 |
+| 14336 × 34816 | 1.06 | 19.0 | 20.8 | 1.92 | 14.0 | 58.8 |
+| 32768 × 32768 | 2.27 | 18.5 | 22.0 | did not fit | | 103 |
+
+RTX 2060 desktop:
+
+| rows × cols | CUDA first pass, device | Packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | CPU alone |
+|---|---|---|---|---|---|---|
+| 2048 × 2048 | 0.09 | 1.13 | 1.53 | 0.40 | 12.9 | 1.79 |
+| 12288 × 16384 | 2.31 | 8.7 | 11.9 | 2.65 | 15.1 | 22.6 |
+| 6144 × 28672 | 2.19 | 15.3 | 18.3 | 2.94 | 15.7 | 27.5 |
+| 14336 × 34816 | 5.14 | 18.4 | 24.7 | 5.24 | 17.9 | 52.7 |
+| 32768 × 32768 | 9.09 | 17.1 | 27.8 | 8.85 | 21.5 | 87.5 |
+
+- **For one request the two paths are close, and the CUDA path is the faster one at small tables**: up to the Dust
+  commitment table on both hosts; WebGPU is faster from 6144 × 28672 on.
+- The WebGPU wall time has about 12 ms that do not depend on the call: submitting the work and reading the answer
+  back in this harness (Deno's WebGPU). Its device time for the single answer is 0.2 to 2 ms on the RTX 4090 and
+  0.4 to 9 ms on the RTX 2060, so a server that does not pay those 12 ms would answer faster than either column.
+- The packing of one request on the CPU is about 1.1 ms a column block, and it is most of the CUDA path here too.
+- On the M4 Max (WebGPU on Metal; no CUDA) a single answer takes 15.1 ms at 2048 × 2048, 16.5 ms at 6144 × 28672
+  and 17.9 ms at 14336 × 34816, of which 1.0, 2.2 and 3.5 ms on the device.
+- A wallet always sends 32 requests in a call, so the call of 32 is what a server answers.
 
 What it took, and what could not be run:
 
