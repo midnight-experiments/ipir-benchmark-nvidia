@@ -1198,6 +1198,7 @@ dependencies = [
 name = "ipir-bench"
 version = "0.1.0"
 dependencies = [
+ "cudarc",
  "ipir-sp",
  "libc",
  "rand_chacha 0.3.1",
