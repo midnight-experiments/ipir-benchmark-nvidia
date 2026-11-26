@@ -212,3 +212,32 @@ export async function scoped<T>(device: GPUDevice, what: string, f: () => Promis
   if (thrown) throw thrown;
   return value as T;
 }
+
+/**
+ * Counts the bytes of the buffers a device holds, from now on: `createBuffer` adds a buffer's size and the buffer's
+ * `destroy` takes it away. `live()` is what is held now, `peak()` the most held since the last `resetPeak()`. This is
+ * what the benchmark allocated, the same on every backend; a driver's own bookkeeping (`nvidia-smi`) adds its
+ * overhead. A buffer dropped without `destroy` stays counted, and textures and query sets are not counted.
+ */
+export function trackGpuMemory(device: GPUDevice): { live(): number; peak(): number; resetPeak(): void } {
+  let live = 0;
+  let peak = 0;
+  const create = device.createBuffer.bind(device);
+  device.createBuffer = (descriptor: GPUBufferDescriptor): GPUBuffer => {
+    const buffer = create(descriptor);
+    const size = buffer.size;
+    live += size;
+    if (live > peak) peak = live;
+    const destroy = buffer.destroy.bind(buffer);
+    let destroyed = false;
+    buffer.destroy = () => {
+      if (!destroyed) {
+        destroyed = true;
+        live -= size;
+      }
+      destroy();
+    };
+    return buffer;
+  };
+  return { live: () => live, peak: () => peak, resetPeak: () => void (peak = live) };
+}

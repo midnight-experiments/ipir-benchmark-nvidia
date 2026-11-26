@@ -17,8 +17,11 @@
  * 3. `check-cpu-answer.ts DIR <rows> <cols> --time <runs>`: the WebGPU path's answers for the dumped table, compared
  *    byte for byte with the CPU's, its times, and the write of one changed column block.
  *
- *   deno run <permissions> bench/cuda-compare.ts --out FILE [--shapes 2048x2048,...] [--runs 9]
+ *   deno run <permissions> bench/cuda-compare.ts --out FILE [--shapes 2048x2048,...] [--runs 9] [--no-cuda]
  *     [--cuda-fetch ipir/target/release/cuda_fetch] [--cpu-fetch ipir/target/release/cpu_fetch] [--timeout-s 1800]
+ *
+ * `--no-cuda` leaves step 2 out (a host without CUDA): the CPU's and the WebGPU path's times for the same table.
+ * Step 1 runs `cpu_fetch` with the same number of runs, so its times of the CPU alone are kept too (`cpu`).
  *
  * A shape whose table does not fit in the GPU's free memory on one path is recorded as such (`ok: false`, with the
  * error) and the other path's figures are kept. Exits 1 when any answer differs from the CPU's or no shape ran.
@@ -35,6 +38,7 @@ const runs = Number(opts.get("runs") ?? 9);
 const cudaFetch = opts.get("cuda-fetch") ?? "ipir/target/release/cuda_fetch";
 const cpuFetch = opts.get("cpu-fetch") ?? "ipir/target/release/cpu_fetch";
 const timeoutS = Number(opts.get("timeout-s") ?? 1800);
+const withCuda = !opts.has("no-cuda");
 const here = new URL(".", import.meta.url).pathname;
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -77,17 +81,23 @@ for (const [rows, cols] of shapes) {
   console.error(`cuda-compare ${rows}x${cols}: building the table on the CPU`);
   const dir = await Deno.makeTempDir({ prefix: "ipir-cuda-compare-" });
   try {
-    const dumped = await child(cpuFetch, [String(rows), String(cols), "1", "--dump", dir]);
+    const dumped = await child(cpuFetch, [String(rows), String(cols), String(runs), "--dump", dir]);
     if (!dumped.success) {
       row.error = `cpu_fetch --dump failed: ${dumped.parsed?.error ?? dumped.stderr.slice(-500)}`;
       console.error(`cuda-compare ${rows}x${cols}: ${row.error}`);
       results.push(row);
       continue;
     }
-    console.error(`cuda-compare ${rows}x${cols}: CUDA first pass and CPU packing`);
-    const cuda = await child(cudaFetch, [String(rows), String(cols), String(runs), "--expect", dir]);
-    row.cuda = cuda.parsed ?? { ok: false, error: `cuda_fetch gave no result: ${cuda.stderr.slice(-500)}` };
-    if (!row.cuda.ok) {
+    // The CPU alone (`NativeServer::respond`), from the program that made the dump.
+    row.cpu = { buildMs: dumped.parsed?.buildMs ?? null, timing: dumped.parsed?.timing ?? null };
+    if (withCuda) {
+      console.error(`cuda-compare ${rows}x${cols}: CUDA first pass and CPU packing`);
+      const cuda = await child(cudaFetch, [String(rows), String(cols), String(runs), "--expect", dir]);
+      row.cuda = cuda.parsed ?? { ok: false, error: `cuda_fetch gave no result: ${cuda.stderr.slice(-500)}` };
+    }
+    if (!withCuda) {
+      // no CUDA on this host
+    } else if (!row.cuda.ok) {
       row.cuda.doesNotFit = noFit(row.cuda.error);
       if (/answers|differ/i.test(String(row.cuda.stage))) different++;
       console.error(`cuda-compare ${rows}x${cols}: CUDA ${row.cuda.doesNotFit ? "does not fit" : "FAILED"} at ${row.cuda.stage}: ${row.cuda.error}`);
