@@ -28,6 +28,8 @@
  * `atOnce`, several tables of a row count at once; `sets`, one chain block of the six tables, back to back and with
  * the GPU idle before each build (`afterIdle...`, as between chain blocks). And `budget.gpu`: the
  * budget cells with the blocks built on the GPU that is answering (`compileP50S` is then the GPU build).
+ * `budgetLargest` (null otherwise): where the 10-million-output tables did not fit in the GPU's memory with the
+ * build, the largest tables that did (`shapes`, `outputs`, `tables`, `residentMiB`) and their budget `cells`.
  *
  * Every budget cell has the share of the time between two blocks (6 s) that the block's work takes at p50
  * (`windowPct`, with `compilePct` and `uploadPct` for its two parts), and how many blocks were over the 1 s goal
@@ -115,6 +117,8 @@ if (fetchFile) {
 // compile and budget, per build.
 const compile: Record<Build, Any[]> = { stock: [], patch0002: [] };
 const budget: Record<Build | "gpu", Any[]> = { stock: [], patch0002: [], gpu: [] };
+// Where the 10M tables do not fit with the blocks built on the GPU: the largest tables that do, and their cells.
+let budgetLargest: Any = null;
 /** A budget set's cells for the page. */
 function budgetRows(s: Any, set: string): Any[] {
   const pct = (ms: number | null | undefined) => (ms === null || ms === undefined ? null : round((ms / (s.intervalMs ?? 6000)) * 100, 1));
@@ -193,6 +197,16 @@ if (gpuFile) {
     const s = gpuFile.r.budget?.gpu?.[set];
     if (s?.ok) budget.gpu.push(...budgetRows(s, set));
   }
+  const l = gpuFile.r.budget?.gpu?.largest;
+  if (l?.ok) {
+    budgetLargest = {
+      shapes: l.set,
+      outputs: l.outputs ?? null,
+      tables: l.tables.map((t: Any) => `${t.rows}x${t.cols}`),
+      residentMiB: round(l.residentBytes / 2 ** 20, 0),
+      cells: budgetRows(l, l.set),
+    };
+  }
 }
 
 // machine: from the first input, then --machine.
@@ -235,6 +249,7 @@ const site = {
   compile,
   gpuCompile,
   budget,
+  budgetLargest,
 };
 const host = m.hostname ?? "host";
 const out = opts.get("out") ?? `site/${host}-${date}-${backend}-site.json`;
@@ -242,5 +257,6 @@ await Deno.writeTextFile(out, JSON.stringify(site, null, 1) + "\n");
 console.error(
   `wrote ${out}: ${fetch.length} fetch shapes, compile ${compile.stock.length} stock / ${compile.patch0002.length} patch 0002, ` +
     `budget ${budget.stock.length} stock / ${budget.patch0002.length} patch 0002 / ${budget.gpu.length} GPU build` +
+    (budgetLargest ? ` (largest tables that fit with the GPU build: ${budgetLargest.shapes})` : "") +
     (gpuCompile ? `; GPU compile: ${gpuCompile.check.equal} of ${gpuCompile.check.blocks} blocks equal, ${gpuCompile.one.length} row counts` : ""),
 );
