@@ -61,7 +61,7 @@ bindir() { if [[ "$1" == stock ]]; then echo ipir/target/stock/release; else ech
 
 if [[ -x "$ROOT/.tools/deno/deno" ]]; then DENO="${DENO:-$ROOT/.tools/deno/deno}"; else DENO="${DENO:-deno}"; fi
 command -v "$DENO" >/dev/null || { echo "deno not found: run ./setup.sh first" >&2; exit 1; }
-command -v cargo >/dev/null || { echo "cargo not found: install Rust with rustup (README, Host requirements)" >&2; exit 1; }
+command -v cargo >/dev/null || { echo "cargo not found: install Rust with rustup (docs/hosts.md)" >&2; exit 1; }
 DENO_VERSION=$("$DENO" --version | head -1 | awk '{print $2}')
 if [[ "$DENO_VERSION" != "$DENO_VERSION_PINNED" ]]; then
   echo "warning: deno $DENO_VERSION, the benchmark was written against $DENO_VERSION_PINNED (./setup.sh installs it)" >&2
@@ -264,7 +264,7 @@ cat "results/$NAME.md"
 echo
 echo "== done in $(( (END-START)/60 )) min: results/$NAME.json and results/$NAME.md (raw files in $RAW)"
 if [[ $QUICK == 0 ]]; then
-  echo "== next: the overview page's file, site/$NAME-site.json (./bench.sh does this itself; see the README, 'Backends'):"
+  echo "== next: the overview page's file, site/$NAME-site.json (./bench.sh does this itself; see docs/full-run.md, 'Backends'):"
   echo "  $DENO run --allow-read --allow-write --allow-run bench/export-site.ts --commit none --label \"<GPU> + <CPU>\" results/$NAME.json"
   [[ $BACKEND == nvidia-unknown-bar ]] && echo "  (resizable BAR was not detected either way: add --backend nvidia or --backend nvidia-no-bar after checking nvidia-smi -q -d MEMORY)"
 fi

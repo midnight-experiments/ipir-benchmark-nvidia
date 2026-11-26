@@ -48,7 +48,7 @@ Two things this machine brought out:
 ## Upstream's CUDA kernel against the WebGPU path (2026-11-26)
 
 `bench/cuda-compare.ts` with CUDA 13.0 (the host's toolkit, driver 580.126.18), bindings `cuda-13`. Its figures are in
-the results file as `cuda`, in the report as step 4 and in the README.
+the results file as `cuda`, in the run's summary as step 4 and in `docs/other-results.md`.
 
 - The figures kept are from a run at 06:25 local time with the host quiet (load average about 1), from a working copy
   with the same files as commit `8866374`. The run was repeated from that commit a few minutes later while other

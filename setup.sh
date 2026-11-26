@@ -42,7 +42,7 @@ if [[ "$(uname)" == Linux ]]; then
         echo "  sudo mkdir -p /usr/share/vulkan/icd.d && echo '{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"libGLX_nvidia.so.0\",\"api_version\":\"1.3\"}}' | sudo tee /usr/share/vulkan/icd.d/nvidia_icd.json"
       elif [[ -f /.dockerenv || -f /run/.containerenv ]]; then
         echo "This is a container without the NVIDIA Vulkan driver (libGLX_nvidia.so.0): start the container with"
-        echo "  NVIDIA_DRIVER_CAPABILITIES=all (or compute,utility,graphics); see the README, 'The nvidia file'"
+        echo "  NVIDIA_DRIVER_CAPABILITIES=all (or compute,utility,graphics); see docs/hosts.md"
       else
         echo "The NVIDIA Vulkan driver (libGLX_nvidia.so.0) is missing: sudo apt install libnvidia-gl-<driver branch>"
       fi
