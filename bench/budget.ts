@@ -44,7 +44,7 @@
 import { type BlockBuildPrep, GpuBlockBuildSet, parseBlockBuildPrep } from "../gpu/block-build.ts";
 import { GpuIpirTable } from "../gpu/ipir.ts";
 import { LADDER, SET_OUTPUTS, SETS } from "./gpu-build-sets.ts";
-import { openBenchGpu, options, residentBytes, scoped, stats, syntheticCells, syntheticMatrix, syntheticRequests, syntheticSetupId, xorshift } from "./lib.ts";
+import { MIB, openBenchGpu, options, residentBytes, scoped, stats, syntheticCells, syntheticMatrix, syntheticRequests, syntheticSetupId, trackGpuMemory, xorshift } from "./lib.ts";
 
 const opts = options(Deno.args);
 const out = opts.get("out");
@@ -203,11 +203,14 @@ try {
   const uploads: { rows: number; cells: Uint16Array; setupId: Uint8Array }[] = [];
   let matrix: Int32Array | null = null;
   let cpu: CpuTables | null = null;
+  // What the benchmark's buffers hold on the GPU: the most at any moment of the run (`gpuPeakMiB`).
+  let memory: ReturnType<typeof trackGpuMemory> | null = null;
   if (answerOn === "gpu") {
     const gpu = await openBenchGpu();
     device = gpu.device;
     device.lost.then((i) => (lost = `device lost (${i.reason}): ${i.message}`));
     result.gpu = gpu.description;
+    memory = trackGpuMemory(device);
     stage = "compiling the kernels";
     await scoped(device, stage, () => GpuIpirTable.compileKernels(device!));
     for (const [i, t] of tables.entries()) {
@@ -402,6 +405,7 @@ try {
   gpuBuild?.destroy();
   for (const r of resident) r.table.release();
   await cpu?.close();
+  if (memory) result.gpuPeakMiB = Math.round(memory.peak() / MIB);
   result.ok = true;
   result.runs = runs;
   await Deno.writeTextFile(out, JSON.stringify(result, null, 1));

@@ -241,10 +241,7 @@ if [[ $CUDA == 1 ]]; then
   if [[ $BACKEND != nvidia* ]]; then
     echo "--cuda needs an NVIDIA GPU backend (this one is $BACKEND): skipped"
   else
-    CUDA_FEATURE=${IPIR_CUDA_FEATURE:-}
-    if [[ -z "$CUDA_FEATURE" ]]; then
-      if ldconfig -p 2>/dev/null | grep -q 'libnvrtc\.so\.13'; then CUDA_FEATURE=cuda-13; else CUDA_FEATURE=cuda-12; fi
-    fi
+    CUDA_FEATURE=$("$ROOT/tools/cuda-feature.sh")
     echo "== CUDA against WebGPU: building cuda_fetch ($CUDA_FEATURE)"
     if (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$CUDA_FEATURE" --bin cuda_fetch 2>/dev/null \
         || cargo build --release --locked -p ipir-bench --features "$CUDA_FEATURE" --bin cuda_fetch; }); then

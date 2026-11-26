@@ -8,6 +8,9 @@
 # More options:
 #   --cpu          after the GPU run, the same benchmark with the answers on the CPU (about 1.5 hours more)
 #   --cpu-only     no GPU run: the CPU backend alone (also for a host with no GPU)
+#   --report       only the report's measurements (bench/report-run.ts, about 30 minutes): a table built from
+#                  scratch, an update, fetch 1 and fetch 32 at 1M and 10M values, and the GPU memory each needs;
+#                  with --cuda also upstream's CUDA kernel for the fetches, with --quick a short check of it
 #   --cuda         also upstream's CUDA kernel: a whole answer against the WebGPU path (in the full run's results),
 #                  and upstream's own first-pass benchmark (NVIDIA, with the CUDA driver library and NVRTC)
 #   --skip-quick   go straight to the full run
@@ -34,7 +37,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 ROOT=$PWD
 
-QUICK_ONLY=0 SKIP_QUICK=0 INSTALL=0 WITH_CPU=0 CPU_ONLY=0 CUDA=0 LABEL="" FULL_ARGS=()
+QUICK_ONLY=0 SKIP_QUICK=0 INSTALL=0 WITH_CPU=0 CPU_ONLY=0 CUDA=0 REPORT=0 LABEL="" FULL_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) QUICK_ONLY=1 ;;
@@ -43,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --cpu) WITH_CPU=1 ;;
     --cpu-only) CPU_ONLY=1 ;;
     --cuda) CUDA=1; FULL_ARGS+=(--cuda) ;;
+    --report) REPORT=1 ;;
     --budget-sets) FULL_ARGS+=(--budget-sets "$2"); shift ;;
     --host) export IPIR_BENCH_HOST="$2"; shift ;;
     --label) LABEL="$2"; shift ;;
@@ -129,6 +133,34 @@ if [[ $OS == Linux && $CPU_ONLY == 0 ]]; then
   fi
 fi
 
+# An NVRTC kept beside the tools goes first: for a host whose installed NVRTC is newer than its driver (README).
+for d in "$ROOT"/.tools/nvrtc-*; do
+  [[ -d "$d" ]] && export LD_LIBRARY_PATH="$d${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+done
+
+# The report's measurements only.
+if [[ $REPORT == 1 ]]; then
+  step "the report's measurements"
+  OUT="results/$HOST-$DATE-report.json"
+  args=(--out "$OUT")
+  [[ -n "$LABEL" ]] && args+=(--label "$LABEL")
+  [[ $QUICK_ONLY == 1 ]] && args+=(--quick)
+  if [[ $CUDA == 1 ]]; then
+    feature=$("$ROOT/tools/cuda-feature.sh")
+    echo "building cuda_fetch ($feature)"
+    (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$feature" --bin cuda_fetch 2>/dev/null \
+      || cargo build --release --locked -p ipir-bench --features "$feature" --bin cuda_fetch; }) || { echo "cuda_fetch did not build" >&2; exit 1; }
+    args+=(--cuda)
+  fi
+  KEEP_AWAKE=()
+  [[ $OS == Darwin ]] && command -v caffeinate >/dev/null && KEEP_AWAKE=(caffeinate -s -i -m)
+  ${KEEP_AWAKE[@]+"${KEEP_AWAKE[@]}"} "$DENO" run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/report-run.ts "${args[@]}" || exit 1
+  echo
+  echo "== the report's measurements: $OUT"
+  echo "   the tables: $DENO run --allow-read --allow-write bench/summary.ts (README, 'The report')"
+  exit 0
+fi
+
 # 4 and 5. The runs. $1 is a note for the log, the rest are run-all.sh's options. Sets NAME to the run's name, or to
 # nothing when run-all.sh stopped before it wrote results. Returns 1 when the run stopped or its check found problems.
 # (`set -e` does not apply inside a function called on the left of `||`, so every step returns its own failure.)
@@ -194,10 +226,7 @@ if [[ $CUDA == 1 ]]; then
   if (
     cd ipir || exit 1
     # The bindings follow the installed NVRTC library, as in run-all.sh.
-    feature=${IPIR_CUDA_FEATURE:-}
-    if [[ -z "$feature" ]]; then
-      if ldconfig -p 2>/dev/null | grep -q 'libnvrtc\.so\.13'; then feature=cuda-13; else feature=cuda-12; fi
-    fi
+    feature=$("$ROOT/tools/cuda-feature.sh")
     for shape in "2048 2048" "12288 16384" "14336 34816" "32768 32768"; do
       echo "== cuda_bench $shape 100 ($feature)"
       # shellcheck disable=SC2086
