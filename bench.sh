@@ -133,7 +133,7 @@ if [[ $OS == Linux && $CPU_ONLY == 0 ]]; then
   fi
 fi
 
-# An NVRTC kept beside the tools goes first: for a host whose installed NVRTC is newer than its driver (README).
+# An NVRTC kept beside the tools goes first: for a host whose installed NVRTC is newer than its driver (README, Troubleshooting).
 for d in "$ROOT"/.tools/nvrtc-*; do
   [[ -d "$d" ]] && export LD_LIBRARY_PATH="$d${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 done
@@ -166,7 +166,7 @@ if [[ $REPORT == 1 ]]; then
   ${KEEP_AWAKE[@]+"${KEEP_AWAKE[@]}"} "$DENO" run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/report-run.ts "${args[@]}" || exit 1
   echo
   echo "== the report's measurements: $OUT"
-  echo "   the tables: $DENO run --allow-read --allow-write bench/summary.ts (README, 'The report')"
+  echo "   the tables: $DENO run --allow-read --allow-write bench/summary.ts (README, 'Run instructions')"
   exit 0
 fi
 
@@ -244,7 +244,7 @@ if [[ $CUDA == 1 ]]; then
   ) 2>&1 | tee "$CUDA_OUT"; then
     :
   else
-    echo "cuda_bench failed (it needs the CUDA driver library and NVRTC: README, 'The nvidia file'); its output is in $CUDA_OUT"
+    echo "cuda_bench failed (it needs the CUDA driver library and NVRTC: docs/hosts.md); its output is in $CUDA_OUT"
     PROBLEMS=1
   fi
 fi

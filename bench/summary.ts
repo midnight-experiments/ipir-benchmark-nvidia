@@ -2,11 +2,14 @@
  * The report: the tables of `REPORT.md`, written from the machines' result files of `bench/report-run.ts`
  * (`./bench.sh --report`). Nothing is typed by hand: a cell is a figure of a result file, or the reason there is none.
  *
- *   deno run --allow-read --allow-write bench/summary.ts [--out REPORT.md] [--cpu NAME] FILE=NAME ...
+ *   deno run --allow-read --allow-write bench/summary.ts [--out REPORT.md] [--readme README.md] [--cpu NAME] FILE=NAME ...
  *
  * `FILE=NAME`: a result file and the machine's short name in the column titles ("M4", "RTX 20"). `--cpu NAME`: the
  * machine whose CPU is the reference column (the first by default). Columns: that CPU; Metal (no native Metal code
  * exists in this benchmark); WebGPU on every machine; upstream's CUDA kernel on every machine measured with `--cuda`.
+ *
+ * `--readme FILE`: also writes the figures as one table (a row per operation and size) into FILE, between its
+ * `<!-- report-summary:start -->` and `<!-- report-summary:end -->` lines: the README's quick results.
  *
  * A result file may carry a `note` (a sentence added by hand about the run's conditions); section 7 prints it.
  *
@@ -27,7 +30,8 @@ const take = (name: string): string | null => {
 };
 const out = take("--out") ?? "REPORT.md";
 const cpuName = take("--cpu");
-if (args.length === 0) throw new Error("usage: summary.ts [--out REPORT.md] [--cpu NAME] FILE=NAME ...");
+const readme = take("--readme");
+if (args.length === 0) throw new Error("usage: summary.ts [--out REPORT.md] [--readme README.md] [--cpu NAME] FILE=NAME ...");
 const machines: { name: string; file: string; r: Any }[] = [];
 for (const a of args) {
   const i = a.lastIndexOf("=");
@@ -61,8 +65,10 @@ function why(step: Any): string {
 }
 const size = (m: { r: Any }, s: string): Any => m.r.sizes?.[s] ?? null;
 const header = ["Values", `CPU ${cpu.name}`, "Metal M4", ...machines.map((m) => `WebGPU ${m.name}`), ...cudas.map((m) => `CUDA ${m.name}`)];
-/** A table of the standard columns: one row per size, from a cell function per kind of column. */
-function table(cells: { cpu: (z: Any) => string; webgpu: (z: Any, m: { name: string; r: Any }) => string; cuda: (z: Any) => string; metal?: (n: Any) => string | null }, rows: string[] = SIZES): string[] {
+/** The rows of the README's table: every table of the standard columns that has a name, a row per size. */
+const summary: string[][] = [];
+/** A table of the standard columns: one row per size, from a cell function per kind of column. `name`: its operation in the README's table. */
+function table(name: string, cells: { cpu: (z: Any) => string; webgpu: (z: Any, m: { name: string; r: Any }) => string; cuda: (z: Any) => string; metal?: (n: Any) => string | null }, rows: string[] = SIZES): string[] {
   const lines = [`| ${header.join(" | ")} |`, `|${header.map(() => "---").join("|")}|`];
   for (const s of rows) {
     const on = <T>(m: { r: Any }, f: () => T): T => {
@@ -73,9 +79,9 @@ function table(cells: { cpu: (z: Any) => string; webgpu: (z: Any, m: { name: str
         inUse = false;
       }
     };
-    lines.push(
-      `| ${[sizeName(s), on(cpu, () => cells.cpu(size(cpu, s))), cells.metal?.(metalOf(s)) ?? "no code", ...machines.map((m) => on(m, () => cells.webgpu(size(m, s), m))), ...cudas.map((m) => on(m, () => cells.cuda(size(m, s))))].join(" | ")} |`,
-    );
+    const row = [sizeName(s), on(cpu, () => cells.cpu(size(cpu, s))), cells.metal?.(metalOf(s)) ?? "no code", ...machines.map((m) => on(m, () => cells.webgpu(size(m, s), m))), ...cudas.map((m) => on(m, () => cells.cuda(size(m, s))))];
+    lines.push(`| ${row.join(" | ")} |`);
+    summary.push([name, ...row]);
   }
   return lines;
 }
@@ -127,7 +133,7 @@ L.push("");
 
 L.push("## 2. Build a whole matrix from scratch", "");
 L.push("At server start, when a matrix changes its number of rows, and when a matrix is added. Every column block's hint columns and packing matrix are computed from the cells.", "");
-L.push(...table({
+L.push(...table("Build from scratch", {
   cpu: (z) => time(z?.build?.cpuBuildMs) ?? why(z?.build),
   webgpu: (z) => (z?.build?.ok ? time(z.build.gpuBuildMs)! : why(z?.build)),
   cuda: (z) => native(z?.cudaBuild, (n) => time(n.build?.wallMs)) ?? NO_GPU,
@@ -140,7 +146,7 @@ if (SIZES.some((s) => metalOf(s) || machines.some((m) => size(m, s)?.cudaBuild))
 L.push("## 3. Update: data added to one column block", "");
 L.push("The cost is the same whether one value or many were added, as long as they fall in one column block.", "");
 L.push("**1×: one column block of the matrix computed again**", "");
-L.push(...table({
+L.push(...table("Update, 1×: one column block", {
   cpu: (z) => time(z?.update1?.cpu?.wallMs) ?? why(z?.update1?.cpu),
   webgpu: (z) => {
     const g = z?.update1?.gpu;
@@ -151,7 +157,7 @@ L.push(...table({
   metal: (n) => native(n, (x) => time(x.update1?.wallMs), false),
 }));
 L.push("", "**6×: one chain block, a column block in each of the six matrices**, while the GPU answers 2 calls a second: the time, and its share of the 6 s between blocks.", "");
-L.push(...table({
+L.push(...table("Update, 6×: one chain block", {
   cpu: (z) => work(z?.update6?.cpu, "pool") ?? why(z?.update6?.cpu),
   webgpu: (z) => {
     const u = z?.update6;
@@ -169,7 +175,7 @@ if (SIZES.some((s) => metalOf(s) || machines.some((m) => size(m, s)?.cudaBuild))
 for (const [n, title] of [["1", "## 4. Fetch 1 value"], ["32", "## 5. Fetch 32 values (one wallet call)"]] as const) {
   L.push(title, "");
   L.push(n === "1" ? "One request: the wall time from the request's bytes to the answer's bytes." : "The call every wallet sends: 32 requests, padded so that the server cannot tell how many it needed.", "");
-  L.push(...table({
+  L.push(...table(n === "1" ? "Fetch 1" : "Fetch 32", {
     cpu: (z) => time(z?.fetch?.cpu?.timing?.[n]?.wallMs?.median) ?? why(z?.fetch?.cpu?.timing ? null : z?.fetch),
     webgpu: (z) => (z?.fetch?.webgpu?.ok ? time(z.fetch.webgpu.timing?.[n]?.wallMs?.median)! : why(z?.fetch?.webgpu)),
     cuda: (z) => (z?.fetch?.cuda?.ok ? time(z.fetch.cuda.cuda?.[n]?.wallMs?.median)! : why(z?.fetch?.cuda)),
@@ -246,3 +252,24 @@ L.push("The WebGPU wall time of a fetch has about 12 ms that do not depend on th
 
 await Deno.writeTextFile(out, L.join("\n"));
 console.error(`wrote ${out} from ${machines.map((m) => m.file).join(", ")}`);
+
+if (readme) {
+  const START = "<!-- report-summary:start -->";
+  const END = "<!-- report-summary:end -->";
+  const text = await Deno.readTextFile(readme);
+  const a = text.indexOf(START);
+  const b = text.indexOf(END);
+  if (a < 0 || b < a) throw new Error(`${readme}: no ${START} ... ${END} lines to write the table between`);
+  const cols = ["Operation", ...header];
+  const block = [`| ${cols.join(" | ")} |`, `|${cols.map(() => "---").join("|")}|`, ...summary.map((r) => `| ${r.join(" | ")} |`), ""];
+  if (summary.some((r) => r.some((c) => c.endsWith("\\*")))) block.push("\\* Computing only, with native kernels: nothing is installed into a table that answers, and no calls are answered meanwhile.", "");
+  // How many cells hold a figure, and why the others do not.
+  const cells = summary.flatMap((r) => r.slice(2));
+  const reasons = new Map<string, number>();
+  for (const c of cells) if (!/^\d/.test(c)) reasons.set(c.split(";")[0]!, (reasons.get(c.split(";")[0]!) ?? 0) + 1);
+  const measured = cells.filter((c) => /^\d/.test(c)).length;
+  block.push(`${measured} of the ${cells.length} cells hold a figure${reasons.size ? `; the others: ${[...reasons].map(([k, n]) => `${n} \`${k}\``).join(", ")}` : ""}.`, "");
+  block.push(`Medians of \`./bench.sh --report\`: ${machines.map((m) => `${m.name}${m.r.label ? ` (${m.r.label})` : ""} on ${m.r.date}`).join(", ")}. The 6× rows give the share of the 6 s between two chain blocks in brackets.`);
+  await Deno.writeTextFile(readme, `${text.slice(0, a + START.length)}\n${block.join("\n")}\n${text.slice(b)}`);
+  console.error(`wrote the table of ${readme}`);
+}

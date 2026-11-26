@@ -78,8 +78,8 @@ runs.
 
 `pop-os-2026-11-25-nvidia-no-bar` is one run of every step at `9e820f3`: `./bench.sh --skip-quick --host pop-os
 --label "RTX 2060 + Ryzen 7 2700X"`, 99 minutes. `bench.sh` found that wgpu refused a 1 GiB buffer and loaded the
-Vulkan layer by itself. It is the run behind `site/pop-os-2026-11-25-nvidia-no-bar-site.json` and the README's
-figures.
+Vulkan layer by itself. It is the run behind `site/pop-os-2026-11-25-nvidia-no-bar-site.json` and the figures of
+`docs/other-results.md`.
 
 - The desktop was in use: the load average was 6.3 at the start (the build just before the run) and 2.9 at the end,
   and a chain node runs on the machine. Its CPU figures are 1 to 10 % above those of the quiet runs above
@@ -114,7 +114,7 @@ them: `budget.gpu.largest` in the results, `budgetLargest` in the site file. The
 ## Upstream's CUDA kernel against the WebGPU path (2026-11-26)
 
 `bench/cuda-compare.ts` at commit `8866374`, bindings `cuda-13`, the Vulkan layer loaded for the WebGPU side. Its
-figures are in the results file as `cuda`, in the report as step 4 and in the README; upstream's `cuda_bench` is in
+figures are in the results file as `cuda`, in the run's summary as step 4 and in `docs/other-results.md`; upstream's `cuda_bench` is in
 `results/pop-os-2026-11-26-cuda-bench.txt`.
 
 - CUDA did not start with what the machine has installed: the toolkit's NVRTC is of CUDA 13.4
