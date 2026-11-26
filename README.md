@@ -205,7 +205,7 @@ needs, what fits on each GPU, and each run's conditions.
 | `REPORT.md` | The standard results | written by `bench/summary.ts` |
 | `docs/` | Host requirements, the full run, the other results, what was checked | new |
 | `bench/` | The Deno benchmark scripts. The report: `report-run.ts`, `summary.ts`, `table-build.ts`, `cuda-compare.ts`. The full run: `fetch-all.ts`, `gpu-compile.ts`, `budget.ts`, `check-run.ts`, `export-site.ts` | new, adapted from spec 00065's GPU answer-time harness |
-| `gpu/ipir.ts`, `ipir-wgsl.ts`, `ipir-wire.ts`, `device.ts` | `GpuIpirTable`, the WebGPU answer, and its WGSL kernels. `ipir.ts` has `createEmpty` and `writeBlock` added, for a table built on the GPU; the others are unchanged | UmbraDB, `examples/private-shielded-sync/gpu/` at `c620f0e7` |
+| `gpu/ipir.ts`, `ipir-wgsl.ts`, `ipir-wire.ts`, `device.ts` | `GpuIpirTable`, the WebGPU answer, and its WGSL kernels. In `ipir.ts`, `create` also takes cells and matrices already on the GPU, and `createEmpty` and `writeBlock` are added, for a table built on the GPU; the others are unchanged | UmbraDB, `examples/private-shielded-sync/gpu/` at `c620f0e7` |
 | `gpu/block-build.ts` | The build of a column block in WebGPU, and `pack_digest`'s digest of its output | new: a WGSL port of the Metal block build |
 | `metal/` | The build of a column block with native Metal kernels (its own Rust crate, macOS only), and `metal_report`, the report's figures | the Metal block build of spec 00065's question 21; `metal_report` is new |
 | `ipir/vendor/` | Five IPIR+SP crates (`inspiring`, `reinspiring`, `ipir-native-client`, `ipir-sp`, `simplepir-kernel`), with the four patches applied | UmbraDB at `4f362386`, copied from `valargroup/ipir-sp` at `791b528` |

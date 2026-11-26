@@ -5,17 +5,24 @@ This repository contains code copied from UmbraDB (https://github.com/midnightnt
 Apache License, Version 2.0 (LICENSE, identical to UmbraDB's):
 
 - gpu/device.ts, gpu/ipir.ts, gpu/ipir-wgsl.ts, gpu/ipir-wire.ts (from examples/private-shielded-sync/gpu/) and
-  ipir/sizes.ts (from examples/private-shielded-sync/ipir/), unchanged, at commit
+  ipir/sizes.ts (from examples/private-shielded-sync/ipir/), at commit
   c620f0e76db4e5d78001eb3dc3a45363c10f47da ("examples/private-shielded-sync/gpu: IPIR+SP's answer on the GPU, byte
-  for byte as the add-on's", 2026-11-16);
+  for byte as the add-on's", 2026-11-16). gpu/ipir.ts is changed in this repository: GpuIpirTable.create also takes
+  cells and packing matrices that are already in GPU buffers, and createEmpty and writeBlock are added, for a table
+  filled one column block at a time. The other four files are unchanged;
 - ipir/vendor/ and ipir/Cargo.lock (adapted), from examples/private-shielded-sync/ipir/ at commit
   4f362386a1b6fbbf041cceed92f8fba432ee2600.
 
 ipir/vendor/ipir-sp/ holds five crates of the IPIR+SP repository of the Zcash wallet services
 (https://github.com/valargroup/ipir-sp, commit 791b5287a26e4fe021f6f1a8fe70b7ab23849787), each licensed
-MIT OR Apache-2.0 (ipir/vendor/ORIGIN.md, ipir/vendor/LICENSE-MIT, ipir/vendor/LICENSE-APACHE), with two patches
-applied: this design's ipir/patches/0001-setup-without-columns.patch, and ipir/patches/0002-faster-block-compile.patch
-(a faster CPU block compile with the same output words).
+MIT OR Apache-2.0 (ipir/vendor/ORIGIN.md, ipir/vendor/LICENSE-MIT, ipir/vendor/LICENSE-APACHE), with four patches
+applied (ipir/patches/README.md describes each):
+
+- ipir/patches/0001-setup-without-columns.patch, this design's: a table gains column blocks and keeps the ones it has;
+- ipir/patches/0002-faster-block-compile.patch: a faster CPU block compile with the same output words;
+- ipir/patches/0003-gpu-build-accessors.patch: read-only accessors for a build of a column block on the GPU;
+- ipir/patches/0004-first-pass-hook.patch: additions for timing a whole answer with the CUDA kernel, and the CUDA
+  release of the bindings as a build feature.
 
 UmbraDB's NOTICE follows.
 
