@@ -93,3 +93,20 @@ figures.
   block's build takes 87 ms of GPU time right after another one and 341 ms after 6 s of idle (104 and 320 ms at the
   10-million-output shapes).
 
+## The largest tables with the blocks built on the GPU (2026-11-26)
+
+The full run's block budget with the blocks built on the GPU does not fit at the 10-million-output shapes. On
+2026-11-26 the search `run-all.sh` now makes in that case was run by hand with the full run's arguments (30 blocks at
+2, 5 and 10 calls a second), into the full run's raw files, and the report and the site file were regenerated from
+them: `budget.gpu.largest` in the results, `budgetLargest` in the site file. The desktop was using 470 MiB.
+
+- 9.5 million outputs: out of memory in the first blocks. 9 and 8.5 million: 30 blocks at 2 calls a second, then out
+  of memory at 5. 8 million: all three rates, block work 0.26, 0.30 and 0.31 s at p50 (4.4, 5.1 and 5.1 % of the
+  6 s), no block of 90 over 1 s.
+- `nvidia-smi`, read every second: 5,688 MiB in use with the 9-million tables, 5,542 MiB with the 8.5-million ones,
+  5,494 MiB at most with the 8-million ones. No sample is above 5,690 MiB of 6,144.
+- `run-all.sh`'s own path was run first with short runs (`--quick --skip-compile --skip-fetch --builds patch0002
+  --budget-sets 10m`): it ended at 8 million too. There 9 million failed earlier, when the build's buffers were
+  made, so a size at the limit does not always fail at the same point.
+- Memory in use depends on the call rate. Whether that is only the scratch of calls being answered, or also buffers
+  of replaced blocks that are freed late, was not looked into.

@@ -216,7 +216,7 @@ if [[ $SKIP_BUDGET == 0 ]]; then
       "$DENO" run "${PERMS[@]}" bench/budget.ts --set "$set" --modes gpu --gpu-prep ipir/target/release/gpu_build_prep \
         --out "$RAW/budget-$set-gpu.json" "${BUDGET_ARGS[@]}" || echo "budget step ($set, GPU build) failed or does not fit" >&2
       # The 10M tables and the GPU build do not fit together in this GPU's memory: measure the largest tables that
-      # do, going down the sizes of bench/gpu-build-sets.ts (a size that does not fit fails at its first block).
+      # do, going down the sizes of bench/gpu-build-sets.ts (a size that does not fit fails in its first minutes).
       if [[ $set == 10m ]] && does_not_fit "$RAW/budget-10m-gpu.json"; then
         for smaller in $("$DENO" run bench/gpu-build-sets.ts); do
           echo "== block budget, shapes: $smaller (looking for the largest that fit), blocks built on the GPU"
