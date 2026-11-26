@@ -108,7 +108,9 @@ const machine = {
   loadavgStart: s.loadavg,
   loadavgEnd: sysEnd?.loadavg ?? null,
 };
-const results = { schema: "ipir-benchmark-nvidia/2", meta, backend, machine, compile, gpuCompile, fetch, budget, sysinfoStart: sysStart, sysinfoEnd: sysEnd };
+// Upstream's CUDA kernel against the WebGPU path (`run-all.sh --cuda`, `bench/cuda-compare.ts`): null when not run.
+const cuda = await json("cuda-compare.json");
+const results = { schema: "ipir-benchmark-nvidia/2", meta, backend, machine, compile, gpuCompile, fetch, budget, cuda, sysinfoStart: sysStart, sysinfoEnd: sysEnd };
 await Deno.writeTextFile(outJson, JSON.stringify(results, null, 1));
 
 // Markdown.
@@ -264,6 +266,48 @@ for (const [build, name, b] of [...BUILDS, "gpu"].flatMap((x) => Object.entries(
         // Runs made before the 1 s goal keep every block's time: count from those.
         `${r.overGoal ?? (r.work ?? []).filter((w: any) => w.workMs > 1000).length}/${r.blocks} | ${r.overBudget}/${r.blocks} | ` +
         `${f(r.answerLatencyMs.duringBlockWork.p50)} / ${f(r.answerLatencyMs.duringBlockWork.p99)} ms | ${f(bl?.p50)} / ${f(bl?.p99)} ms | ${r.cancelled ?? 0} of ${r.issued ?? "?"} |`,
+    );
+  }
+  lines.push("");
+}
+if (cuda) {
+  lines.push("## 4. Upstream's CUDA kernel against the WebGPU path: a whole answer", "");
+  lines.push(
+    "The same table and the same 32 requests, answered three ways; every answer is compared with the CPU's, byte for byte. " +
+      "CUDA: upstream's `CudaKernel` does the first pass (the table times the request) on the GPU, one request at a time, and the packing of every column block runs on this host's CPU; the kernel has neither packing nor a call for several requests. " +
+      "WebGPU: both steps on the GPU, the 32 requests in one submission. CPU: `NativeServer::respond` alone. Times in ms, medians.",
+    "",
+  );
+  const shape = (x: any) => `${x.rows} × ${x.cols}`;
+  const why = (x: any) => (x?.doesNotFit ? "does not fit" : `failed${x?.stage ? ` at ${x.stage}` : ""}`);
+  for (const count of ["32", "1"]) {
+    lines.push(`A call of ${count}:`, "");
+    lines.push(
+      "| rows × cols | CUDA first pass: device | CUDA first pass: as the host sees it | packing on the CPU | CUDA path, whole answer | WebGPU, device | WebGPU, whole answer | CPU alone | answers equal the CPU's |",
+      "|---|---|---|---|---|---|---|---|---|",
+    );
+    for (const x of cuda.shapes ?? []) {
+      if (x.error) {
+        lines.push(`| ${shape(x)} | ${x.error} | | | | | | | |`);
+        continue;
+      }
+      const c = x.cuda?.ok ? x.cuda.cuda[count] : null;
+      const cpu = x.cuda?.ok ? x.cuda.cpu[count] : null;
+      const w = x.webgpu?.ok ? x.webgpu.timing?.[count] : null;
+      const equal = [x.cuda?.ok ? "CUDA yes" : null, x.webgpu?.ok ? "WebGPU yes" : x.webgpu?.equal === false && !x.webgpu?.error ? "WebGPU NO" : null].filter(Boolean).join(", ");
+      lines.push(
+        `| ${shape(x)} | ${c ? f(c.kernelMs, 2) : why(x.cuda)} | ${c ? f(c.firstPassMs, 2) : ""} | ${c ? f(c.packMs, 2) : ""} | ${c ? f(c.wallMs.median, 2) : ""} | ` +
+          `${w ? f(w.execMedianMs?.total, 2) : why(x.webgpu)} | ${w ? f(w.wallMs.median, 2) : ""} | ${cpu ? f(cpu.wallMs.median, 2) : ""} | ${equal} |`,
+      );
+    }
+    lines.push("");
+  }
+  lines.push("A changed column block: the CUDA kernel takes a table whole, so the table is uploaded again; WebGPU writes the one block (its cells and its packing matrix, from host memory).", "");
+  lines.push("| rows × cols | table | CUDA: the table again | WebGPU: one block | WebGPU: the whole table, for comparison |", "|---|---|---|---|---|");
+  for (const x of cuda.shapes ?? []) {
+    if (x.error) continue;
+    lines.push(
+      `| ${shape(x)} | ${f(x.tableMiB, 0)} MiB of cells | ${x.cuda?.ok ? f(x.cuda.reuploadMedianMs, 1) : why(x.cuda)} | ${x.webgpu?.ok ? f(x.webgpu.blockUploadMs, 1) : why(x.webgpu)} | ${x.webgpu?.ok ? f(x.webgpu.uploadMs, 0) : ""} |`,
     );
   }
   lines.push("");

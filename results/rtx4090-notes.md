@@ -44,3 +44,18 @@ Two things this machine brought out:
   differs between machines; the GPU build's check hashes its words under the name the CPU reports.
 - `vulkaninfo` is not installed, and the Vulkan loader prints "TU: error ... failed to open device" for Mesa's
   freedreno driver each time a device is opened. Neither matters: the adapter WebGPU opens is the NVIDIA GPU.
+
+## Upstream's CUDA kernel against the WebGPU path (2026-11-26)
+
+`bench/cuda-compare.ts` with CUDA 13.0 (the host's toolkit, driver 580.126.18), bindings `cuda-13`. Its figures are in
+the results file as `cuda`, in the report as step 4 and in the README.
+
+- The figures kept are from a run at 06:25 local time with the host quiet (load average about 1), from a working copy
+  with the same files as commit `8866374`. The run was repeated from that commit a few minutes later while other
+  users were compiling (load average 8 to 16): the device times were the same within 2 %, the packing on the CPU was
+  slower (832 ms against 611 ms for a call of 32 at 14336 × 34816). That repeat is not in the results.
+- `results/rtx4090-2026-11-26-cuda-bench.txt` (upstream's `cuda_bench`) ran during that load: its GPU columns are
+  not affected, its `cpu_wall_ms_per_query` is.
+- 3 GiB of the card were free (another user's process held 20.7 GiB): 32768 × 32768 ran on CUDA (2 GiB of cells) and
+  did not fit on WebGPU, which also keeps the packing matrices on the card (2.6 GiB).
+- Every answer of both paths equals the CPU's, byte for byte, at all five shapes (four on WebGPU).

@@ -13,3 +13,17 @@ rand_chacha = "0.3.1"
 rayon = "1"
 libc = "0.2"
 sha2 = "0.10"
+# Only for `cuda_fetch` (feature `cuda`): upstream's CUDA first-pass kernel.
+simplepir-kernel = { path = "../vendor/ipir-sp/simplepir-kernel", optional = true }
+
+[features]
+# `cuda_fetch`: a whole answer with the first pass on CUDA. Needs the CUDA driver library and NVRTC at run time.
+# Build with `cuda-13` or `cuda-12`, after the CUDA release whose NVRTC library the host has (`libnvrtc.so.13` or
+# `libnvrtc.so.12`); `cuda` alone does not choose the bindings.
+cuda = ["dep:simplepir-kernel", "simplepir-kernel/cuda"]
+cuda-12 = ["cuda", "simplepir-kernel/cuda-12"]
+cuda-13 = ["cuda", "simplepir-kernel/cuda-13"]
+
+[[bin]]
+name = "cuda_fetch"
+required-features = ["cuda"]

@@ -16,7 +16,8 @@
   "denoWebgpuBackend": "vulkan",
   "preflight": null,
   "started": "2026-11-25T20:29:28Z",
-  "seconds": 3060
+  "seconds": 3060,
+  "cuda": true
  },
  "backend": {
   "name": "nvidia",
@@ -27777,6 +27778,584 @@
    },
    "10m": null
   }
+ },
+ "cuda": {
+  "schema": "ipir-benchmark-cuda/1",
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "gpuTotalMiB": 24564,
+  "runs": 9,
+  "note": "cuda: first pass on the GPU with upstream's CudaKernel, one request at a time, packing on the CPU; webgpu: both steps on the GPU; cpu: NativeServer::respond. Every path's answers are compared with the CPU's, byte for byte.",
+  "shapes": [
+   {
+    "rows": 2048,
+    "cols": 2048,
+    "colBlocks": 1,
+    "tableMiB": 8,
+    "webgpuResidentMiB": 40,
+    "gpuUsedMiBBefore": 21466,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 2048,
+     "cols": 2048,
+     "cells": 4194304,
+     "colBlocks": 1,
+     "tableBytes": 8388608,
+     "matrixStorage": "packed27",
+     "rayonThreads": 16,
+     "buildMs": 238.43,
+     "initMs": 116.61,
+     "uploadMs": 5.24,
+     "reuploadMedianMs": 0.96,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 0.309,
+        "median": 0.319,
+        "max": 0.397
+       },
+       "kernelMs": 0.013,
+       "firstPassMs": 0.037,
+       "deserializeMs": 0.117,
+       "packMs": 0.144,
+       "serializeMs": 0.03
+      },
+      "32": {
+       "wallMs": {
+        "min": 10.143,
+        "median": 10.52,
+        "max": 10.917
+       },
+       "kernelMs": 0.41,
+       "firstPassMs": 1.084,
+       "deserializeMs": 3.652,
+       "packMs": 4.737,
+       "serializeMs": 1.008
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 0.447,
+        "median": 0.468,
+        "max": 0.573
+       },
+       "firstPassMs": 0.096,
+       "deserializeMs": 0.114,
+       "packMs": 0.219,
+       "serializeMs": 0.028
+      },
+      "32": {
+       "wallMs": {
+        "min": 14.467,
+        "median": 14.74,
+        "max": 15.152
+       },
+       "firstPassMs": 2.659,
+       "deserializeMs": 3.992,
+       "packMs": 6.933,
+       "serializeMs": 1.072
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 2048,
+     "cols": 2048,
+     "requests": 32,
+     "answerBytes": 182400,
+     "gpu": "4318 9860 NVIDIA GeForce RTX 4090",
+     "firstDiff": null,
+     "uploadMs": 28.43661000000003,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 11.594720999999993,
+        "median": 12.418103999999971,
+        "max": 13.062003000000004
+       },
+       "execMedianMs": {
+        "unpack": 0.008192,
+        "scan": 0.052032,
+        "pack": 0.050368,
+        "finish": 0.066976,
+        "total": 0.177824
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 12.25701399999997,
+        "median": 12.729673999999989,
+        "max": 13.000157999999942
+       },
+       "execMedianMs": {
+        "unpack": 0.011264,
+        "scan": 0.08576,
+        "pack": 0.189184,
+        "finish": 0.044768,
+        "total": 0.331168
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 20.74576400000001
+    }
+   },
+   {
+    "rows": 12288,
+    "cols": 16384,
+    "colBlocks": 8,
+    "tableMiB": 384,
+    "webgpuResidentMiB": 640,
+    "gpuUsedMiBBefore": 21466,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 12288,
+     "cols": 16384,
+     "cells": 201326592,
+     "colBlocks": 8,
+     "tableBytes": 402653184,
+     "matrixStorage": "packed27",
+     "rayonThreads": 16,
+     "buildMs": 2425.03,
+     "initMs": 114.24,
+     "uploadMs": 53.29,
+     "reuploadMedianMs": 48.02,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 9.387,
+        "median": 9.439,
+        "max": 9.579
+       },
+       "kernelMs": 0.435,
+       "firstPassMs": 0.497,
+       "deserializeMs": 0.315,
+       "packMs": 8.448,
+       "serializeMs": 0.179
+      },
+      "32": {
+       "wallMs": {
+        "min": 301.82,
+        "median": 302.901,
+        "max": 309.343
+       },
+       "kernelMs": 13.91,
+       "firstPassMs": 15.88,
+       "deserializeMs": 10.029,
+       "packMs": 271.341,
+       "serializeMs": 5.723
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 24.864,
+        "median": 24.909,
+        "max": 24.985
+       },
+       "firstPassMs": 15.361,
+       "deserializeMs": 0.351,
+       "packMs": 9.021,
+       "serializeMs": 0.177
+      },
+      "32": {
+       "wallMs": {
+        "min": 796.985,
+        "median": 797.996,
+        "max": 813.476
+       },
+       "firstPassMs": 490.943,
+       "deserializeMs": 11.504,
+       "packMs": 289.779,
+       "serializeMs": 5.862
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 12288,
+     "cols": 16384,
+     "requests": 32,
+     "answerBytes": 1443968,
+     "gpu": "4318 9860 NVIDIA GeForce RTX 4090",
+     "firstDiff": null,
+     "uploadMs": 145.795392,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 12.738751000000093,
+        "median": 13.192545999999993,
+        "max": 13.608558999999786
+       },
+       "execMedianMs": {
+        "unpack": 0.009216,
+        "scan": 0.445696,
+        "pack": 0.29424,
+        "finish": 0.210112,
+        "total": 0.9596480000000001
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 17.6382500000002,
+        "median": 18.98848299999986,
+        "max": 19.90700300000003
+       },
+       "execMedianMs": {
+        "unpack": 0.016896,
+        "scan": 3.176032,
+        "pack": 1.597408,
+        "finish": 0.060544,
+        "total": 4.851072
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 27.718664000000217
+    }
+   },
+   {
+    "rows": 6144,
+    "cols": 28672,
+    "colBlocks": 14,
+    "tableMiB": 336,
+    "webgpuResidentMiB": 784,
+    "gpuUsedMiBBefore": 21466,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 6144,
+     "cols": 28672,
+     "cells": 176160768,
+     "colBlocks": 14,
+     "tableBytes": 352321536,
+     "matrixStorage": "packed27",
+     "rayonThreads": 16,
+     "buildMs": 3598.53,
+     "initMs": 113.58,
+     "uploadMs": 48.79,
+     "reuploadMedianMs": 41.97,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 16.37,
+        "median": 16.429,
+        "max": 16.472
+       },
+       "kernelMs": 0.379,
+       "firstPassMs": 0.462,
+       "deserializeMs": 0.2,
+       "packMs": 15.511,
+       "serializeMs": 0.253
+      },
+      "32": {
+       "wallMs": {
+        "min": 525.753,
+        "median": 526.508,
+        "max": 535.816
+       },
+       "kernelMs": 12.119,
+       "firstPassMs": 14.721,
+       "deserializeMs": 6.345,
+       "packMs": 497.188,
+       "serializeMs": 8.171
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 29.851,
+        "median": 29.893,
+        "max": 31.545
+       },
+       "firstPassMs": 13.503,
+       "deserializeMs": 0.223,
+       "packMs": 15.902,
+       "serializeMs": 0.266
+      },
+      "32": {
+       "wallMs": {
+        "min": 956.319,
+        "median": 959.192,
+        "max": 1008.09
+       },
+       "firstPassMs": 433.233,
+       "deserializeMs": 7.133,
+       "packMs": 509.735,
+       "serializeMs": 8.62
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 6144,
+     "cols": 28672,
+     "requests": 32,
+     "answerBytes": 2525312,
+     "gpu": "4318 9860 NVIDIA GeForce RTX 4090",
+     "firstDiff": null,
+     "uploadMs": 160.66924700000004,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 13.137072999999873,
+        "median": 13.708165999999892,
+        "max": 14.37707999999975
+       },
+       "execMedianMs": {
+        "unpack": 0.009216,
+        "scan": 0.391744,
+        "pack": 0.50416,
+        "finish": 0.129088,
+        "total": 1.0347520000000001
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 18.647919,
+        "median": 20.183468000000175,
+        "max": 21.690482000000202
+       },
+       "execMedianMs": {
+        "unpack": 0.014336,
+        "scan": 2.961472,
+        "pack": 2.657632,
+        "finish": 0.059808,
+        "total": 5.69248
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 22.15882399999964
+    }
+   },
+   {
+    "rows": 14336,
+    "cols": 34816,
+    "colBlocks": 17,
+    "tableMiB": 952,
+    "webgpuResidentMiB": 1496,
+    "gpuUsedMiBBefore": 21466,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 14336,
+     "cols": 34816,
+     "cells": 499122176,
+     "colBlocks": 17,
+     "tableBytes": 998244352,
+     "matrixStorage": "packed27",
+     "rayonThreads": 16,
+     "buildMs": 5340.68,
+     "initMs": 120.71,
+     "uploadMs": 128.62,
+     "reuploadMedianMs": 119.04,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 20.789,
+        "median": 20.834,
+        "max": 20.92
+       },
+       "kernelMs": 1.06,
+       "firstPassMs": 1.159,
+       "deserializeMs": 0.351,
+       "packMs": 19.026,
+       "serializeMs": 0.304
+      },
+      "32": {
+       "wallMs": {
+        "min": 668.254,
+        "median": 669.115,
+        "max": 675.383
+       },
+       "kernelMs": 33.954,
+       "firstPassMs": 37.037,
+       "deserializeMs": 11.281,
+       "packMs": 610.599,
+       "serializeMs": 10.164
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 58.559,
+        "median": 58.765,
+        "max": 58.936
+       },
+       "firstPassMs": 38.538,
+       "deserializeMs": 0.413,
+       "packMs": 19.506,
+       "serializeMs": 0.309
+      },
+      "32": {
+       "wallMs": {
+        "min": 1884.376,
+        "median": 1891.959,
+        "max": 1902.735
+       },
+       "firstPassMs": 1240.142,
+       "deserializeMs": 13.129,
+       "packMs": 628.327,
+       "serializeMs": 9.998
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 14336,
+     "cols": 34816,
+     "requests": 32,
+     "answerBytes": 3065984,
+     "gpu": "4318 9860 NVIDIA GeForce RTX 4090",
+     "firstDiff": null,
+     "uploadMs": 285.77496900000006,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 13.060158999999658,
+        "median": 14.028842000000168,
+        "max": 14.398519999999735
+       },
+       "execMedianMs": {
+        "unpack": 0.009216,
+        "scan": 1.181856,
+        "pack": 0.610688,
+        "finish": 0.120992,
+        "total": 1.9232960000000001
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 25.072607999999946,
+        "median": 27.446085999999923,
+        "max": 28.432131000000027
+       },
+       "execMedianMs": {
+        "unpack": 0.0256,
+        "scan": 7.740032,
+        "pack": 3.343968,
+        "finish": 0.158912,
+        "total": 11.279264
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 32.21601399999963
+    }
+   },
+   {
+    "rows": 32768,
+    "cols": 32768,
+    "colBlocks": 16,
+    "tableMiB": 2048,
+    "webgpuResidentMiB": 2560,
+    "gpuUsedMiBBefore": 21466,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 32768,
+     "cols": 32768,
+     "cells": 1073741824,
+     "colBlocks": 16,
+     "tableBytes": 2147483648,
+     "matrixStorage": "packed27",
+     "rayonThreads": 16,
+     "buildMs": 8359.15,
+     "initMs": 112.04,
+     "uploadMs": 261.88,
+     "reuploadMedianMs": 269.27,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 21.831,
+        "median": 21.974,
+        "max": 23.565
+       },
+       "kernelMs": 2.269,
+       "firstPassMs": 2.392,
+       "deserializeMs": 0.715,
+       "packMs": 18.533,
+       "serializeMs": 0.356
+      },
+      "32": {
+       "wallMs": {
+        "min": 692.56,
+        "median": 699.185,
+        "max": 703.12
+       },
+       "kernelMs": 72.578,
+       "firstPassMs": 76.56,
+       "deserializeMs": 22.643,
+       "packMs": 588.616,
+       "serializeMs": 11.391
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 102.609,
+        "median": 103.023,
+        "max": 105.74
+       },
+       "firstPassMs": 83.375,
+       "deserializeMs": 0.828,
+       "packMs": 18.359,
+       "serializeMs": 0.354
+      },
+      "32": {
+       "wallMs": {
+        "min": 3292.997,
+        "median": 3302.987,
+        "max": 3405.414
+       },
+       "firstPassMs": 2675.342,
+       "deserializeMs": 26.709,
+       "packMs": 589.246,
+       "serializeMs": 11.538
+      }
+     }
+    },
+    "webgpu": {
+     "ok": false,
+     "equal": false,
+     "rows": 32768,
+     "cols": 32768,
+     "stage": "answering on the GPU",
+     "error": "validation error occurred",
+     "doesNotFit": true
+    }
+   }
+  ]
  },
  "sysinfoStart": {
   "date": "2026-11-25T20:29:27.795Z",

@@ -4,7 +4,7 @@
  "date": "2026-11-25",
  "source": {
   "repo": "midnight-experiments/ipir-benchmark-nvidia",
-  "commit": "8ebc83be1aeacd4401710726a86920ac3bd289b7",
+  "commit": "e9b2979e7996472137f2f743f39551d09c2c71f2",
   "results": [
    "results/rtx4090-2026-11-25-nvidia.json"
   ]
@@ -678,5 +678,6 @@
     "blocks": 30
    }
   ]
- }
+ },
+ "budgetLargest": null
 }

@@ -149,6 +149,24 @@ impl CudaKernel {
     ) -> Result<f32, KernelError> {
         self.evaluate(rlwe, db, rows, cols, query, out, true)
     }
+    /// As `try_multiply_power_of_two`, returning the synchronized device kernel time in milliseconds (patch 0004,
+    /// for the benchmark's whole-answer timing). Not part of the API.
+    #[doc(hidden)]
+    pub fn multiply_power_of_two_timed(
+        &self,
+        q: u64,
+        db: &[u16],
+        rows: usize,
+        cols: usize,
+        query: &[u64],
+        out: &mut [u64],
+    ) -> Result<f32, KernelError> {
+        if !q.is_power_of_two() || q < 2 || rows == 0 || cols == 0 || query.iter().any(|&x| x >= q)
+        {
+            return Err(error("invalid native modulus/query"));
+        }
+        self.evaluate_modulus(q, db, rows, cols, query, out, true)
+    }
     #[allow(clippy::too_many_arguments)]
     fn evaluate(
         &self,

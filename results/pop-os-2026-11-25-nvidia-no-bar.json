@@ -16,7 +16,8 @@
   "denoWebgpuBackend": "vulkan",
   "preflight": null,
   "started": "2026-11-25T20:47:27Z",
-  "seconds": 5961
+  "seconds": 5961,
+  "cuda": true
  },
  "backend": {
   "name": "nvidia-no-bar",
@@ -53689,6 +53690,620 @@
     ]
    }
   }
+ },
+ "cuda": {
+  "schema": "ipir-benchmark-cuda/1",
+  "gpu": "NVIDIA GeForce RTX 2060",
+  "gpuTotalMiB": 6144,
+  "runs": 9,
+  "note": "cuda: first pass on the GPU with upstream's CudaKernel, one request at a time, packing on the CPU; webgpu: both steps on the GPU; cpu: NativeServer::respond. Every path's answers are compared with the CPU's, byte for byte.",
+  "shapes": [
+   {
+    "rows": 2048,
+    "cols": 2048,
+    "colBlocks": 1,
+    "tableMiB": 8,
+    "webgpuResidentMiB": 40,
+    "gpuUsedMiBBefore": 526,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 2048,
+     "cols": 2048,
+     "cells": 4194304,
+     "colBlocks": 1,
+     "tableBytes": 8388608,
+     "matrixStorage": "i32",
+     "rayonThreads": 16,
+     "buildMs": 399.28,
+     "initMs": 297.86,
+     "uploadMs": 9.52,
+     "reuploadMedianMs": 0.95,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 1.447,
+        "median": 1.526,
+        "max": 1.733
+       },
+       "kernelMs": 0.089,
+       "firstPassMs": 0.139,
+       "deserializeMs": 0.202,
+       "packMs": 1.125,
+       "serializeMs": 0.048
+      },
+      "32": {
+       "wallMs": {
+        "min": 51.518,
+        "median": 52.814,
+        "max": 59.197
+       },
+       "kernelMs": 2.876,
+       "firstPassMs": 4.629,
+       "deserializeMs": 6.877,
+       "packMs": 39.78,
+       "serializeMs": 1.601
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 1.727,
+        "median": 1.786,
+        "max": 2.166
+       },
+       "firstPassMs": 0.366,
+       "deserializeMs": 0.217,
+       "packMs": 1.147,
+       "serializeMs": 0.048
+      },
+      "32": {
+       "wallMs": {
+        "min": 58.428,
+        "median": 60.481,
+        "max": 61.256
+       },
+       "firstPassMs": 12.893,
+       "deserializeMs": 7.051,
+       "packMs": 38.51,
+       "serializeMs": 1.591
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 2048,
+     "cols": 2048,
+     "requests": 32,
+     "answerBytes": 182400,
+     "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+     "firstDiff": null,
+     "uploadMs": 45.21277500000002,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 12.661293,
+        "median": 12.884453000000008,
+        "max": 16.547024999999962
+       },
+       "execMedianMs": {
+        "unpack": 0.013568,
+        "scan": 0.127488,
+        "pack": 0.156416,
+        "finish": 0.105824,
+        "total": 0.402816
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 15.319118000000003,
+        "median": 15.769577000000027,
+        "max": 16.851674000000003
+       },
+       "execMedianMs": {
+        "unpack": 0.03216,
+        "scan": 0.54656,
+        "pack": 1.379776,
+        "finish": 0.213024,
+        "total": 2.171328
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 20.19425799999999
+    }
+   },
+   {
+    "rows": 12288,
+    "cols": 16384,
+    "colBlocks": 8,
+    "tableMiB": 384,
+    "webgpuResidentMiB": 640,
+    "gpuUsedMiBBefore": 526,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 12288,
+     "cols": 16384,
+     "cells": 201326592,
+     "colBlocks": 8,
+     "tableBytes": 402653184,
+     "matrixStorage": "i32",
+     "rayonThreads": 16,
+     "buildMs": 3840.81,
+     "initMs": 329.2,
+     "uploadMs": 46.02,
+     "reuploadMedianMs": 40.75,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 11.654,
+        "median": 11.915,
+        "max": 13.475
+       },
+       "kernelMs": 2.311,
+       "firstPassMs": 2.406,
+       "deserializeMs": 0.496,
+       "packMs": 8.742,
+       "serializeMs": 0.243
+      },
+      "32": {
+       "wallMs": {
+        "min": 376.298,
+        "median": 384.296,
+        "max": 395.594
+       },
+       "kernelMs": 73.958,
+       "firstPassMs": 77.023,
+       "deserializeMs": 15.982,
+       "packMs": 283.059,
+       "serializeMs": 7.766
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 21.928,
+        "median": 22.617,
+        "max": 25.182
+       },
+       "firstPassMs": 13.134,
+       "deserializeMs": 0.499,
+       "packMs": 8.806,
+       "serializeMs": 0.262
+      },
+      "32": {
+       "wallMs": {
+        "min": 705.032,
+        "median": 741.899,
+        "max": 758.051
+       },
+       "firstPassMs": 429.301,
+       "deserializeMs": 16.004,
+       "packMs": 287.854,
+       "serializeMs": 7.931
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 12288,
+     "cols": 16384,
+     "requests": 32,
+     "answerBytes": 1443968,
+     "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+     "firstDiff": null,
+     "uploadMs": 184.98979299999974,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 14.736269999999877,
+        "median": 15.056129000000055,
+        "max": 15.353947999999946
+       },
+       "execMedianMs": {
+        "unpack": 0.014176,
+        "scan": 1.30032,
+        "pack": 0.901664,
+        "finish": 0.436448,
+        "total": 2.652736
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 43.45067900000004,
+        "median": 46.64955200000031,
+        "max": 52.14884099999972
+       },
+       "execMedianMs": {
+        "unpack": 0.062656,
+        "scan": 18.8864,
+        "pack": 10.4512,
+        "finish": 0.736128,
+        "total": 30.131424
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 34.22706900000003
+    }
+   },
+   {
+    "rows": 6144,
+    "cols": 28672,
+    "colBlocks": 14,
+    "tableMiB": 336,
+    "webgpuResidentMiB": 784,
+    "gpuUsedMiBBefore": 526,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 6144,
+     "cols": 28672,
+     "cells": 176160768,
+     "colBlocks": 14,
+     "tableBytes": 352321536,
+     "matrixStorage": "i32",
+     "rayonThreads": 16,
+     "buildMs": 5873.63,
+     "initMs": 560.01,
+     "uploadMs": 40.96,
+     "reuploadMedianMs": 36,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 17.816,
+        "median": 18.313,
+        "max": 19.603
+       },
+       "kernelMs": 2.19,
+       "firstPassMs": 2.32,
+       "deserializeMs": 0.322,
+       "packMs": 15.3,
+       "serializeMs": 0.374
+      },
+      "32": {
+       "wallMs": {
+        "min": 572.196,
+        "median": 585.247,
+        "max": 602.518
+       },
+       "kernelMs": 70.076,
+       "firstPassMs": 74.033,
+       "deserializeMs": 10.369,
+       "packMs": 488.907,
+       "serializeMs": 11.418
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 26.618,
+        "median": 27.509,
+        "max": 29.515
+       },
+       "firstPassMs": 11.399,
+       "deserializeMs": 0.322,
+       "packMs": 15.327,
+       "serializeMs": 0.372
+      },
+      "32": {
+       "wallMs": {
+        "min": 864.845,
+        "median": 888.341,
+        "max": 902.184
+       },
+       "firstPassMs": 374.3,
+       "deserializeMs": 10.621,
+       "packMs": 492.621,
+       "serializeMs": 11.775
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 6144,
+     "cols": 28672,
+     "requests": 32,
+     "answerBytes": 2525312,
+     "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+     "firstDiff": null,
+     "uploadMs": 215.60614899999973,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 15.121738000000278,
+        "median": 15.708896999999979,
+        "max": 16.075636999999915
+       },
+       "execMedianMs": {
+        "unpack": 0.01408,
+        "scan": 1.159552,
+        "pack": 1.482336,
+        "finish": 0.284608,
+        "total": 2.942272
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 49.12034700000004,
+        "median": 54.00614599999972,
+        "max": 58.35830799999985
+       },
+       "execMedianMs": {
+        "unpack": 0.038144,
+        "scan": 13.748576,
+        "pack": 18.202656,
+        "finish": 0.735072,
+        "total": 32.896032
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 22.25925300000017
+    }
+   },
+   {
+    "rows": 14336,
+    "cols": 34816,
+    "colBlocks": 17,
+    "tableMiB": 952,
+    "webgpuResidentMiB": 1496,
+    "gpuUsedMiBBefore": 526,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 14336,
+     "cols": 34816,
+     "cells": 499122176,
+     "colBlocks": 17,
+     "tableBytes": 998244352,
+     "matrixStorage": "i32",
+     "rayonThreads": 16,
+     "buildMs": 8377.39,
+     "initMs": 412.43,
+     "uploadMs": 106.65,
+     "reuploadMedianMs": 98.99,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 24.296,
+        "median": 24.68,
+        "max": 26.464
+       },
+       "kernelMs": 5.141,
+       "firstPassMs": 5.289,
+       "deserializeMs": 0.54,
+       "packMs": 18.386,
+       "serializeMs": 0.47
+      },
+      "32": {
+       "wallMs": {
+        "min": 817.403,
+        "median": 828.182,
+        "max": 857.932
+       },
+       "kernelMs": 198.143,
+       "firstPassMs": 202.887,
+       "deserializeMs": 17.266,
+       "packMs": 593.782,
+       "serializeMs": 14.602
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 50.57,
+        "median": 52.665,
+        "max": 54.058
+       },
+       "firstPassMs": 32.812,
+       "deserializeMs": 0.558,
+       "packMs": 18.498,
+       "serializeMs": 0.475
+      },
+      "32": {
+       "wallMs": {
+        "min": 1631.71,
+        "median": 1674.092,
+        "max": 1747.441
+       },
+       "firstPassMs": 1040.269,
+       "deserializeMs": 18.311,
+       "packMs": 600.085,
+       "serializeMs": 15.478
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 14336,
+     "cols": 34816,
+     "requests": 32,
+     "answerBytes": 3065984,
+     "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+     "firstDiff": null,
+     "uploadMs": 354.0794699999997,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 17.215393999999833,
+        "median": 17.871793000000253,
+        "max": 18.410321999999724
+       },
+       "execMedianMs": {
+        "unpack": 0.012288,
+        "scan": 3.1584,
+        "pack": 1.804288,
+        "finish": 0.268928,
+        "total": 5.244704
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 80.53291199999967,
+        "median": 83.04806600000029,
+        "max": 89.68567300000086
+       },
+       "execMedianMs": {
+        "unpack": 0.061344,
+        "scan": 38.458656,
+        "pack": 23.252608,
+        "finish": 1.784736,
+        "total": 63.589888
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 36.23306500000035
+    }
+   },
+   {
+    "rows": 32768,
+    "cols": 32768,
+    "colBlocks": 16,
+    "tableMiB": 2048,
+    "webgpuResidentMiB": 2560,
+    "gpuUsedMiBBefore": 526,
+    "cuda": {
+     "ok": true,
+     "backend": "cuda",
+     "rows": 32768,
+     "cols": 32768,
+     "cells": 1073741824,
+     "colBlocks": 16,
+     "tableBytes": 2147483648,
+     "matrixStorage": "i32",
+     "rayonThreads": 16,
+     "buildMs": 12722.28,
+     "initMs": 276.65,
+     "uploadMs": 236.02,
+     "reuploadMedianMs": 211.5,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 27.688,
+        "median": 27.837,
+        "max": 28.898
+       },
+       "kernelMs": 9.085,
+       "firstPassMs": 9.221,
+       "deserializeMs": 1.042,
+       "packMs": 17.085,
+       "serializeMs": 0.48
+      },
+      "32": {
+       "wallMs": {
+        "min": 976.788,
+        "median": 985.994,
+        "max": 1018.971
+       },
+       "kernelMs": 367.803,
+       "firstPassMs": 372.602,
+       "deserializeMs": 34.597,
+       "packMs": 562.788,
+       "serializeMs": 15.608
+      }
+     },
+     "cpu": {
+      "1": {
+       "wallMs": {
+        "min": 86.147,
+        "median": 87.461,
+        "max": 98.446
+       },
+       "firstPassMs": 68.902,
+       "deserializeMs": 1.068,
+       "packMs": 17.065,
+       "serializeMs": 0.488
+      },
+      "32": {
+       "wallMs": {
+        "min": 2795.042,
+        "median": 2833.923,
+        "max": 2868.593
+       },
+       "firstPassMs": 2224.584,
+       "deserializeMs": 35.205,
+       "packMs": 556.462,
+       "serializeMs": 15.86
+      }
+     }
+    },
+    "webgpu": {
+     "ok": true,
+     "equal": true,
+     "rows": 32768,
+     "cols": 32768,
+     "requests": 32,
+     "answerBytes": 2885760,
+     "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+     "firstDiff": null,
+     "uploadMs": 880.2842089999995,
+     "runs": 9,
+     "timing": {
+      "1": {
+       "wallMs": {
+        "min": 20.256226999999853,
+        "median": 21.534615000000485,
+        "max": 22.00342400000045
+       },
+       "execMedianMs": {
+        "unpack": 0.012288,
+        "scan": 6.924992,
+        "pack": 1.737888,
+        "finish": 0.16656,
+        "total": 8.85248
+       },
+       "execMeasured": 9
+      },
+      "32": {
+       "wallMs": {
+        "min": 140.53408599999966,
+        "median": 147.3841620000003,
+        "max": 150.24533599999995
+       },
+       "execMedianMs": {
+        "unpack": 0.112896,
+        "scan": 84.596928,
+        "pack": 21.908256,
+        "finish": 3.514944,
+        "total": 110.04899200000001
+       },
+       "execMeasured": 9
+      }
+     },
+     "blockUploadMs": 54.91114599999855
+    }
+   }
+  ]
  },
  "sysinfoStart": {
   "date": "2026-11-25T20:47:26.720Z",
