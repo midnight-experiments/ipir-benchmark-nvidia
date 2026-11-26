@@ -52669,6 +52669,1024 @@
     "stage": "gpu at 2 calls/s",
     "error": "uploading a block: GPU out of memory: not enough memory left",
     "doesNotFit": true
+   },
+   "largest": {
+    "set": "8m",
+    "outputs": 8000000,
+    "tables": [
+     {
+      "name": "read",
+      "rows": 12288,
+      "cols": 32768
+     },
+     {
+      "name": "nullifier",
+      "rows": 8192,
+      "cols": 30720
+     },
+     {
+      "name": "shielded groups",
+      "rows": 8192,
+      "cols": 16384
+     },
+     {
+      "name": "Dust groups",
+      "rows": 6144,
+      "cols": 28672
+     },
+     {
+      "name": "first coins",
+      "rows": 2048,
+      "cols": 2048
+     },
+     {
+      "name": "generation groups",
+      "rows": 2048,
+      "cols": 4096
+     }
+    ],
+    "rates": [
+     2,
+     5,
+     10
+    ],
+    "modes": [
+     "gpu"
+    ],
+    "blocks": 30,
+    "intervalMs": 6000,
+    "baselineS": 20,
+    "budgetMs": 3000,
+    "goalMs": 1000,
+    "residentBytes": 3833593856,
+    "answer": "gpu",
+    "note": "compile recomputes each changed block's whole hint columns: an upper bound for the hint updates of new records, which are not built yet",
+    "gpu": "4318 7944 NVIDIA GeForce RTX 2060",
+    "gpuBuild": {
+     "setupMs": 199.15449700000318,
+     "scratchBytes": 774062256,
+     "cellsBytes": 159383552
+    },
+    "ok": true,
+    "runs": [
+     {
+      "rate": 2,
+      "mode": "none",
+      "issued": 41,
+      "calls": 41,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 41,
+       "min": 14.75,
+       "p50": 51.719,
+       "p90": 287.813,
+       "p99": 335.259,
+       "max": 335.259
+      }
+     },
+     {
+      "rate": 2,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 214.256,
+       "p50": 263.26,
+       "p90": 287.22,
+       "p99": 303.624,
+       "max": 303.624
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 136.769,
+       "p50": 164.248,
+       "p90": 187.017,
+       "p99": 220.289,
+       "max": 220.289
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 77.084,
+       "p50": 80.574,
+       "p90": 121.287,
+       "p99": 124.636,
+       "max": 124.636
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 354,
+      "calls": 354,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 354,
+        "min": 14.667,
+        "p50": 48.068,
+        "p90": 199.135,
+        "p99": 482.022,
+        "max": 493.645
+       },
+       "duringBlockWork": {
+        "n": 43,
+        "min": 55.172,
+        "p50": 341.751,
+        "p90": 475.203,
+        "p99": 493.645,
+        "max": 493.645
+       },
+       "outsideBlockWork": {
+        "n": 311,
+        "min": 14.667,
+        "p50": 41.461,
+        "p90": 150.544,
+        "p99": 258.301,
+        "max": 321.859
+       }
+      },
+      "work": [
+       {
+        "compileMs": 182.71694299999945,
+        "uploadMs": 80.54313900000125,
+        "workMs": 263.2600820000007,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 142.69831800000247,
+        "uploadMs": 80.02474999999686,
+        "workMs": 222.72306799999933,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 137.17203699999664,
+        "uploadMs": 77.08403500000713,
+        "workMs": 214.25607200000377,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.90472299999965,
+        "uploadMs": 77.79164399999718,
+        "workMs": 241.69636699999683,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 178.82429899999988,
+        "uploadMs": 80.63277900000685,
+        "workMs": 259.45707800000673,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 187.0167769999971,
+        "uploadMs": 82.42127599999367,
+        "workMs": 269.43805299999076,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.2478129999945,
+        "uploadMs": 113.78780499999993,
+        "workMs": 278.03561799999443,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 220.28938200000266,
+        "uploadMs": 79.95526999999129,
+        "workMs": 300.24465199999395,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 147.8312089999963,
+        "uploadMs": 122.76864100000239,
+        "workMs": 270.5998499999987,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.48257300000114,
+        "uploadMs": 79.27394099999219,
+        "workMs": 243.75651399999333,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.43002299999353,
+        "uploadMs": 79.6865700000053,
+        "workMs": 243.11659299999883,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.52629100000195,
+        "uploadMs": 123.79237899999134,
+        "workMs": 289.3186699999933,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 162.58394599999883,
+        "uploadMs": 124.63617700000759,
+        "workMs": 287.2201230000064,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.44993500001146,
+        "uploadMs": 114.10169499999029,
+        "workMs": 277.55163000000175,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 147.92612000001827,
+        "uploadMs": 117.54900899998029,
+        "workMs": 265.47512899999856,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.5327110000071,
+        "uploadMs": 78.27120300001116,
+        "workMs": 243.80391400001827,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 167.6120280000032,
+        "uploadMs": 79.31603099999484,
+        "workMs": 246.92805899999803,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.71985299998778,
+        "uploadMs": 116.05956100000185,
+        "workMs": 280.77941399998963,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.16626099997666,
+        "uploadMs": 119.0637970000098,
+        "workMs": 284.23005799998646,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 138.2287350000115,
+        "uploadMs": 78.13753299997188,
+        "workMs": 216.3662679999834,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 136.76888799999142,
+        "uploadMs": 78.22368399999687,
+        "workMs": 214.9925719999883,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 165.3021520000184,
+        "uploadMs": 80.57361900000251,
+        "workMs": 245.8757710000209,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.05472300000838,
+        "uploadMs": 79.91451000000234,
+        "workMs": 243.96923300001072,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.43097399998805,
+        "uploadMs": 111.31669899998815,
+        "workMs": 274.7476729999762,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.17339300000458,
+        "uploadMs": 121.28718400001526,
+        "workMs": 285.46057700001984,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 210.56569799999124,
+        "uploadMs": 93.0582080000022,
+        "workMs": 303.62390599999344,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 189.60134200000903,
+        "uploadMs": 92.14622999998392,
+        "workMs": 281.74757199999294,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.89535199999227,
+        "uploadMs": 79.47818100001314,
+        "workMs": 244.3735330000054,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 163.34932599999593,
+        "uploadMs": 79.03290099999867,
+        "workMs": 242.3822269999946,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 164.55395199998748,
+        "uploadMs": 119.57819600001676,
+        "workMs": 284.13214800000424,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 5,
+      "mode": "none",
+      "issued": 101,
+      "calls": 101,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 101,
+       "min": 15.443,
+       "p50": 57.669,
+       "p90": 101.213,
+       "p99": 119.943,
+       "max": 127.214
+      }
+     },
+     {
+      "rate": 5,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 278.554,
+       "p50": 304.96,
+       "p90": 345.912,
+       "p99": 358.733,
+       "max": 358.733
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 192.031,
+       "p50": 211.782,
+       "p90": 237.425,
+       "p99": 250.377,
+       "max": 250.377
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 86.522,
+       "p50": 93.489,
+       "p90": 113.691,
+       "p99": 117.575,
+       "max": 117.575
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 883,
+      "calls": 883,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 883,
+        "min": 14.415,
+        "p50": 47.337,
+        "p90": 103.644,
+        "p99": 317.877,
+        "max": 358.563
+       },
+       "duringBlockWork": {
+        "n": 71,
+        "min": 33.982,
+        "p50": 130.201,
+        "p90": 320.585,
+        "p99": 358.563,
+        "max": 358.563
+       },
+       "outsideBlockWork": {
+        "n": 812,
+        "min": 14.415,
+        "p50": 46.519,
+        "p90": 90.468,
+        "p99": 119.879,
+        "max": 127.327
+       }
+      },
+      "work": [
+       {
+        "compileMs": 242.0434360000072,
+        "uploadMs": 115.26576300000306,
+        "workMs": 357.30919900001027,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 211.78155600000173,
+        "uploadMs": 92.98286800002097,
+        "workMs": 304.7644240000227,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 193.2250359999598,
+        "uploadMs": 90.98792200000025,
+        "workMs": 284.21295799996005,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 206.55023499997333,
+        "uploadMs": 92.61896900000283,
+        "workMs": 299.16920399997616,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 221.20400099997642,
+        "uploadMs": 111.39667899999768,
+        "workMs": 332.6006799999741,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 250.37735399999656,
+        "uploadMs": 103.75385099998675,
+        "workMs": 354.1312049999833,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 246.8992089999956,
+        "uploadMs": 111.83371899998747,
+        "workMs": 358.7329279999831,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 194.83223300002282,
+        "uploadMs": 91.61797099997057,
+        "workMs": 286.4502039999934,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 206.6018439999898,
+        "uploadMs": 91.84265100001357,
+        "workMs": 298.44449500000337,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 221.57769999996526,
+        "uploadMs": 112.75935700000264,
+        "workMs": 334.3370569999679,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 235.7411659999634,
+        "uploadMs": 105.77342600002885,
+        "workMs": 341.51459199999226,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 215.83818800002337,
+        "uploadMs": 113.69119499996305,
+        "workMs": 329.5293829999864,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 195.7403190000332,
+        "uploadMs": 94.25584399997024,
+        "workMs": 289.99616300000343,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 203.10841599997366,
+        "uploadMs": 89.9035520000034,
+        "workMs": 293.01196799997706,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 208.0026599999983,
+        "uploadMs": 91.19673899997724,
+        "workMs": 299.19939899997553,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 237.4246539999731,
+        "uploadMs": 106.58315600000788,
+        "workMs": 344.00780999998096,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 212.65302299999166,
+        "uploadMs": 93.37969599995995,
+        "workMs": 306.0327189999516,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 192.03110399999423,
+        "uploadMs": 86.52246700000251,
+        "workMs": 278.55357099999674,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 213.95154099998763,
+        "uploadMs": 102.60989199997857,
+        "workMs": 316.5614329999662,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 215.48632800002815,
+        "uploadMs": 112.99897600000259,
+        "workMs": 328.48530400003074,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 224.20227499998873,
+        "uploadMs": 107.27452400000766,
+        "workMs": 331.4767989999964,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 208.2768100000103,
+        "uploadMs": 86.72925600002054,
+        "workMs": 295.00606600003084,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 194.94870900001843,
+        "uploadMs": 88.32713400002103,
+        "workMs": 283.27584300003946,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 211.19597599998815,
+        "uploadMs": 88.97352200001478,
+        "workMs": 300.16949800000293,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 229.7190459999838,
+        "uploadMs": 115.71988200000487,
+        "workMs": 345.43892799998866,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 224.73872399999527,
+        "uploadMs": 109.97037100000307,
+        "workMs": 334.70909499999834,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 207.67073900002288,
+        "uploadMs": 91.8190889999969,
+        "workMs": 299.48982800001977,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 195.53409000003012,
+        "uploadMs": 89.82789099996444,
+        "workMs": 285.36198099999456,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 211.47095400001854,
+        "uploadMs": 93.4891559999669,
+        "workMs": 304.96010999998543,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 228.33622800000012,
+        "uploadMs": 117.57548900000984,
+        "workMs": 345.91171700000996,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     },
+     {
+      "rate": 10,
+      "mode": "none",
+      "issued": 201,
+      "calls": 201,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "n": 201,
+       "min": 14.14,
+       "p50": 46.78,
+       "p90": 70.152,
+       "p99": 88.796,
+       "max": 168.144
+      }
+     },
+     {
+      "rate": 10,
+      "mode": "gpu",
+      "blocks": 30,
+      "blockWorkMs": {
+       "n": 30,
+       "min": 301.015,
+       "p50": 306.557,
+       "p90": 369.512,
+       "p99": 375.148,
+       "max": 375.148
+      },
+      "compileMs": {
+       "n": 30,
+       "min": 191.348,
+       "p50": 196.859,
+       "p90": 285.453,
+       "p99": 290.877,
+       "max": 290.877
+      },
+      "uploadMs": {
+       "n": 30,
+       "min": 81.356,
+       "p50": 106.313,
+       "p90": 111.285,
+       "p99": 113.712,
+       "max": 113.712
+      },
+      "overBudget": 0,
+      "overGoal": 0,
+      "issued": 1765,
+      "calls": 1765,
+      "cancelled": 0,
+      "failures": [],
+      "answerLatencyMs": {
+       "all": {
+        "n": 1765,
+        "min": 13.828,
+        "p50": 46.993,
+        "p90": 71.356,
+        "p99": 261.957,
+        "max": 364.892
+       },
+       "duringBlockWork": {
+        "n": 119,
+        "min": 14.199,
+        "p50": 86.124,
+        "p90": 299.748,
+        "p99": 362.581,
+        "max": 364.892
+       },
+       "outsideBlockWork": {
+        "n": 1646,
+        "min": 13.828,
+        "p50": 43.21,
+        "p90": 69.804,
+        "p99": 86.512,
+        "max": 89.863
+       }
+      },
+      "work": [
+       {
+        "compileMs": 228.8659270000062,
+        "uploadMs": 110.38615000003483,
+        "workMs": 339.252077000041,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 270.8578029999626,
+        "uploadMs": 83.52294200001052,
+        "workMs": 354.3807449999731,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 272.8569800000405,
+        "uploadMs": 86.40766699996311,
+        "workMs": 359.2646470000036,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 195.71194799995283,
+        "uploadMs": 108.65819300001021,
+        "workMs": 304.37014099996304,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 191.34804499999154,
+        "uploadMs": 110.64738999999827,
+        "workMs": 301.9954349999898,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 290.87652200000593,
+        "uploadMs": 84.27189999999246,
+        "workMs": 375.1484219999984,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 195.2301790000056,
+        "uploadMs": 107.94315400003688,
+        "workMs": 303.1733330000425,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 193.9231509999954,
+        "uploadMs": 108.6678129999782,
+        "workMs": 302.5909639999736,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 223.21139599999879,
+        "uploadMs": 111.2852379999822,
+        "workMs": 334.496633999981,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 277.19489300000714,
+        "uploadMs": 81.35567399999127,
+        "workMs": 358.5505669999984,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 194.13924099999713,
+        "uploadMs": 108.8821820000303,
+        "workMs": 303.0214230000274,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 192.43722399999388,
+        "uploadMs": 110.32391999999527,
+        "workMs": 302.76114399998914,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 288.3664960000315,
+        "uploadMs": 82.76894300000276,
+        "workMs": 371.13543900003424,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 193.41361200006213,
+        "uploadMs": 112.01807699992787,
+        "workMs": 305.43168899999,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 194.83583999995608,
+        "uploadMs": 107.54490400000941,
+        "workMs": 302.3807439999655,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 270.154484000057,
+        "uploadMs": 87.55448499997146,
+        "workMs": 357.70896900002845,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 278.48213100002613,
+        "uploadMs": 84.70243000006303,
+        "workMs": 363.18456100008916,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 192.84496299992315,
+        "uploadMs": 113.71181400003843,
+        "workMs": 306.5567769999616,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 196.8585670000175,
+        "uploadMs": 105.13265799998771,
+        "workMs": 301.9912250000052,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 269.36660499998834,
+        "uploadMs": 83.62677099998109,
+        "workMs": 352.99337599996943,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 271.66364200005773,
+        "uploadMs": 84.99584899994079,
+        "workMs": 356.6594909999985,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 192.05026399996132,
+        "uploadMs": 113.22588599997107,
+        "workMs": 305.2761499999324,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 194.81322000001092,
+        "uploadMs": 107.69983399997,
+        "workMs": 302.5130539999809,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 289.6100729999598,
+        "uploadMs": 83.12199300003704,
+        "workMs": 372.73206599999685,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 196.5779769999208,
+        "uploadMs": 104.43679900001734,
+        "workMs": 301.01477599993814,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 195.87859800003935,
+        "uploadMs": 106.31326599989552,
+        "workMs": 302.19186399993487,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 285.4530599999707,
+        "uploadMs": 84.05895999993663,
+        "workMs": 369.51201999990735,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 204.8146640000632,
+        "uploadMs": 109.14148199988995,
+        "workMs": 313.95614599995315,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 191.52575499995146,
+        "uploadMs": 110.58147900004406,
+        "workMs": 302.1072339999955,
+        "worker": {
+         "mode": "gpu"
+        }
+       },
+       {
+        "compileMs": 274.2344179999782,
+        "uploadMs": 84.43859999999404,
+        "workMs": 358.6730179999722,
+        "worker": {
+         "mode": "gpu"
+        }
+       }
+      ]
+     }
+    ]
    }
   }
  },

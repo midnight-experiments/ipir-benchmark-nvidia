@@ -162,4 +162,16 @@ read 14336 × 34816, nullifier 16384 × 18432, shielded groups 8192 × 20480, Du
 
 Does not fit in the GPU's memory (at gpu at 2 calls/s): uploading a block: GPU out of memory: not enough memory left
 
+### Shapes: 8 million outputs, the largest tables that fit in this GPU's memory with the build, blocks built on the GPU
+
+read 12288 × 32768, nullifier 8192 × 30720, shielded groups 8192 × 16384, Dust groups 6144 × 28672, first coins 2048 × 2048, generation groups 2048 × 4096; 3.57 GiB resident.
+
+30 blocks every 6 s; the build holds 890 MiB of GPU memory.
+
+| calls/s | mode | block work p50 / p99 | of the 6 s | compile p50 / p99 | upload p50 | over 1 s | over 3 s | answer p50 / p99 during work | answer p50 / p99 no block work | calls dropped |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | gpu | 0.26 / 0.30 s | 4.4 % | 0.16 / 0.22 s | 80.6 ms | 0/30 | 0/30 | 341.8 / 493.6 ms | 51.7 / 335.3 ms | 0 of 354 |
+| 5 | gpu | 0.30 / 0.36 s | 5.1 % | 0.21 / 0.25 s | 93.5 ms | 0/30 | 0/30 | 130.2 / 358.6 ms | 57.7 / 119.9 ms | 0 of 883 |
+| 10 | gpu | 0.31 / 0.38 s | 5.1 % | 0.20 / 0.29 s | 106.3 ms | 0/30 | 0/30 | 86.1 / 362.6 ms | 46.8 / 88.8 ms | 0 of 1765 |
+
 Full data: `pop-os-2026-11-25-nvidia-no-bar.json`.

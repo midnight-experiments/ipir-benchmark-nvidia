@@ -5,7 +5,8 @@
  *
  * The raw dir holds what `run-all.sh` wrote: `meta.json`, `sysinfo-start.json`, `sysinfo-end.json`, `fetch.json`,
  * and for each build of the vendored crates (`stock`, without patch 0002, and `patch0002`) `compile-<build>.jsonl`,
- * `budget-today-<build>.json` and `budget-10m-<build>.json` (any may be missing if its step failed or was skipped).
+ * `budget-today-<build>.json` and `budget-10m-<build>.json` (any may be missing if its step failed or was skipped),
+ * `budget-largest-gpu.json` (only where the 10M tables did not fit with the GPU build; `budget.gpu.largest`).
  * On a GPU backend also the blocks built on the GPU: `gpu-build-check.json` (its output against the CPU's),
  * `gpu-compile.json` (its time) and `budget-<set>-gpu.json`; in the results, `gpuCompile` and `budget.gpu`.
  *
@@ -40,6 +41,9 @@ const fetch = await json("fetch.json");
 const BUILDS = ["stock", "patch0002"] as const;
 const budget: Record<string, Record<string, any>> = {};
 for (const b of [...BUILDS, "gpu"]) budget[b] = { today: await json(`budget-today-${b}.json`), "10m": await json(`budget-10m-${b}.json`) };
+// Where the 10M tables do not fit with the blocks built on the GPU: the largest tables that do (`run-all.sh`).
+const largest = await json("budget-largest-gpu.json");
+if (largest) budget.gpu!.largest = largest;
 // The GPU build of the blocks: null when the run had none.
 const gpuCompile = meta?.gpuCompile ? { check: await json("gpu-build-check.json"), timing: await json("gpu-compile.json") } : null;
 
@@ -235,7 +239,8 @@ lines.push(
 );
 for (const [build, name, b] of [...BUILDS, "gpu"].flatMap((x) => Object.entries(budget[x]!).map(([n, v]) => [x, n, v] as const))) {
   if (!b) continue;
-  lines.push(`### Shapes: ${name === "today" ? "today's starting shapes" : "10 million outputs"}, ${buildName(build)}`, "");
+  const size = name === "today" ? "today's starting shapes" : name === "10m" ? "10 million outputs" : `${b.outputs / 1e6} million outputs, the largest tables that fit in this GPU's memory with the build`;
+  lines.push(`### Shapes: ${size}, ${buildName(build)}`, "");
   lines.push(b.tables.map((t: any) => `${t.name} ${t.rows} × ${t.cols}`).join(", ") + `; ${f(b.residentBytes / 2 ** 30, 2)} GiB resident.`, "");
   if (!b.ok) {
     lines.push(b.doesNotFit ? `Does not fit in the GPU's memory (at ${b.stage}): ${b.error}` : `Failed at ${b.stage}: ${b.error}`, "");

@@ -25,7 +25,7 @@
  * dropped and counted as `cancelled`.
  *
  *   deno run <permissions> bench/budget.ts --worker ipir/target/release/block_worker --out FILE
- *     [--set today|10m | --tables ROWSxCOLS,...] [--rates 2,5,10] [--modes seq,pool] [--blocks 30] [--interval-ms 6000] [--baseline-s 20]
+ *     [--set today|10m|9.5m|9m|...|1m | --tables ROWSxCOLS,...] [--rates 2,5,10] [--modes seq,pool] [--blocks 30] [--interval-ms 6000] [--baseline-s 20]
  *     [--pool-threads N] [--answer gpu|cpu] [--cpu-server ipir/target/release/cpu_server] [--drain-s 30]
  *
  * Modes (`block_worker`): `seq`, the blocks one after another on all cores at normal priority; `pool`, all at once on
@@ -43,33 +43,16 @@
  */
 import { type BlockBuildPrep, GpuBlockBuildSet, parseBlockBuildPrep } from "../gpu/block-build.ts";
 import { GpuIpirTable } from "../gpu/ipir.ts";
+import { LADDER, SET_OUTPUTS, SETS } from "./gpu-build-sets.ts";
 import { openBenchGpu, options, residentBytes, scoped, stats, syntheticCells, syntheticMatrix, syntheticRequests, syntheticSetupId, xorshift } from "./lib.ts";
-
-const SETS: Record<string, { name: string; rows: number; cols: number }[]> = {
-  today: [
-    { name: "read", rows: 2048, cols: 2048 },
-    { name: "nullifier", rows: 2048, cols: 2048 },
-    { name: "shielded groups", rows: 2048, cols: 4096 },
-    { name: "Dust groups", rows: 6144, cols: 28672 },
-    { name: "first coins", rows: 2048, cols: 2048 },
-    { name: "generation groups", rows: 2048, cols: 4096 },
-  ],
-  "10m": [
-    { name: "read", rows: 14336, cols: 34816 },
-    { name: "nullifier", rows: 16384, cols: 18432 },
-    { name: "shielded groups", rows: 8192, cols: 20480 },
-    { name: "Dust groups", rows: 6144, cols: 28672 },
-    { name: "first coins", rows: 2048, cols: 2048 },
-    { name: "generation groups", rows: 2048, cols: 4096 },
-  ],
-};
 
 const opts = options(Deno.args);
 const out = opts.get("out");
 const workerPath = opts.get("worker");
 if (!out) throw new Error("--out FILE is required");
-// `--tables 4096x12288,4096x8192,...`: the tables' shapes given outright (rows x columns each), for sizes between
-// the two sets; `--set` is then only the name in the results.
+// `--set`: `today`, `10m`, or a size between them (`bench/gpu-build-sets.ts`).
+// `--tables 4096x12288,4096x8192,...`: the tables' shapes given outright (rows x columns each); `--set` is then only
+// the name in the results.
 const custom = opts.get("tables");
 const setName = opts.get("set") ?? (custom ? "custom" : "today");
 const tables = custom
@@ -79,7 +62,7 @@ const tables = custom
     return { name: `table ${i + 1}`, rows, cols };
   })
   : SETS[setName];
-if (!tables) throw new Error(`unknown set ${setName}`);
+if (!tables) throw new Error(`unknown set ${setName} (today, 10m, ${LADDER.map((x) => x.set).join(", ")})`);
 const rates = (opts.get("rates") ?? "2,5,10").split(",").map(Number);
 const modes = (opts.get("modes") ?? "seq,pool").split(",");
 const gpuPrepPath = opts.get("gpu-prep");
@@ -197,6 +180,8 @@ interface Call {
 
 const result: Record<string, unknown> = {
   set: setName,
+  // Shielded outputs the tables are sized for (null: the starting shapes, or shapes given with --tables).
+  outputs: custom ? null : SET_OUTPUTS[setName] ?? null,
   tables,
   rates,
   modes,

@@ -107,6 +107,11 @@ if (r.meta?.gpuCompile && String(r.meta?.gpuCompileSteps ?? "").includes("budget
     else if (s.doesNotFit && !quick) console.log(`note    budget ${set}, blocks built on the GPU: does not fit in the GPU's memory (${String(s.error ?? "").slice(0, 200)})`);
     else say(false, `budget ${set}, blocks built on the GPU: not ok (${String(s.error ?? "").slice(0, 300)})`);
   }
+  // The largest tables that fit with the GPU build, looked for when the 10M tables do not.
+  const l: Any = r.budget?.gpu?.largest ?? null;
+  if (l?.ok === true) say(true, `budget, largest tables that fit with the blocks built on the GPU: ${l.set}, ${(l.runs ?? []).filter((x: Any) => x.mode === "gpu").length} run(s)`);
+  else if (l) say(false, `budget, largest tables that fit with the blocks built on the GPU: ${l.doesNotFit ? "none of the sizes fit" : "not ok"} (last tried ${l.set}: ${String(l.error ?? "").slice(0, 200)})`);
+  else if (r.budget?.gpu?.["10m"]?.doesNotFit && !quick) say(false, "budget, largest tables that fit with the blocks built on the GPU: missing");
 }
 
 if (problems.length) {
