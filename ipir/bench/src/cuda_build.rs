@@ -538,8 +538,10 @@ fn update(h: &mut Sha256, words: &[u64]) {
     }
 }
 
-/// `pack_digest`'s digest of the last build's output words: (all, hints, packing). The matrix's storage label is
-/// `i32`, the CPU build's choice for these words on a CPU that stores them so.
+/// `pack_digest`'s digest of the last build's output words: (all, hints, packing). `pack_digest` hashes the name of
+/// the CPU build's matrix storage with the words, and that name depends on the CPU (`i32`, or `packed27` where the
+/// CPU has the instructions for it): `IPIR_STORAGE_LABEL` gives the name the CPU reports (`pack_digest --parts`
+/// prints it as `storage=`), `i32` when it is not set.
 pub fn digest(b: &CudaBuilder) -> Result<(String, String, String), String> {
     let (d, q) = (b.d, b.q);
     let masks = b.hint_masks()?;
@@ -551,7 +553,7 @@ pub fn digest(b: &CudaBuilder) -> Result<(String, String, String), String> {
     }
     update(&mut packing, &slots[0]);
     update(&mut packing, &slots[d / 2]);
-    packing.update("i32");
+    packing.update(std::env::var("IPIR_STORAGE_LABEL").unwrap_or_else(|_| "i32".into()));
     update(&mut packing, &[d as u64, 2 * d as u64, q]);
     update(&mut packing, &matrix);
     let (hints, packing) = (hints.finalize(), packing.finalize());

@@ -94,10 +94,14 @@ async function nativeBuild(program: string, rows: number, blocks: number, six: n
   } catch {
     return null;
   }
+  // The CPU's digests first: they name the CPU's matrix storage, which the digest hashes with the words.
+  const cpu = await run(`${bin}/pack_digest`, [String(rows), "1,2,3", "--parts"]);
+  const label = cpu.lines[0]?.match(/ storage=(\S+)/)?.[1];
+  if (label) Deno.env.set("IPIR_STORAGE_LABEL", label);
   const r = await run(program, [String(rows), String(blocks), six.join(","), quick ? "2" : "5"]);
   const j = lastJson(r.lines) ?? { ok: false, error: `${program} printed no result` };
   if (j.ok && Array.isArray(j.digests)) {
-    const cpu = await run(`${bin}/pack_digest`, [String(rows), "1,2,3", "--parts"]);
+    j.cpuStorage = label ?? null;
     const want = cpu.lines.map((l) => l.replace(/ storage=\S+/, "").trim());
     j.digestsEqual = j.digests.filter((d: string) => want.includes(d.trim())).length;
     j.digestsChecked = j.digests.length;
