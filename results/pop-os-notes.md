@@ -124,3 +124,20 @@ figures are in the results file as `cuda`, in the run's summary as step 4 and in
   `LD_LIBRARY_PATH`. Nothing installed on the machine was changed.
 - The desktop was using 526 MiB of the card and the load average was about 1 at the start.
 - Every answer of both paths equals the CPU's, byte for byte, at all five shapes.
+
+## The CUDA fetch and the answers per second (2026-11-27)
+
+`./bench.sh --report --cuda --steps fetch,update6cuda --merge results/pop-os-2026-11-26-report.json` at `5c0ed70`,
+written to `results/pop-os-2026-11-27-report.json`: the fetch step measured again and the CUDA update while answering
+added; the other steps are those of 2026-11-26. The desktop was in use (load average 7 at the start, 362 MiB of the
+card held by the desktop).
+
+- Fetch 32 with this repository's CUDA kernels: 7.9 ms at 1 million values and 30.3 ms at 10 million, of which the
+  device 6.4 and 27.4 ms. WebGPU on the card: 25.8 and 81.9 ms. Upstream's CUDA kernel: 258 and 840 ms.
+- The 6× update at 1 million values, built on the device and installed while the six matrices answer: 113 ms.
+- At 10 million values the six matrices, the calls' buffers and the block build do not fit in the card's 6 GiB. The
+  largest set of the ladder that fits is 5 million (142 ms, 5.1 GiB on the device); with the WebGPU build it is
+  8 million. The CUDA block build keeps about 1.9 GiB of working buffers for six tables, twice the WebGPU build's.
+- The layout sweep (`cuda_fetch_native --sweep`): the fastest first pass has 4 columns and 2 requests per thread,
+  3 to 5 % faster than the default (4 and 4), which is the fastest on the RTX 4090. The default is kept for both.
+

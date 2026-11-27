@@ -10,7 +10,9 @@
 #   --cpu-only     no GPU run: the CPU backend alone (also for a host with no GPU)
 #   --report       only the report's measurements (bench/report-run.ts, about 30 minutes): a table built from
 #                  scratch, an update, fetch 1 and fetch 32 at 1M and 10M values, and the GPU memory each needs;
-#                  with --cuda also upstream's CUDA kernel for the fetches, with --quick a short check of it
+#                  with --cuda also the CUDA paths (this repository's kernels and upstream's), with --quick a
+#                  short check of it; --steps LIST --merge FILE measures only those steps again, into a copy of
+#                  an earlier result file
 #   --cuda         also upstream's CUDA kernel: a whole answer against the WebGPU path (in the full run's results),
 #                  and upstream's own first-pass benchmark (NVIDIA, with the CUDA driver library and NVRTC)
 #   --skip-quick   go straight to the full run
@@ -52,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     --budget-sets) FULL_ARGS+=(--budget-sets "$2"); shift ;;
     --host) export IPIR_BENCH_HOST="$2"; shift ;;
     --label) LABEL="$2"; shift ;;
-    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (./bench.sh --help)" >&2; exit 2 ;;
   esac
   shift

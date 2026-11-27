@@ -31,6 +31,36 @@ BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of st
 `run-all.sh` and the GPU tools (the layer loaded and not, a failed quick check, a stopped run, the CPU options).
 The first `./bench.sh --quick` on a Linux host is the check of the rest.
 
+## The CUDA fetch (2026-11-27)
+
+`cuda_fetch_native` (this repository's CUDA fetch: the first pass for all the requests of a call, the packing and the
+rounding on the GPU) checks itself before any timing, and ends with exit code 1 on a difference. On the RTX 2060 and
+on the RTX 4090, at 2048 × 2048, 4,096 × 12,288 (1M) and 14,336 × 34,816 (10M), with the CUDA 13 bindings:
+
+- The answers to a call of 32 and to a call of 1 equal `NativeServer::respond`'s, byte for byte, and the dump that
+  `cpu_fetch` wrote for the same table.
+- The first pass alone and the packing product alone, unrounded, equal upstream's `PreparedU16Query::dot` and
+  `NativePreprocessed::prepare_pack`, for all 32 requests. The requests' words for this comparison are read by a
+  second, bit-by-bit reader, apart from the fetch's own.
+- After `write_block` of a changed column block (new cells, and the matrix the CPU compiled for them), the answers
+  equal those of a table built whole on the CPU with those cells. After the first block is written back, they equal
+  the first answers again.
+- The same changed block built on the device by the CUDA block build and installed from its buffers gives those
+  answers too.
+- Every layout the sweep tries (`--sweep`: 153 of the first pass, 255 of the packing, 16 for a call of 1) gives the
+  CPU's answers, on both cards.
+- A table that does not fit ends with `"doesNotFit":true` and the driver's error, not a crash: seen on the RTX 2060
+  with six tables above 5 million values (`cuda_budget`).
+
+`cuda_budget` (a chain block built and installed while six tables answer) does not compare answers: its tables are
+synthetic. The report's calls-per-second measure compares one answer made through the split calls
+(`FetchShape::prepare`, `CudaFetch::run`, `FetchShape::answers`) with the CPU's before it counts.
+
+Not checked: the CUDA 12 bindings. `cuda_fetch_native`, `cuda_budget` and `cuda_fetch` compile with
+`--features cuda-12`, but neither host has CUDA 12's NVRTC to run them (with CUDA 13's they stop at
+`undefined symbol: nvrtcGetNVVM`, as upstream's kernel does). The calls-per-second rows and the fetch step have not
+been measured again on the M4.
+
 Before the backends:
 
 Developed and run on macOS (Apple M4 Max, Metal, Deno 2.7.5, Rust 1.92.0). There, the Rust programs build and run,
