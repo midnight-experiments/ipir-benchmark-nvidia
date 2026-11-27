@@ -154,6 +154,65 @@ pub fn lower_thread_priority() -> &'static str {
     "unsupported OS: normal priority"
 }
 
+/// Calls answered per second by `callers` callers that each send their next call as soon as their last one is
+/// answered, for `seconds`. `call` answers one call; its first error ends the measure.
+pub fn calls_per_second(callers: usize, seconds: f64, call: &(dyn Fn() -> Result<(), String> + Sync)) -> Result<f64, String> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let stop = AtomicBool::new(false);
+    let t = Instant::now();
+    let done: Vec<Result<usize, String>> = std::thread::scope(|sc| {
+        let handles: Vec<_> = (0..callers)
+            .map(|_| {
+                sc.spawn(|| -> Result<usize, String> {
+                    let mut n = 0usize;
+                    while !stop.load(Ordering::Relaxed) {
+                        call()?;
+                        n += 1;
+                    }
+                    Ok(n)
+                })
+            })
+            .collect();
+        std::thread::sleep(Duration::from_secs_f64(seconds));
+        stop.store(true, Ordering::Relaxed);
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    let elapsed = t.elapsed().as_secs_f64();
+    let mut total = 0usize;
+    for d in done {
+        total += d?;
+    }
+    Ok(total as f64 / elapsed)
+}
+
+/// The numbers of callers the calls-per-second measure tries, in order.
+pub const CALLERS: [usize; 5] = [1, 2, 4, 8, 16];
+
+/// The calls-per-second measure of a path, for calls of 1 and of 32 requests and each number of callers in `levels`
+/// (it stops at a number of callers that is a tenth slower than the best so far):
+/// `"throughput":{"seconds":S,"1":{"callsPerSecond":best,"callers":its callers,"byCallers":{...}},"32":{...}}`.
+/// `rate(count, callers)` measures one combination.
+pub fn throughput_json(seconds: f64, levels: &[usize], rate: &mut dyn FnMut(usize, usize) -> Result<f64, String>) -> Result<String, String> {
+    let mut per_count = Vec::new();
+    for count in [1usize, 32] {
+        let mut by = Vec::new();
+        let mut best = (0usize, 0f64);
+        for &callers in levels {
+            let r = rate(count, callers)?;
+            eprintln!("calls per second: calls of {count}, {callers} caller(s): {r:.1}");
+            if r > best.1 {
+                best = (callers, r);
+            }
+            by.push(format!("\"{callers}\":{r:.2}"));
+            if r < 0.9 * best.1 {
+                break;
+            }
+        }
+        per_count.push(format!("\"{count}\":{{\"callsPerSecond\":{:.2},\"callers\":{},\"byCallers\":{{{}}}}}", best.1, best.0, by.join(",")));
+    }
+    Ok(format!("\"throughput\":{{\"seconds\":{seconds},{}}}", per_count.join(",")))
+}
+
 pub fn logical_cpus() -> usize {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
 }

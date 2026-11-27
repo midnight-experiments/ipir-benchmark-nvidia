@@ -140,6 +140,12 @@ impl CudaDevice {
         self.ctx.name().unwrap_or_else(|e| format!("unknown ({e})"))
     }
 
+    /// The device's context: a fetch on the same device opens its own stream in it (`cuda_fetch_native`), so that it
+    /// can read a build's buffers.
+    pub fn context(&self) -> &Arc<CudaContext> {
+        &self.ctx
+    }
+
     fn alloc<T: DeviceRepr + ValidAsZeroBits>(&self, len: usize) -> Result<CudaSlice<T>, String> {
         self.stream.alloc_zeros(len.max(1)).map_err(err)
     }
@@ -492,6 +498,17 @@ impl CudaBuilder {
     /// Bytes of the compiled matrix the answer kernel reads (i32 words).
     pub fn matrix_bytes(&self) -> usize {
         2 * self.d * self.d * 4
+    }
+
+    /// The last uploaded block's cells on the device (column-major, rows × d), and the last build's compiled matrix
+    /// (d rows of 2d words): what a table that answers installs (`CudaFetch::write_block_device`). Read them only
+    /// after the build was waited for.
+    pub fn cells_buffer(&self) -> &CudaSlice<u16> {
+        &self.cells
+    }
+
+    pub fn matrix_buffer(&self) -> &CudaSlice<i32> {
+        &self.matrix
     }
 }
 

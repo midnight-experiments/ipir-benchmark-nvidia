@@ -70,6 +70,16 @@ Then:
    - WebGPU: both steps on the GPU;
    - for the same table and the same 32 requests, with every answer compared with the CPU's, byte for byte.
 
+   `./bench.sh --report --cuda` also measures this repository's own CUDA path, which upstream's kernel is compared
+   with in the report:
+   - `cuda_fetch_native`: a whole answer with the first pass for all the requests of a call in one launch and the
+     packing on the GPU. Before any timing it checks its answers, its first pass and its packing product against the
+     CPU's, and a column block replaced from the host and from the CUDA block build. `--sweep` times the layouts a
+     call can have on the card and prints the fastest as a value for `IPIR_CUDA_FETCH`; the defaults are the
+     fastest on the RTX 4090 and within 5 % of it on the RTX 2060.
+   - `cuda_budget`: one chain block built on the GPU and installed into six tables while they answer 2 calls a
+     second.
+
    It also times the upload of the table again, which is what a changed column block costs on the CUDA kernel,
    against WebGPU's write of one block. `bench.sh --cuda` then runs upstream's own `cuda_bench` (one request's
    first pass with another modulus; `results/<short name>-<date>-cuda-bench.txt`).
@@ -84,7 +94,8 @@ Then:
 
    By hand, on a results folder that exists:
    ```sh
-   (cd ipir && cargo build --release --locked -p ipir-bench --features cuda-13 --bin cuda_fetch)
+   (cd ipir && cargo build --release --locked -p ipir-bench --features cuda-13 --bin cuda_fetch --bin cuda_fetch_native --bin cuda_budget)
+   ipir/target/release/cuda_fetch_native 14336 34816 9 --throughput 3     # the checks, the times, the calls per second
    deno run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/cuda-compare.ts --out results/raw/<run>/cuda-compare.json
    deno run --allow-read --allow-write --allow-run --allow-env --allow-sys bench/report.ts results/raw/<run> results/<run>.json results/<run>.md
    ```

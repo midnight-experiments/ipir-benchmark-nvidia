@@ -79,3 +79,17 @@ cells could not run beside that model.
 - Other users' container builds were using the CPU when the run ended (load average 2.7 at the start, 35 at the
   end; 0.4 while the 6× update at 1 million was measured), so the CUDA fetch cells, whose packing runs on the CPU,
   are slower than on a quiet host.
+
+## The CUDA fetch and the answers per second (2026-11-27)
+
+`./bench.sh --report --cuda --steps fetch,update6cuda --merge results/rtx4090-2026-11-27-report.json` at `5c0ed70`,
+with the card still free (1 MiB in use) and a load average of 4 at the start. It replaced the file's fetch step and
+added the CUDA update while answering; the other steps are those of the morning's run.
+
+- Fetch 32 with this repository's CUDA kernels: 1.6 ms at 1 million values and 6.8 ms at 10 million, of which the
+  device 1.0 and 5.2 ms. WebGPU on the card: 15.6 and 25.9 ms. Upstream's CUDA kernel: 208 and 666 ms.
+- The 6× update, built on the device and installed into the six matrices while they answer 2 calls a second: 40.6 ms
+  and 58.9 ms (the largest of 30 blocks: 41.5 and 61.6 ms). A fetch 32 that arrives meanwhile takes 9.5 and 26.4 ms.
+- Six matrices at 10 million values, the calls' buffers and the block build hold 6.2 GiB on the device, of which the
+  build's working buffers about 1.9 GiB.
+- The layout sweep (`cuda_fetch_native --sweep`) found the default layout the fastest at both sizes.
