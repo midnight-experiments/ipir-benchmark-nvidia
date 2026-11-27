@@ -57,8 +57,8 @@ One request: the wall time from the request's bytes to the answer's bytes.
 
 | Values | CPU M4 | Metal M4 | WebGPU M4 | WebGPU RTX 20 | WebGPU RTX 40 | CUDA RTX 20 | CUDA RTX 40 | CUDA, upstream's kernel RTX 20 | CUDA, upstream's kernel RTX 40 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1M | 2.1 ms | no code | 15.2 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms | 8.0 ms | 6.5 ms |
-| 10M | 11.0 ms | no code | 18.0 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms | 25.5 ms | 20.8 ms |
+| 1M | 2.1 ms | no code | 15.3 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms | 8.0 ms | 6.5 ms |
+| 10M | 12.8 ms | no code | 16.9 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms | 25.5 ms | 20.8 ms |
 
 ## 5. Fetch 32 values (one wallet call)
 
@@ -66,8 +66,8 @@ The call every wallet sends: 32 requests, padded so that the server cannot tell 
 
 | Values | CPU M4 | Metal M4 | WebGPU M4 | WebGPU RTX 20 | WebGPU RTX 40 | CUDA RTX 20 | CUDA RTX 40 | CUDA, upstream's kernel RTX 20 | CUDA, upstream's kernel RTX 40 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1M | 66.1 ms | no code | 29.6 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms | 258 ms | 208 ms |
-| 10M | 363 ms | no code | 72.7 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms | 840 ms | 666 ms |
+| 1M | 72.1 ms | no code | 25.4 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms | 258 ms | 208 ms |
+| 10M | 427 ms | no code | 73.7 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms | 840 ms | 666 ms |
 
 The CUDA cells answer the 32 requests in one pass over the matrix, with the packing on the GPU. Upstream's kernel does the first pass one request at a time and leaves the packing to that NVIDIA host's CPU, so its call of 32 costs about 32 calls of 1. Every WebGPU and CUDA answer equals the CPU's, byte for byte.
 
@@ -79,15 +79,15 @@ The calls a matrix answers per second when calls arrive without a pause: each ca
 
 | Values | CPU M4 | Metal M4 | WebGPU M4 | WebGPU RTX 20 | WebGPU RTX 40 | CUDA RTX 20 | CUDA RTX 40 | CUDA, upstream's kernel RTX 20 | CUDA, upstream's kernel RTX 40 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1M | not run | no code | not run | 416 | 846 | 953 | 2671 | 124 | 153 |
-| 10M | not run | no code | not run | 158 | 407 | 190 | 561 | 37.7 | 47.6 |
+| 1M | 517 | no code | 442 | 416 | 846 | 953 | 2671 | 124 | 153 |
+| 10M | 83.8 | no code | 193 | 158 | 407 | 190 | 561 | 37.7 | 47.6 |
 
 **Calls of 32 per second**
 
 | Values | CPU M4 | Metal M4 | WebGPU M4 | WebGPU RTX 20 | WebGPU RTX 40 | CUDA RTX 20 | CUDA RTX 40 | CUDA, upstream's kernel RTX 20 | CUDA, upstream's kernel RTX 40 |
 |---|---|---|---|---|---|---|---|---|---|
-| 1M | not run | no code | not run | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) | 3.9 (123 values) | 4.8 (153 values) |
-| 10M | not run | no code | not run | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) | 1.2 (38 values) | 1.5 (48 values) |
+| 1M | 15.4 (493 values) | no code | 73.8 (2,360 values) | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) | 3.9 (123 values) | 4.8 (153 values) |
+| 10M | 2.4 (76 values) | no code | 13.5 (431 values) | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) | 1.2 (38 values) | 1.5 (48 values) |
 
 ## 7. Memory: what fits on each GPU
 
@@ -111,12 +111,13 @@ What the WebGPU path's buffers hold on the GPU, at most, during each operation (
 
 ## 8. Detail and conditions
 
-**M4** (Apple M4 Max), `results/m4-max-2026-11-26-report.json`, 2026-11-26:
+**M4** (Apple M4 Max), `results/m4-max-2026-11-27-report.json`, 2026-11-26:
 
 - Load average (1 min) at the start: 7.8, at the end: 3.4.
 - The machine was in use during the run: load average 8 at the start and 3 at the end.
-- 1M: the GPU-built matrix answers as the CPU-built one (32 of 32); during the re-dimension the old matrix answered 1 call(s) of 32, 1 equal to the CPU's, in 142 ms (p50); fetch 32 while an update runs 196 ms, against 41.2 ms otherwise; no block of 30 over 1 s: yes; the six blocks computed alone on the GPU 146 ms, and 181 ms with the GPU idle for 6 s before; the native Metal build's output equals the CPU's in 3 of 3 blocks; its six blocks alone 53.1 ms, and 98.8 ms after 6 s of idle; WebGPU fetch 32: 10.2 ms on the device.
-- 10M: the GPU-built matrix answers as the CPU-built one (32 of 32); during the re-dimension the old matrix answered 4 call(s) of 32, 4 equal to the CPU's, in 235 ms (p50); fetch 32 while an update runs 268 ms, against 67.7 ms otherwise; no block of 30 over 1 s: yes; the six blocks computed alone on the GPU 155 ms, and 199 ms with the GPU idle for 6 s before; the native Metal build's output equals the CPU's in 3 of 3 blocks; its six blocks alone 60.7 ms, and 114 ms after 6 s of idle; WebGPU fetch 32: 55.1 ms on the device.
+- Measured again on 2026-11-27: fetch (1M, 10M); load average 5.9 at its start.
+- 1M: the GPU-built matrix answers as the CPU-built one (32 of 32); during the re-dimension the old matrix answered 1 call(s) of 32, 1 equal to the CPU's, in 142 ms (p50); fetch 32 while an update runs 196 ms, against 41.2 ms otherwise; no block of 30 over 1 s: yes; the six blocks computed alone on the GPU 146 ms, and 181 ms with the GPU idle for 6 s before; the native Metal build's output equals the CPU's in 3 of 3 blocks; its six blocks alone 53.1 ms, and 98.8 ms after 6 s of idle; callers at the highest rate of answers per second, for calls of 1 and of 32: the CPU 4 and 8, WebGPU 8 and 8; WebGPU fetch 32: 10.2 ms on the device.
+- 10M: the GPU-built matrix answers as the CPU-built one (32 of 32); during the re-dimension the old matrix answered 4 call(s) of 32, 4 equal to the CPU's, in 235 ms (p50); fetch 32 while an update runs 268 ms, against 67.7 ms otherwise; no block of 30 over 1 s: yes; the six blocks computed alone on the GPU 155 ms, and 199 ms with the GPU idle for 6 s before; the native Metal build's output equals the CPU's in 3 of 3 blocks; its six blocks alone 60.7 ms, and 114 ms after 6 s of idle; callers at the highest rate of answers per second, for calls of 1 and of 32: the CPU 16 and 1, WebGPU 16 and 1; WebGPU fetch 32: 55.8 ms on the device.
 
 **RTX 20** (RTX 2060 + Ryzen 7 2700X), `results/pop-os-2026-11-27-report.json`, 2026-11-26:
 

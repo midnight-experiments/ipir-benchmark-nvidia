@@ -58,8 +58,11 @@ synthetic. The report's calls-per-second measure compares one answer made throug
 
 Not checked: the CUDA 12 bindings. `cuda_fetch_native`, `cuda_budget` and `cuda_fetch` compile with
 `--features cuda-12`, but neither host has CUDA 12's NVRTC to run them (with CUDA 13's they stop at
-`undefined symbol: nvrtcGetNVVM`, as upstream's kernel does). The calls-per-second rows and the fetch step have not
-been measured again on the M4.
+`undefined symbol: nvrtcGetNVVM`, as upstream's kernel does).
+
+The M4's fetch step was measured again on 2026-11-27 for the calls per second, with the laptop in use (load average
+6 at the start, 11 at the end): its CPU figures of that step are slower than on 2026-11-26 (fetch 32 at 10M: 427 ms,
+against 363 ms).
 
 Before the backends:
 
