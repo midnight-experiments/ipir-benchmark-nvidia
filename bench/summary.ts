@@ -213,7 +213,7 @@ L.push("The CUDA cells answer the 32 requests in one pass over the matrix, with 
 
 L.push("## 6. Answers per second", "");
 L.push(
-  "The calls a matrix answers per second when calls arrive without a pause: each caller sends its next call as soon as its last one is answered, for a few seconds, with 1, 2 and 4 callers. A cell is the highest rate of the three. For calls of 32 it also gives the values per second (calls × 32). Upstream's CUDA kernel takes one request at a time, so it has one caller.",
+  "The calls a matrix answers per second when calls arrive without a pause: each caller sends its next call as soon as its last one is answered, for 3 seconds, with 1, 2, 4, 8 and 16 callers. A cell is the highest rate found; section 8 gives the number of callers that reached it. For calls of 32 it also gives the values per second (calls × 32). Upstream's CUDA kernel takes one request at a time, so it has one caller.",
   "",
 );
 for (const [n, title] of [["1", "**Calls of 1 per second**"], ["32", "**Calls of 32 per second**"]] as const) {
@@ -296,6 +296,10 @@ for (const m of machines) {
       const cb = cu.runs?.find((x: Any) => x.mode === "none");
       bits.push(`CUDA 6× update${cu === z.update6?.cuda ? "" : ` (at ${String(cu.set).toUpperCase()})`}: ${time(cr.compileMs?.p50)} to build the six blocks and ${time(cr.uploadMs?.p50)} to install them; fetch 32 while it runs ${time(cr.answerLatencyMs?.duringBlockWork?.p50)}, against ${time(cb?.answerLatencyMs?.p50)} otherwise; no block of ${cr.blocks} over 1 s: ${cr.overGoal === 0 ? "yes" : `no, ${cr.overGoal}`}; the six matrices, the calls' buffers and the build hold ${gib(cu.gpuPeakMiB)} on the device`);
     }
+    const reached = ([["the CPU", z.fetch?.cpu?.throughput], ["WebGPU", z.fetch?.webgpu?.ok ? z.fetch.webgpu.throughput : null], ["CUDA", cn?.throughput]] as [string, Any][])
+      .filter(([, t]) => t?.["1"] && t?.["32"])
+      .map(([name, t]) => `${name} ${t["1"].callers} and ${t["32"].callers}`);
+    if (reached.length) bits.push(`callers at the highest rate of answers per second, for calls of 1 and of 32: ${reached.join(", ")}`);
     const c = z.fetch?.cuda?.ok ? z.fetch.cuda.cuda?.["32"] : null;
     if (c) bits.push(`upstream's CUDA kernel, fetch 32: first pass ${time(c.kernelMs)} on the device, packing ${time(c.packMs)} on the CPU`);
     const w = z.fetch?.webgpu?.ok ? z.fetch.webgpu.timing?.["32"] : null;

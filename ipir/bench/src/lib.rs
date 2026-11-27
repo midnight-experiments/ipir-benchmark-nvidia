@@ -185,7 +185,11 @@ pub fn calls_per_second(callers: usize, seconds: f64, call: &(dyn Fn() -> Result
     Ok(total as f64 / elapsed)
 }
 
-/// The calls-per-second measure of a path, for calls of 1 and of 32 requests and each number of callers in `levels`:
+/// The numbers of callers the calls-per-second measure tries, in order.
+pub const CALLERS: [usize; 5] = [1, 2, 4, 8, 16];
+
+/// The calls-per-second measure of a path, for calls of 1 and of 32 requests and each number of callers in `levels`
+/// (it stops at a number of callers that is a tenth slower than the best so far):
 /// `"throughput":{"seconds":S,"1":{"callsPerSecond":best,"callers":its callers,"byCallers":{...}},"32":{...}}`.
 /// `rate(count, callers)` measures one combination.
 pub fn throughput_json(seconds: f64, levels: &[usize], rate: &mut dyn FnMut(usize, usize) -> Result<f64, String>) -> Result<String, String> {
@@ -200,6 +204,9 @@ pub fn throughput_json(seconds: f64, levels: &[usize], rate: &mut dyn FnMut(usiz
                 best = (callers, r);
             }
             by.push(format!("\"{callers}\":{r:.2}"));
+            if r < 0.9 * best.1 {
+                break;
+            }
         }
         per_count.push(format!("\"{count}\":{{\"callsPerSecond\":{:.2},\"callers\":{},\"byCallers\":{{{}}}}}", best.1, best.0, by.join(",")));
     }

@@ -14,8 +14,8 @@
 //! all null: there is no GPU time.
 //!
 //! `--throughput SECONDS` adds the calls answered per second (`throughput`): for calls of 1 and of 32, callers that
-//! each send their next call when their last one is answered, for SECONDS, with 1, 2 and 4 callers. Every caller's
-//! requests share Rayon's pool.
+//! each send their next call when their last one is answered, for SECONDS, with 1, 2, 4, 8 and 16 callers (stopping at a number that is a
+//! tenth slower than the best). Every caller's requests share Rayon's pool.
 //!
 //! `--dump DIR` also writes what `bench/check-cpu-answer.ts` needs to compare these answers with the GPU's, byte for
 //! byte: `setup-id.bin`, `requests.bin` (32 requests), `answers.bin` (this server's 32 answers) and `matrices.bin`
@@ -139,7 +139,7 @@ fn main() {
         dump(dir, rows, cols, &server, &requests, each);
     }
     let throughput = throughput_s.map_or(String::new(), |seconds| {
-        let line = throughput_json(seconds, &[1, 2, 4], &mut |count, callers| {
+        let line = throughput_json(seconds, &CALLERS, &mut |count, callers| {
             calls_per_second(callers, seconds, &|| {
                 for r in requests[..count * each].chunks_exact(each) {
                     server.respond(r).map_err(|e| format!("{e:?}"))?;

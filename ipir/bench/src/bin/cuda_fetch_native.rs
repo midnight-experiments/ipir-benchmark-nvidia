@@ -26,8 +26,9 @@
 //! `hashMs`, `copyOutMs` (the wait for the device after the hashing, and the copy back), `serializeMs`.
 //!
 //! `--throughput SECONDS` adds the calls answered per second (`throughput`): for calls of 1 and of 32, callers that
-//! each send their next call when their last one is answered, for SECONDS, with 1, 2 and 4 callers. The host's part
-//! of a call (parsing, hashing, the answer's bytes) runs in the caller; the device's part of one call at a time.
+//! each send their next call when their last one is answered, for SECONDS, with 1, 2, 4, 8 and 16 callers (stopping
+//! at a number that is a tenth slower than the best). The host's part of a call (parsing, hashing, the answer's
+//! bytes) runs in the caller; the device's part of one call at a time.
 //!
 //! `--sweep` times the layouts a call of 32 and a call of 1 can have on this card (columns, matrix rows and requests
 //! per thread, segment length, block order), checks every one's answers, lists them on standard error and reports
@@ -308,7 +309,7 @@ fn main() {
     );
 }
 
-/// Calls answered per second with 1, 2 and 4 callers, for calls of 1 and of 32: `"throughput":{...},` for the result
+/// Calls answered per second with 1 to 16 callers, for calls of 1 and of 32: `"throughput":{...},` for the result
 /// line. The host's part of a call runs in its caller; the device's part of one call at a time. Before the measure,
 /// an answer made this way is compared with the CPU's.
 fn run_throughput(s: &Shape, table: CudaFetch, requests: &[u8], each: usize, expected: &[Vec<u8>], seconds: f64) -> String {
@@ -326,7 +327,7 @@ fn run_throughput(s: &Shape, table: CudaFetch, requests: &[u8], each: usize, exp
             fail(s, "measuring the calls per second", "an answer differs from the CPU's");
         }
     }
-    let line = throughput_json(seconds, &[1, 2, 4], &mut |count, callers| calls_per_second(callers, seconds, &|| answer(count).map(|_| ())));
+    let line = throughput_json(seconds, &CALLERS, &mut |count, callers| calls_per_second(callers, seconds, &|| answer(count).map(|_| ())));
     format!("{},", line.unwrap_or_else(|e| fail(s, "measuring the calls per second", &e)))
 }
 

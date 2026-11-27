@@ -14,8 +14,9 @@
  * (`blockUploadMs`, median of 5). `bench/cuda-compare.ts` reads these next to `cuda_fetch`'s for the same table.
  *
  * `--throughput SECONDS` adds the calls answered per second (`throughput`): for calls of 1 and of 32, callers that
- * each send their next call when their last one is answered, for SECONDS, with 1, 2 and 4 callers. A number of
- * callers that fails (the calls' buffers did not fit together) is recorded as null and ends that call size's levels.
+ * each send their next call when their last one is answered, for SECONDS, with 1, 2, 4, 8 and 16 callers. The
+ * levels of a call size end at a number of callers that is a tenth slower than the best, or that fails (the calls'
+ * buffers did not fit together; recorded as null).
  */
 import { GpuIpirTable } from "../gpu/ipir.ts";
 import { ipirRequestBytes, ipirResponseBytes } from "../ipir/sizes.ts";
@@ -95,7 +96,7 @@ try {
       const call = requests.subarray(0, n * eachRequest);
       const byCallers: Record<string, number | null> = {};
       let best = { callers: 0, rate: 0 };
-      for (const callers of [1, 2, 4]) {
+      for (const callers of [1, 2, 4, 8, 16]) {
         stage = `calls per second: calls of ${n}, ${callers} caller(s)`;
         let done = 0;
         let failed: unknown = null;
@@ -118,6 +119,7 @@ try {
         const rate = done / ((performance.now() - t0) / 1000);
         byCallers[String(callers)] = Math.round(rate * 100) / 100;
         if (rate > best.rate) best = { callers, rate };
+        if (rate < 0.9 * best.rate) break;
       }
       throughput[String(n)] = { callsPerSecond: Math.round(best.rate * 100) / 100, callers: best.callers, byCallers };
     }
