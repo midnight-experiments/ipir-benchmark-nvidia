@@ -47,7 +47,7 @@ Then write the tables from the machines' result files, here the three files on `
 
 ```sh
 .tools/deno/deno run --allow-read --allow-write bench/summary.ts --out REPORT.md --readme README.md --cpu M4 \
-  "results/m4-max-2026-11-26-report.json=M4" \
+  "results/m4-max-2026-11-27-report.json=M4" \
   "results/pop-os-2026-11-27-report.json=RTX 20" \
   "results/rtx4090-2026-11-27-report.json=RTX 40"
 ```
@@ -164,18 +164,18 @@ a second, and a CPU backend ([docs/full-run.md](docs/full-run.md)).
 | Update, 1×: one column block | 10M | 121 ms | 30.9 ms | 66.9 ms | 71.1 ms | 45.1 ms | 52.4 ms | 34.2 ms |
 | Update, 6×: one chain block | 1M | 544 ms (9.1 %) | 53.1 ms (0.9 %)\* | 266 ms (4.4 %) | 252 ms (4.2 %) | 353 ms (5.9 %) | 113 ms (1.9 %) | 40.6 ms (0.7 %) |
 | Update, 6×: one chain block | 10M | 627 ms (10.4 %) | 60.7 ms (1.0 %)\* | 264 ms (4.4 %) | does not fit; 268 ms (4.5 %) at 8M | 384 ms (6.4 %) | does not fit; 142 ms (2.4 %) at 5M | 58.9 ms (1.0 %) |
-| Fetch 1 | 1M | 2.1 ms | no code | 15.2 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms |
-| Fetch 1 | 10M | 11.0 ms | no code | 18.0 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms |
-| Fetch 32 | 1M | 66.1 ms | no code | 29.6 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms |
-| Fetch 32 | 10M | 363 ms | no code | 72.7 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms |
-| Calls of 1 per second | 1M | not run | no code | not run | 416 | 846 | 953 | 2671 |
-| Calls of 1 per second | 10M | not run | no code | not run | 158 | 407 | 190 | 561 |
-| Calls of 32 per second | 1M | not run | no code | not run | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) |
-| Calls of 32 per second | 10M | not run | no code | not run | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) |
+| Fetch 1 | 1M | 2.1 ms | no code | 15.3 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms |
+| Fetch 1 | 10M | 12.8 ms | no code | 16.9 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms |
+| Fetch 32 | 1M | 72.1 ms | no code | 25.4 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms |
+| Fetch 32 | 10M | 427 ms | no code | 73.7 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms |
+| Calls of 1 per second | 1M | 517 | no code | 442 | 416 | 846 | 953 | 2671 |
+| Calls of 1 per second | 10M | 83.8 | no code | 193 | 158 | 407 | 190 | 561 |
+| Calls of 32 per second | 1M | 15.4 (493 values) | no code | 73.8 (2,360 values) | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) |
+| Calls of 32 per second | 10M | 2.4 (76 values) | no code | 13.5 (431 values) | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) |
 
 \* Computing only, with native kernels: nothing is installed into a table that answers, and no calls are answered meanwhile.
 
-80 of the 98 cells hold a figure; the others: 2 `does not fit`, 8 `no code`, 8 `not run`.
+88 of the 98 cells hold a figure; the others: 2 `does not fit`, 8 `no code`.
 
 Medians of `./bench.sh --report`: M4 (Apple M4 Max) on 2026-11-26, RTX 20 (RTX 2060 + Ryzen 7 2700X) on 2026-11-26, RTX 40 (RTX 4090 + Ryzen 7 7700X) on 2026-11-27. The 6× rows give the share of the 6 s between two chain blocks in brackets.
 <!-- report-summary:end -->
@@ -198,7 +198,9 @@ Medians of `./bench.sh --report`: M4 (Apple M4 Max) on 2026-11-26, RTX 20 (RTX 2
   submitting the work and reading the answer back in this harness.
 - **Answers per second**: with CUDA the RTX 40 answers 695 calls of 32 a second at 1M and 160 at 10M, the RTX 20
   147 and 27. WebGPU reaches a third to a half of that, and needs several callers at once to reach it (up to 16
-  for calls of 1), because the 12 ms of waiting in each of its calls overlap between calls. The M4's rates are not measured yet.
+  for calls of 1), because the 12 ms of waiting in each of its calls overlap between calls. The M4 with WebGPU
+  answers 73.8 calls of 32 a second at 1M and 13.5 at 10M, about as many as the RTX 20 with WebGPU; its CPU answers
+  15.4 and 2.4.
 - **One column block (1×)**: native Metal and native CUDA compute it in half to three quarters of the time WebGPU
   takes on the same GPU.
 - **Does not fit**: a 6 GB card cannot hold the six 10M matrices and build their blocks at once. The largest size at
