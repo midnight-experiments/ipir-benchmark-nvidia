@@ -59,3 +59,23 @@ the results file as `cuda`, in the run's summary as step 4 and in `docs/other-re
 - 3 GiB of the card were free (another user's process held 20.7 GiB): 32768 × 32768 ran on CUDA (2 GiB of cells) and
   did not fit on WebGPU, which also keeps the packing matrices on the card (2.6 GiB).
 - Every answer of both paths equals the CPU's, byte for byte, at all five shapes (four on WebGPU).
+
+## The report run with the card free (2026-11-27)
+
+`./bench.sh --report --cuda --host rtx4090 --label "RTX 4090 + Ryzen 7 7700X"` at `ec442eb`, 20 minutes,
+`results/rtx4090-2026-11-27-report.json`. The owner of the model that usually holds 20.7 GiB of the card stopped it
+for this run: 1 MiB of the card was in use at the start. It replaces the report run of 2026-11-26, in which six
+cells could not run beside that model.
+
+- Every cell of the RTX 40 columns now holds a figure, and the six matrices at 10 million values fit with a chain
+  block being computed (4,930 MiB at most).
+- The 6× update with WebGPU, while the GPU answers 2 calls a second: 353 ms at 1 million values and 384 ms at
+  10 million (the largest of 30 blocks: 397 and 401 ms). Computing the six blocks is 256 and 283 ms of that, and
+  installing them 97 and 100 ms.
+- The same six blocks computed alone, one right after another, take 50 ms and 67 ms. The card is idle for most of
+  the 6 s between two chain blocks, and after that idle time the WebGPU build is about five times slower (257 and
+  314 ms measured alone after 6 s of idle). The CUDA build on this card does not slow: 36 and 67 ms, and 38 and
+  70 ms after idle. The cause is not known.
+- Other users' container builds were using the CPU when the run ended (load average 2.7 at the start, 35 at the
+  end; 0.4 while the 6× update at 1 million was measured), so the CUDA fetch cells, whose packing runs on the CPU,
+  are slower than on a quiet host.
