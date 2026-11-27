@@ -21,8 +21,12 @@
 //! byte: `setup-id.bin`, `requests.bin` (32 requests), `answers.bin` (this server's 32 answers) and `matrices.bin`
 //! (each block's compiled packing matrix, 2,048 × 4,096 signed 32-bit words, row-major, as `GpuIpirTable` takes
 //! them). The matrices are computed again through the public calls that `build_with_concurrency` makes
-//! (`for_packing_blocks` of the library) and read with patch 0002's `NativePreprocessed::matrix()`.
+//! (`for_packing_blocks` in `packing.rs`) and read with patch 0002's `NativePreprocessed::matrix()`.
+#[path = "../packing.rs"]
+mod packing;
+
 use ipir_bench::*;
+use packing::{for_packing_blocks, matrix_words};
 use ipir_sp::native::NativeServer;
 use std::time::{Duration, Instant};
 

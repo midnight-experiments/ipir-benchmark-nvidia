@@ -43,12 +43,15 @@ mod cuda_fetch_native;
 #[path = "../gpu_prep.rs"]
 #[allow(dead_code)]
 mod gpu_prep;
+#[path = "../packing.rs"]
+mod packing;
 #[path = "../rns32.rs"]
 mod rns32;
 
 use cuda_build::{CudaBuilder, CudaDevice};
 use cuda_fetch_native::{CallTiming, CudaFetch, FetchDevice, Tuning, KEY_WORDS};
 use ipir_bench::*;
+use packing::{for_packing_blocks, matrix_words};
 use ipir_sp::native::NativeServer;
 use rayon::prelude::*;
 use reinspiring::native::NativeKeys;
