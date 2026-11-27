@@ -2785,6 +2785,132 @@
        ]
       }
      ]
+    },
+    "metal": {
+     "ok": true,
+     "backend": "metal-native",
+     "device": "Apple M4 Max",
+     "set": "1m",
+     "tables": [
+      {
+       "rows": 4096,
+       "cols": 12288
+      },
+      {
+       "rows": 4096,
+       "cols": 8192
+      },
+      {
+       "rows": 2048,
+       "cols": 8192
+      },
+      {
+       "rows": 6144,
+       "cols": 28672
+      },
+      {
+       "rows": 2048,
+       "cols": 2048
+      },
+      {
+       "rows": 2048,
+       "cols": 4096
+      }
+     ],
+     "rates": [
+      2
+     ],
+     "modes": [
+      "metal"
+     ],
+     "blocks": 30,
+     "intervalMs": 6000,
+     "baselineS": 20,
+     "budgetMs": 3000,
+     "goalMs": 1000,
+     "residentBytes": 1619001344,
+     "callBytes": 378273792,
+     "stagingBytes": 58720256,
+     "deviceUsedAtStartBytes": 475136,
+     "deviceUsedBytes": 4357079040,
+     "deviceTotalBytes": 38654705664,
+     "gpuPeakMiB": 4155,
+     "tuning": "ct=4,gt=4,it=4,pgt=4,ct1=8,it1=8,seg=0,pseg=0,so=1,po=1,target=262144,threads=256",
+     "runs": [
+      {
+       "rate": 2,
+       "mode": "none",
+       "issued": 40,
+       "calls": 40,
+       "answerLatencyMs": {
+        "n": 40,
+        "min": 4.004,
+        "p50": 14.08,
+        "p90": 43.448,
+        "p99": 48.71,
+        "max": 48.893
+       }
+      },
+      {
+       "rate": 2,
+       "mode": "metal",
+       "blocks": 30,
+       "blockWorkMs": {
+        "n": 30,
+        "min": 88.153,
+        "p50": 95.641,
+        "p90": 110.978,
+        "p99": 126.929,
+        "max": 130.548
+       },
+       "compileMs": {
+        "n": 30,
+        "min": 73.847,
+        "p50": 80.921,
+        "p90": 89.243,
+        "p99": 100.807,
+        "max": 101.699
+       },
+       "uploadMs": {
+        "n": 30,
+        "min": 7.343,
+        "p50": 14.695,
+        "p90": 22.5,
+        "p99": 28.436,
+        "max": 28.848
+       },
+       "overBudget": 0,
+       "overGoal": 0,
+       "issued": 353,
+       "calls": 353,
+       "answerLatencyMs": {
+        "all": {
+         "n": 353,
+         "min": 2.193,
+         "p50": 10.717,
+         "p90": 29.984,
+         "p99": 42.703,
+         "max": 55.608
+        },
+        "duringBlockWork": {
+         "n": 30,
+         "min": 12.848,
+         "p50": 19.007,
+         "p90": 25.224,
+         "p99": 31.271,
+         "max": 32.125
+        },
+        "outsideBlockWork": {
+         "n": 323,
+         "min": 2.193,
+         "p50": 10.18,
+         "p90": 31.095,
+         "p99": 43.295,
+         "max": 55.608
+        }
+       }
+      }
+     ]
     }
    },
    "metal": {
@@ -2837,13 +2963,13 @@
     "webgpuResidentMiB": 288,
     "gpuUsedMiBBefore": null,
     "cpu": {
-     "buildMs": 660.6,
+     "buildMs": 675.95,
      "timing": {
       "1": {
        "wallMs": {
-        "min": 2.038,
-        "median": 2.136,
-        "max": 2.41
+        "min": 2.122,
+        "median": 2.372,
+        "max": 3.418
        },
        "execMedianMs": {
         "unpack": null,
@@ -2855,16 +2981,16 @@
        "execMeasured": 0,
        "cpuStagesMedianMs": {
         "deserialize": 0.091,
-        "scan": 0.971,
-        "pack": 0.898,
-        "serialize": 0.159
+        "scan": 1.059,
+        "pack": 1.033,
+        "serialize": 0.156
        }
       },
       "32": {
        "wallMs": {
-        "min": 70.625,
-        "median": 72.065,
-        "max": 74.854
+        "min": 70.858,
+        "median": 76.956,
+        "max": 95.165
        },
        "execMedianMs": {
         "unpack": null,
@@ -2875,37 +3001,151 @@
        },
        "execMeasured": 0,
        "cpuStagesMedianMs": {
-        "deserialize": 2.972,
-        "scan": 33.308,
-        "pack": 30.989,
-        "serialize": 4.732
+        "deserialize": 2.875,
+        "scan": 37.092,
+        "pack": 32.533,
+        "serialize": 4.686
        }
       }
      },
      "throughput": {
       "1": {
-       "callsPerSecond": 516.99,
-       "callers": 4,
+       "callsPerSecond": 428.45,
+       "callers": 8,
        "byCallers": {
-        "1": 435.75,
-        "2": 479.06,
-        "4": 516.99,
-        "8": 512.02,
-        "16": 501.48
+        "1": 351.01,
+        "2": 364.66,
+        "4": 410.97,
+        "8": 428.45,
+        "16": 357.86
        }
       },
       "32": {
-       "callsPerSecond": 15.42,
-       "callers": 8,
+       "callsPerSecond": 12.58,
+       "callers": 2,
        "byCallers": {
-        "1": 12.67,
-        "2": 14.3,
-        "4": 15.19,
-        "8": 15.42,
-        "16": 15.27
+        "1": 10.89,
+        "2": 12.58,
+        "4": 11.74,
+        "8": 10.55
        }
       },
       "seconds": 3
+     }
+    },
+    "metalNative": {
+     "ok": true,
+     "backend": "metal-native",
+     "device": "Apple M4 Max",
+     "rows": 4096,
+     "cols": 12288,
+     "cells": 50331648,
+     "colBlocks": 6,
+     "tableBytes": 100663296,
+     "residentBytes": 301989888,
+     "callBytes": 110837760,
+     "deviceUsedBeforeBytes": 475136,
+     "deviceUsedAfterBytes": 463634432,
+     "deviceTotalBytes": 38654705664,
+     "rayonThreads": 16,
+     "tuning": "ct=4,gt=4,it=4,pgt=4,ct1=8,it1=8,seg=0,pseg=0,so=1,po=1,target=262144,threads=256",
+     "buildMs": 1512.63,
+     "initMs": 87.81,
+     "uploadMs": 20.63,
+     "writeBlockMs": 1.646,
+     "writeBlockCopyMs": 0.682,
+     "writeBlockLayoutMs": 0.964,
+     "blockBuildMs": 33.134,
+     "installMs": 0.598,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "checked": [
+      "answers of a call of 32 and of 1",
+      "first pass unrounded",
+      "packing product unrounded",
+      "write_block of a changed block",
+      "block written back",
+      "block built on the device and installed"
+     ],
+     "throughput": {
+      "1": {
+       "callsPerSecond": 1291.74,
+       "callers": 4,
+       "byCallers": {
+        "1": 1096.01,
+        "2": 1270.34,
+        "4": 1291.74,
+        "8": 1258.27,
+        "16": 1260.39
+       }
+      },
+      "32": {
+       "callsPerSecond": 144.64,
+       "callers": 2,
+       "byCallers": {
+        "1": 124.71,
+        "2": 144.64,
+        "4": 143.42,
+        "8": 140.95,
+        "16": 141.99
+       }
+      },
+      "seconds": 3
+     },
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 0.75,
+        "median": 0.781,
+        "max": 0.852
+       },
+       "kernelMs": 0.622,
+       "scanMs": 0.209,
+       "packMs": 0.402,
+       "finishMs": 0.01,
+       "parseMs": 0.007,
+       "copyInMs": 0.001,
+       "hashMs": 0.096,
+       "copyOutMs": 0.646,
+       "serializeMs": 0.016,
+       "layout": {
+        "requests": 1,
+        "columnsPerThread": 8,
+        "requestsPerThread": 1,
+        "matrixRowsPerThread": 8,
+        "packRequestsPerThread": 1,
+        "segmentRows": 256,
+        "scanSegments": 16,
+        "packSegments": 16
+       }
+      },
+      "32": {
+       "wallMs": {
+        "min": 7.127,
+        "median": 7.326,
+        "max": 7.548
+       },
+       "kernelMs": 6.44,
+       "scanMs": 2.631,
+       "packMs": 3.612,
+       "finishMs": 0.195,
+       "parseMs": 0.284,
+       "copyInMs": 0.028,
+       "hashMs": 0.474,
+       "copyOutMs": 6.261,
+       "serializeMs": 0.222,
+       "layout": {
+        "requests": 32,
+        "columnsPerThread": 4,
+        "requestsPerThread": 4,
+        "matrixRowsPerThread": 4,
+        "packRequestsPerThread": 4,
+        "segmentRows": 256,
+        "scanSegments": 16,
+        "packSegments": 16
+       }
+      }
      }
     },
     "webgpu": {
@@ -2917,62 +3157,62 @@
      "answerBytes": 1083520,
      "gpu": "Apple M4 Max",
      "firstDiff": null,
-     "uploadMs": 90.24679199999997,
+     "uploadMs": 79.80979100000002,
      "runs": 9,
      "timing": {
       "1": {
        "wallMs": {
-        "min": 13.509207999999944,
-        "median": 15.297416999999996,
-        "max": 20.597499999999968
+        "min": 14.384625000000028,
+        "median": 15.309999999999945,
+        "max": 15.775041999999985
        },
        "execMedianMs": {
-        "unpack": 0.008917,
-        "scan": 0.236541,
-        "pack": 0.437333,
-        "finish": 0.07975,
-        "total": 0.783458
+        "unpack": 0.007792,
+        "scan": 0.242167,
+        "pack": 0.426041,
+        "finish": 0.073333,
+        "total": 0.750709
        },
        "execMeasured": 9
       },
       "32": {
        "wallMs": {
-        "min": 24.821542000000022,
-        "median": 25.430500000000052,
-        "max": 27.274167000000034
+        "min": 24.507624999999962,
+        "median": 25.156417000000033,
+        "max": 26.12900000000002
        },
        "execMedianMs": {
-        "unpack": 0.029,
-        "scan": 3.735709,
-        "pack": 6.356208,
-        "finish": 0.060125,
-        "total": 10.225126
+        "unpack": 0.027167,
+        "scan": 3.726458,
+        "pack": 6.357708,
+        "finish": 0.059042,
+        "total": 10.170499
        },
        "execMeasured": 9
       }
      },
-     "blockUploadMs": 21.683332999999948,
+     "blockUploadMs": 20.581416999999988,
      "throughput": {
       "1": {
-       "callsPerSecond": 441.9,
+       "callsPerSecond": 545.88,
        "callers": 8,
        "byCallers": {
-        "1": 66.44,
-        "2": 122.93,
-        "4": 274.48,
-        "8": 441.9,
-        "16": 428.41
+        "1": 65.64,
+        "2": 134.59,
+        "4": 277.51,
+        "8": 545.88,
+        "16": 478.16
        }
       },
       "32": {
-       "callsPerSecond": 73.75,
-       "callers": 8,
+       "callsPerSecond": 71.49,
+       "callers": 2,
        "byCallers": {
-        "1": 39.79,
-        "2": 71.56,
-        "4": 73.46,
-        "8": 73.75,
-        "16": 73.28
+        "1": 39.65,
+        "2": 71.49,
+        "4": 70.56,
+        "8": 68.81,
+        "16": 65.81
        }
       },
       "seconds": 3
@@ -5682,6 +5922,132 @@
        ]
       }
      ]
+    },
+    "metal": {
+     "ok": true,
+     "backend": "metal-native",
+     "device": "Apple M4 Max",
+     "set": "10m",
+     "tables": [
+      {
+       "rows": 14336,
+       "cols": 34816
+      },
+      {
+       "rows": 16384,
+       "cols": 18432
+      },
+      {
+       "rows": 8192,
+       "cols": 20480
+      },
+      {
+       "rows": 6144,
+       "cols": 28672
+      },
+      {
+       "rows": 2048,
+       "cols": 2048
+      },
+      {
+       "rows": 2048,
+       "cols": 4096
+      }
+     ],
+     "rates": [
+      2
+     ],
+     "modes": [
+      "metal"
+     ],
+     "blocks": 30,
+     "intervalMs": 6000,
+     "baselineS": 20,
+     "budgetMs": 3000,
+     "goalMs": 1000,
+     "residentBytes": 4093640704,
+     "callBytes": 430702592,
+     "stagingBytes": 100663296,
+     "deviceUsedAtStartBytes": 475136,
+     "deviceUsedBytes": 7044218880,
+     "deviceTotalBytes": 38654705664,
+     "gpuPeakMiB": 6718,
+     "tuning": "ct=4,gt=4,it=4,pgt=4,ct1=8,it1=8,seg=0,pseg=0,so=1,po=1,target=262144,threads=256",
+     "runs": [
+      {
+       "rate": 2,
+       "mode": "none",
+       "issued": 41,
+       "calls": 41,
+       "answerLatencyMs": {
+        "n": 41,
+        "min": 3.151,
+        "p50": 26.735,
+        "p90": 55.173,
+        "p99": 65.449,
+        "max": 68.966
+       }
+      },
+      {
+       "rate": 2,
+       "mode": "metal",
+       "blocks": 30,
+       "blockWorkMs": {
+        "n": 30,
+        "min": 127.38,
+        "p50": 155.676,
+        "p90": 169.629,
+        "p99": 175.823,
+        "max": 177.473
+       },
+       "compileMs": {
+        "n": 30,
+        "min": 97.992,
+        "p50": 118.215,
+        "p90": 136.81,
+        "p99": 145.221,
+        "max": 145.988
+       },
+       "uploadMs": {
+        "n": 30,
+        "min": 22.53,
+        "p50": 31.058,
+        "p90": 45.466,
+        "p99": 46.241,
+        "max": 46.354
+       },
+       "overBudget": 0,
+       "overGoal": 0,
+       "issued": 353,
+       "calls": 353,
+       "answerLatencyMs": {
+        "all": {
+         "n": 353,
+         "min": 2.547,
+         "p50": 27.291,
+         "p90": 69.751,
+         "p99": 137.454,
+         "max": 150.598
+        },
+        "duringBlockWork": {
+         "n": 30,
+         "min": 50.882,
+         "p50": 118.59,
+         "p90": 139.387,
+         "p99": 149.396,
+         "max": 150.598
+        },
+        "outsideBlockWork": {
+         "n": 323,
+         "min": 2.547,
+         "p50": 25.804,
+         "p90": 46.24,
+         "p99": 79.662,
+         "max": 88.182
+        }
+       }
+      }
+     ]
     }
    },
    "metal": {
@@ -5734,13 +6100,13 @@
     "webgpuResidentMiB": 1496,
     "gpuUsedMiBBefore": null,
     "cpu": {
-     "buildMs": 2581.03,
+     "buildMs": 2129.47,
      "timing": {
       "1": {
        "wallMs": {
-        "min": 11.893,
-        "median": 12.81,
-        "max": 13.659
+        "min": 10.9,
+        "median": 11.358,
+        "max": 12.448
        },
        "execMedianMs": {
         "unpack": null,
@@ -5751,17 +6117,17 @@
        },
        "execMeasured": 0,
        "cpuStagesMedianMs": {
-        "deserialize": 0.213,
-        "scan": 9.4,
-        "pack": 2.75,
-        "serialize": 0.448
+        "deserialize": 0.189,
+        "scan": 8.394,
+        "pack": 2.348,
+        "serialize": 0.373
        }
       },
       "32": {
        "wallMs": {
-        "min": 409.995,
-        "median": 427.12,
-        "max": 446.935
+        "min": 369.753,
+        "median": 382.125,
+        "max": 397.125
        },
        "execMedianMs": {
         "unpack": null,
@@ -5772,34 +6138,152 @@
        },
        "execMeasured": 0,
        "cpuStagesMedianMs": {
-        "deserialize": 7.736,
-        "scan": 314.837,
-        "pack": 90.591,
-        "serialize": 13.517
+        "deserialize": 6.319,
+        "scan": 278.717,
+        "pack": 87.084,
+        "serialize": 11.034
        }
       }
      },
      "throughput": {
       "1": {
-       "callsPerSecond": 83.76,
-       "callers": 16,
+       "callsPerSecond": 90.91,
+       "callers": 4,
        "byCallers": {
-        "1": 77.58,
-        "2": 80.47,
-        "4": 80.91,
-        "8": 82.79,
-        "16": 83.76
+        "1": 87.1,
+        "2": 89.46,
+        "4": 90.91,
+        "8": 89.46,
+        "16": 87.91
        }
       },
       "32": {
-       "callsPerSecond": 2.38,
-       "callers": 1,
+       "callsPerSecond": 2.6,
+       "callers": 16,
        "byCallers": {
-        "1": 2.38,
-        "2": 2.02
+        "1": 2.37,
+        "2": 2.23,
+        "4": 2.54,
+        "8": 2.59,
+        "16": 2.6
        }
       },
       "seconds": 3
+     }
+    },
+    "metalNative": {
+     "ok": true,
+     "backend": "metal-native",
+     "device": "Apple M4 Max",
+     "rows": 14336,
+     "cols": 34816,
+     "cells": 499122176,
+     "colBlocks": 17,
+     "tableBytes": 998244352,
+     "residentBytes": 1568669696,
+     "callBytes": 136749056,
+     "deviceUsedBeforeBytes": 475136,
+     "deviceUsedAfterBytes": 1798176768,
+     "deviceTotalBytes": 38654705664,
+     "rayonThreads": 16,
+     "tuning": "ct=4,gt=4,it=4,pgt=4,ct1=8,it1=8,seg=0,pseg=0,so=1,po=1,target=262144,threads=256",
+     "buildMs": 2681.96,
+     "initMs": 51.2,
+     "uploadMs": 83.96,
+     "writeBlockMs": 2.354,
+     "writeBlockCopyMs": 1.303,
+     "writeBlockLayoutMs": 1.044,
+     "blockBuildMs": 34.353,
+     "installMs": 1.149,
+     "runs": 9,
+     "answersEqual": 32,
+     "comparedWithDump": true,
+     "checked": [
+      "answers of a call of 32 and of 1",
+      "first pass unrounded",
+      "packing product unrounded",
+      "write_block of a changed block",
+      "block written back",
+      "block built on the device and installed"
+     ],
+     "throughput": {
+      "1": {
+       "callsPerSecond": 286.08,
+       "callers": 2,
+       "byCallers": {
+        "1": 265.56,
+        "2": 286.08,
+        "4": 285.39,
+        "8": 285.5,
+        "16": 285.28
+       }
+      },
+      "32": {
+       "callsPerSecond": 26.62,
+       "callers": 2,
+       "byCallers": {
+        "1": 25.06,
+        "2": 26.62,
+        "4": 26.57,
+        "8": 26.52,
+        "16": 26.54
+       }
+      },
+      "seconds": 3
+     },
+     "cuda": {
+      "1": {
+       "wallMs": {
+        "min": 3.412,
+        "median": 3.448,
+        "max": 3.56
+       },
+       "kernelMs": 3.261,
+       "scanMs": 2.029,
+       "packMs": 1.197,
+       "finishMs": 0.027,
+       "parseMs": 0.013,
+       "copyInMs": 0.002,
+       "hashMs": 0.216,
+       "copyOutMs": 3.154,
+       "serializeMs": 0.041,
+       "layout": {
+        "requests": 1,
+        "columnsPerThread": 8,
+        "requestsPerThread": 1,
+        "matrixRowsPerThread": 8,
+        "packRequestsPerThread": 1,
+        "segmentRows": 256,
+        "scanSegments": 56,
+        "packSegments": 16
+       }
+      },
+      "32": {
+       "wallMs": {
+        "min": 37.635,
+        "median": 37.776,
+        "max": 37.903
+       },
+       "kernelMs": 36.579,
+       "scanMs": 25.99,
+       "packMs": 10.402,
+       "finishMs": 0.176,
+       "parseMs": 0.452,
+       "copyInMs": 0.062,
+       "hashMs": 1.099,
+       "copyOutMs": 35.836,
+       "serializeMs": 0.287,
+       "layout": {
+        "requests": 32,
+        "columnsPerThread": 4,
+        "requestsPerThread": 4,
+        "matrixRowsPerThread": 4,
+        "packRequestsPerThread": 4,
+        "segmentRows": 2048,
+        "scanSegments": 7,
+        "packSegments": 4
+       }
+      }
      }
     },
     "webgpu": {
@@ -5811,62 +6295,62 @@
      "answerBytes": 3065984,
      "gpu": "Apple M4 Max",
      "firstDiff": null,
-     "uploadMs": 605.7477920000001,
+     "uploadMs": 185.99408399999993,
      "runs": 9,
      "timing": {
       "1": {
        "wallMs": {
-        "min": 16.26929199999995,
-        "median": 16.88608299999987,
-        "max": 17.805374999999913
+        "min": 16.987333000000035,
+        "median": 18.275500000000193,
+        "max": 27.71429199999966
        },
        "execMedianMs": {
-        "unpack": 0.007625,
-        "scan": 2.02875,
-        "pack": 1.151209,
-        "finish": 0.102333,
-        "total": 3.298333
+        "unpack": 0.007834,
+        "scan": 2.084375,
+        "pack": 1.141167,
+        "finish": 0.094792,
+        "total": 3.337625
        },
        "execMeasured": 9
       },
       "32": {
        "wallMs": {
-        "min": 72.60083299999951,
-        "median": 73.65029099999992,
-        "max": 75.11325000000033
+        "min": 71.13216700000021,
+        "median": 72.45766600000024,
+        "max": 81.0915
        },
        "execMedianMs": {
-        "unpack": 0.054042,
-        "scan": 36.503625,
-        "pack": 18.343292,
-        "finish": 1.007666,
-        "total": 55.76474999999999
+        "unpack": 0.053708,
+        "scan": 35.328542,
+        "pack": 17.702375,
+        "finish": 0.953292,
+        "total": 54.048375
        },
        "execMeasured": 9
       }
      },
-     "blockUploadMs": 25.435874999999214,
+     "blockUploadMs": 25.973957999999584,
      "throughput": {
       "1": {
-       "callsPerSecond": 193.42,
+       "callsPerSecond": 228.11,
        "callers": 16,
        "byCallers": {
-        "1": 58.13,
-        "2": 114.51,
-        "4": 187.61,
-        "8": 190.13,
-        "16": 193.42
+        "1": 50.31,
+        "2": 104.07,
+        "4": 152.59,
+        "8": 219.19,
+        "16": 228.11
        }
       },
       "32": {
-       "callsPerSecond": 13.48,
-       "callers": 1,
+       "callsPerSecond": 16.79,
+       "callers": 8,
        "byCallers": {
-        "1": 13.48,
-        "2": 13.33,
-        "4": 12.96,
-        "8": 13.01,
-        "16": 13.3
+        "1": 13.96,
+        "2": 16.7,
+        "4": 16.74,
+        "8": 16.79,
+        "16": 16.69
        }
       },
       "seconds": 3
@@ -5900,6 +6384,24 @@
    ],
    "gpuMemoryUsedMiB": null,
    "ended": "2026-11-27T20:41:52.992Z"
+  },
+  {
+   "started": "2026-11-27T21:01:59.062Z",
+   "steps": [
+    "fetch",
+    "update6metal"
+   ],
+   "sizes": [
+    "1m",
+    "10m"
+   ],
+   "loadavg": [
+    7.94873046875,
+    5.35986328125,
+    5.0986328125
+   ],
+   "gpuMemoryUsedMiB": null,
+   "ended": "2026-11-27T21:12:16.778Z"
   }
  ]
 }

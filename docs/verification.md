@@ -60,6 +60,28 @@ Not checked: the CUDA 12 bindings. `cuda_fetch_native`, `cuda_budget` and `cuda_
 `--features cuda-12`, but neither host has CUDA 12's NVRTC to run them (with CUDA 13's they stop at
 `undefined symbol: nvrtcGetNVVM`, as upstream's kernel does).
 
+## The native Metal fetch (2026-11-27)
+
+`metal_fetch` (`metal/src/fetch.rs`, `metal/shaders/fetch.metal`) is the CUDA fetch ported to Metal, with the same
+host code for reading requests and writing answers (`ipir/bench/src/fetch_host.rs`) and the same checks before any
+timing. On the M4 Max, at 2048 × 2048, 4,096 × 12,288 (1M) and 14,336 × 34,816 (10M):
+
+- The answers to a call of 32 and to a call of 1 equal `NativeServer::respond`'s, byte for byte.
+- The first pass alone and the packing product alone, unrounded, equal upstream's, for all 32 requests.
+- A column block replaced from the host, written back, and built on the GPU by the Metal block build and installed
+  from its buffers: the answers equal the CPU's each time.
+- Every layout of the sweep (`--sweep`: 153 of the first pass, 85 of the packing, 16 for a call of 1) gives the CPU's
+  answers. The layout changes the time by less than the run-to-run spread, so the defaults are kept.
+
+Two arithmetic forms were measured on the Apple GPU. The first pass multiplies 16-bit cells, so it can do without a
+32-bit high product (`mulhi`): three 32-bit products of 16-bit halves. That form is 27 % faster there (25.9 ms
+against 35.4 ms for a call of 32 at 10M) and is the one kept. The packing multiplies 32-bit matrix entries; without
+`mulhi` it needs five products and is slower (12.5 ms against 10.4 ms), so it keeps `mulhi`. The CUDA kernels were
+not changed.
+
+Not checked: a table of more than 32,768 rows (the Metal first pass adds a segment's rows in 32 bits; `MetalFetch`
+refuses such a table), and memory running out (the M4 Max has 48 GB).
+
 The M4's fetch step was measured again on 2026-11-27 for the calls per second, with the laptop in use (load average
 6 at the start, 11 at the end): its CPU figures of that step are slower than on 2026-11-26 (fetch 32 at 10M: 427 ms,
 against 363 ms).

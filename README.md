@@ -37,8 +37,9 @@ cd ipir-benchmark-nvidia
   the command and stops. It never installs a GPU driver.
 - `--cuda` adds the CUDA columns. It needs the CUDA driver library and NVRTC ([docs/hosts.md](docs/hosts.md)).
 - `--steps LIST --merge FILE` measures only some steps again (`build`, `redimension`, `update1`, `update6`, `native`,
-  `fetch`, `update6cuda`) and puts them into a copy of an earlier result file of the same machine.
-- On macOS the run also builds and measures the native Metal kernels in `metal/`.
+  `fetch`, `update6cuda`, `update6metal`) and puts them into a copy of an earlier result file of the same machine.
+- On macOS the run also builds and measures the native Metal kernels in `metal/`: the block build, the fetch and
+  the update while answering.
 - On an NVIDIA GPU without resizable BAR, `bench.sh` builds and loads the Vulkan layer of
   `tools/hide-memory-budget-layer/` by itself.
 - `--quick` with `--report` is a short check of a few minutes; its numbers are not results.
@@ -133,15 +134,15 @@ block is 2,048 of its columns.
 |---|---|---|---|---|
 | CPU: the IPIR+SP crates with patch 0002 | M4, as the reference | yes | yes | yes |
 | WebGPU: Deno 2.7.5, on Metal on the Mac and on Vulkan on NVIDIA | M4, RTX 20, RTX 40 | yes | yes | yes, both steps on the GPU |
-| Native Metal: `metal/` | M4 | computing only | computing only | no code |
-| CUDA: this repository's kernels | RTX 20, RTX 40 | computing only | yes: built on the GPU and installed into the matrix that answers | yes, both steps on the GPU, all the requests of a call in one pass |
+| Native Metal: `metal/` | M4 | computing only | yes: built on the GPU and installed into the matrix that answers | yes, both steps on the GPU, all the requests of a call in one pass |
+| CUDA: this repository's kernels | RTX 20, RTX 40 | computing only | yes, as Metal | yes, as Metal |
 | CUDA, upstream's kernel | RTX 20, RTX 40 | no code | no code | the first pass on the GPU, one request at a time, and the packing on the host's CPU |
 
 - **Computing only**: the blocks are computed and compared with the CPU's, but nothing is installed into a table that
-  answers and no calls are answered meanwhile. Metal has no fetch to install into; the CUDA build from scratch is
-  not joined to the CUDA fetch yet.
-- The CUDA build is this repository's port of the Metal kernels, and the CUDA fetch its port of the WebGPU fetch,
-  with 64-bit integers where WebGPU's shader language has only 32-bit ones.
+  answers and no calls are answered meanwhile: the native build from scratch is not joined to the native fetch yet.
+- The CUDA build is this repository's port of the Metal build. The CUDA fetch is its port of the WebGPU fetch, with
+  64-bit integers where WebGPU's shader language has only 32-bit ones, and the Metal fetch is a port of the CUDA
+  one. The two native fetches share the host code that reads requests and writes answers.
 - Upstream's CUDA kernel is measured as it is, in two more columns of the report's fetch tables. It is not in the
   table below.
 - Every GPU result is compared with the CPU's: answers byte for byte, built blocks by a SHA-256 digest over every
@@ -162,52 +163,54 @@ a second, and a CPU backend ([docs/full-run.md](docs/full-run.md)).
 | Build from scratch | 10M | 2.44 s | 250 ms\* | 966 ms | 1.34 s | 495 ms | 443 ms\* | 317 ms\* |
 | Update, 1×: one column block | 1M | 101 ms | 28.4 ms | 61.5 ms | 59.3 ms | 47.9 ms | 41.8 ms | 23.1 ms |
 | Update, 1×: one column block | 10M | 121 ms | 30.9 ms | 66.9 ms | 71.1 ms | 45.1 ms | 52.4 ms | 34.2 ms |
-| Update, 6×: one chain block | 1M | 544 ms (9.1 %) | 53.1 ms (0.9 %)\* | 266 ms (4.4 %) | 252 ms (4.2 %) | 353 ms (5.9 %) | 113 ms (1.9 %) | 40.6 ms (0.7 %) |
-| Update, 6×: one chain block | 10M | 627 ms (10.4 %) | 60.7 ms (1.0 %)\* | 264 ms (4.4 %) | does not fit; 268 ms (4.5 %) at 8M | 384 ms (6.4 %) | does not fit; 142 ms (2.4 %) at 5M | 58.9 ms (1.0 %) |
-| Fetch 1 | 1M | 2.1 ms | no code | 15.3 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms |
-| Fetch 1 | 10M | 12.8 ms | no code | 16.9 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms |
-| Fetch 32 | 1M | 72.1 ms | no code | 25.4 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms |
-| Fetch 32 | 10M | 427 ms | no code | 73.7 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms |
-| Calls of 1 per second | 1M | 517 | no code | 442 | 416 | 846 | 953 | 2671 |
-| Calls of 1 per second | 10M | 83.8 | no code | 193 | 158 | 407 | 190 | 561 |
-| Calls of 32 per second | 1M | 15.4 (493 values) | no code | 73.8 (2,360 values) | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) |
-| Calls of 32 per second | 10M | 2.4 (76 values) | no code | 13.5 (431 values) | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) |
+| Update, 6×: one chain block | 1M | 544 ms (9.1 %) | 95.6 ms (1.6 %) | 266 ms (4.4 %) | 252 ms (4.2 %) | 353 ms (5.9 %) | 113 ms (1.9 %) | 40.6 ms (0.7 %) |
+| Update, 6×: one chain block | 10M | 627 ms (10.4 %) | 156 ms (2.6 %) | 264 ms (4.4 %) | does not fit; 268 ms (4.5 %) at 8M | 384 ms (6.4 %) | does not fit; 142 ms (2.4 %) at 5M | 58.9 ms (1.0 %) |
+| Fetch 1 | 1M | 2.4 ms | 0.8 ms | 15.3 ms | 13.2 ms | 12.2 ms | 1.1 ms | 0.4 ms |
+| Fetch 1 | 10M | 11.4 ms | 3.4 ms | 18.3 ms | 18.5 ms | 14.5 ms | 5.4 ms | 1.8 ms |
+| Fetch 32 | 1M | 77.0 ms | 7.3 ms | 25.2 ms | 25.8 ms | 15.6 ms | 7.9 ms | 1.6 ms |
+| Fetch 32 | 10M | 382 ms | 37.8 ms | 72.5 ms | 81.9 ms | 25.9 ms | 30.3 ms | 6.8 ms |
+| Calls of 1 per second | 1M | 428 | 1292 | 546 | 416 | 846 | 953 | 2671 |
+| Calls of 1 per second | 10M | 90.9 | 286 | 228 | 158 | 407 | 190 | 561 |
+| Calls of 32 per second | 1M | 12.6 (403 values) | 145 (4,628 values) | 71.5 (2,288 values) | 63.5 (2,034 values) | 235 (7,533 values) | 147 (4,699 values) | 695 (22,227 values) |
+| Calls of 32 per second | 10M | 2.6 (83 values) | 26.6 (852 values) | 16.8 (537 values) | 13.3 (425 values) | 67.9 (2,172 values) | 27.0 (864 values) | 160 (5,111 values) |
 
 \* Computing only, with native kernels: nothing is installed into a table that answers, and no calls are answered meanwhile.
 
-88 of the 98 cells hold a figure; the others: 2 `does not fit`, 8 `no code`.
+96 of the 98 cells hold a figure; the others: 2 `does not fit`.
 
 Medians of `./bench.sh --report`: M4 (Apple M4 Max) on 2026-11-26, RTX 20 (RTX 2060 + Ryzen 7 2700X) on 2026-11-26, RTX 40 (RTX 4090 + Ryzen 7 7700X) on 2026-11-27. The 6× rows give the share of the 6 s between two chain blocks in brackets.
 <!-- report-summary:end -->
 
-- **Update of a chain block (6×)**, the figure the 6 s depend on: every GPU path is under the 1 s goal. CUDA builds
-  the six blocks and installs them while the matrices answer in about 2 % of the 6 s on the RTX 20 and 1 % or less
-  on the RTX 40. WebGPU takes 4 to 6 % on the three GPUs. Native Metal computes the six blocks in 1 % of the 6 s,
-  computing only. The CPU takes 9 to 10 %.
-- **A call during an update waits less with CUDA.** A fetch 32 that arrives while a chain block is built takes 9 to
-  32 ms with CUDA and 260 to 370 ms with WebGPU on the same cards: the CUDA build and the answers run on two streams
-  of the device, the WebGPU ones in one queue.
+- **Update of a chain block (6×)**, the figure the 6 s depend on: every GPU path is under the 1 s goal. The native
+  kernels build the six blocks and install them while the matrices answer: CUDA in about 2 % of the 6 s on the
+  RTX 20 and 1 % or less on the RTX 40, Metal in 1.6 % at 1M and 2.6 % at 10M on the M4. WebGPU takes 4 to 6 % on
+  the three GPUs. The CPU takes 9 to 10 %.
+- **A call during an update waits less with the native kernels.** A fetch 32 that arrives while a chain block is
+  built takes 9 to 32 ms with CUDA and 19 to 119 ms with Metal, against 196 to 370 ms with WebGPU on the same
+  machines: the native build and the answers have separate streams or queues on the device, the WebGPU ones share
+  one queue.
 - **WebGPU's 6× update is slowest on the fastest card.** The RTX 40 takes 353 ms at 1M, against 266 ms on the M4 and
   252 ms on the RTX 20. Of the 353 ms, 256 ms is computing the six blocks, which the same card does in 50 ms when
   it has just worked: after the idle time between two chain blocks the WebGPU build is five times slower there. The
   CUDA build on that card does not slow after idle. The cause is not known yet.
-- **Fetch 32**: CUDA is the fastest path on both NVIDIA cards, 2.7 to 10 times faster than WebGPU on the same card.
-  Upstream's CUDA kernel, which answers one request at a time and packs on the CPU, is 28 to 130 times slower than
-  it ([`REPORT.md`](REPORT.md), section 5).
-- **Fetch 1**: CUDA answers in 0.4 to 5.4 ms. WebGPU's time holds about 12 ms that do not depend on the call:
-  submitting the work and reading the answer back in this harness.
-- **Answers per second**: with CUDA the RTX 40 answers 695 calls of 32 a second at 1M and 160 at 10M, the RTX 20
-  147 and 27. WebGPU reaches a third to a half of that, and needs several callers at once to reach it (up to 16
-  for calls of 1), because the 12 ms of waiting in each of its calls overlap between calls. The M4 with WebGPU
-  answers 73.8 calls of 32 a second at 1M and 13.5 at 10M, about as many as the RTX 20 with WebGPU; its CPU answers
-  15.4 and 2.4.
+- **Fetch 32**: the native kernels are the fastest path on every machine. CUDA is 2.7 to 10 times faster than WebGPU
+  on the same card, and Metal 1.9 to 3.5 times faster than WebGPU on the M4. The M4 with Metal is level with the
+  RTX 20 with CUDA at 1M (7.3 against 7.9 ms) and a quarter slower at 10M (37.8 against 30.3 ms). Upstream's CUDA
+  kernel, which answers one request at a time and packs on the CPU, is 28 to 130 times slower than this
+  repository's ([`REPORT.md`](REPORT.md), section 5).
+- **Fetch 1**: CUDA answers in 0.4 to 5.4 ms and Metal in 0.8 to 3.4 ms. WebGPU's time holds about 12 ms that do
+  not depend on the call: submitting the work and reading the answer back in this harness.
+- **Answers per second**: for calls of 32, the RTX 40 with CUDA answers 695 a second at 1M and 160 at 10M; the
+  RTX 20 with CUDA 147 and 27; the M4 with Metal 145 and 27. WebGPU reaches a third to two thirds of the native
+  rate on the same machine, and needs several callers at once to reach it (up to 16 for calls of 1), because the
+  12 ms of waiting in each of its calls overlap between calls.
 - **One column block (1×)**: native Metal and native CUDA compute it in half to three quarters of the time WebGPU
   takes on the same GPU.
 - **Does not fit**: a 6 GB card cannot hold the six 10M matrices and build their blocks at once. The largest size at
   which it does both is 8M with WebGPU and 5M with CUDA, whose block build keeps about twice the working memory
   (1.9 GiB for six tables).
-- **No code yet**: a native Metal fetch, and the CUDA build from scratch joined to the CUDA fetch (the build
-  computes every block; the blocks are not yet installed into a matrix that answers in the same run).
+- **Not joined yet**: the native build from scratch computes every block but does not install them into a matrix
+  that answers in the same run, so those four cells stay "computing only".
 
 **Full standard results:** [`REPORT.md`](REPORT.md): each table with its definitions, the GPU memory every operation
 needs, what fits on each GPU, and each run's conditions.
@@ -233,11 +236,12 @@ needs, what fits on each GPU, and each run's conditions.
 | `bench/` | The Deno benchmark scripts. The report: `report-run.ts`, `summary.ts`, `table-build.ts`, `cuda-compare.ts`, `check-cpu-answer.ts`. The full run: `fetch-all.ts`, `gpu-compile.ts`, `budget.ts`, `check-run.ts`, `export-site.ts` | new, adapted from spec 00065's GPU answer-time harness |
 | `gpu/ipir.ts`, `ipir-wgsl.ts`, `ipir-wire.ts`, `device.ts` | `GpuIpirTable`, the WebGPU answer, and its WGSL kernels. In `ipir.ts`, `create` also takes cells and matrices already on the GPU, and `createEmpty` and `writeBlock` are added, for a table built on the GPU; the others are unchanged | UmbraDB, `examples/private-shielded-sync/gpu/` at `c620f0e7` |
 | `gpu/block-build.ts` | The build of a column block in WebGPU, and `pack_digest`'s digest of its output | new: a WGSL port of the Metal block build |
-| `metal/` | The build of a column block with native Metal kernels (its own Rust crate, macOS only), and `metal_report`, the report's figures | the Metal block build of spec 00065's question 21; `metal_report` is new |
+| `metal/` | Native Metal kernels (its own Rust crate, macOS only): the build of a column block with `metal_report`, the report's figures; and the fetch (`src/fetch.rs`, `shaders/fetch.metal`) with `metal_fetch` (its checks, times and layout sweep) and `metal_budget` (a chain block built and installed while the tables answer) | the Metal block build of spec 00065's question 21; `metal_report` and the fetch are new, the fetch a port of the CUDA one |
 | `ipir/vendor/` | Five IPIR+SP crates (`inspiring`, `reinspiring`, `ipir-native-client`, `ipir-sp`, `simplepir-kernel`), with the four patches applied | UmbraDB at `4f362386`, copied from `valargroup/ipir-sp` at `791b528` |
 | `ipir/patches/` | The patches to `ipir/vendor/`: 0001 (a table gains column blocks and keeps the ones it has), 0002 (a faster CPU block compile with the same output words), 0003 (read-only accessors for a GPU build), 0004 (a hook for timing upstream's CUDA kernel, and the CUDA release as a build choice) | 0001: UmbraDB research, spec 00065; the others new |
 | `ipir/bench/src/bin/` | The CPU programs: `compile_block`, `block_worker`, `pack_digest`, `cpu_fetch`, `cpu_server`, `gpu_build_prep`; and with CUDA `cuda_fetch` (upstream's kernel), `cuda_fetch_native` (this repository's fetch: its checks, its times, its layout sweep), `cuda_budget` (a chain block built and installed while the tables answer), `cuda_build_digest`, `cuda_build_report` | new, adapted from spec 00065's compile checks |
 | `ipir/bench/src/cuda_fetch_native.rs`, `cuda_fetch_native.cu` | A fetch in CUDA: the first pass for all the requests of a call, the packing and the rounding on the GPU, a table that stays on the device, and one column block replaced in place | new: a CUDA port of the fetch in `gpu/ipir.ts` |
+| `ipir/bench/src/fetch_host.rs` | The host's part of a fetch on a GPU, for CUDA and Metal alike: the call's layout, the requests' packed words, the SHA-256, the answers' bytes | new |
 | `ipir/bench/src/packing.rs` | Each column block's compiled packing matrix, computed apart from the server through the crates' public calls | new |
 | `ipir/bench/src/cuda_build.rs`, `cuda_build.cu` | The build of a column block in CUDA: the kernels, compiled at start with NVRTC, and their host side | new: a CUDA port of the kernels in `metal/` |
 | `ipir/bench/src/gpu_prep.rs`, `rns32.rs` | The GPU builds' constant tables for a table shape, and the CPU's stage outputs to check them against | `rns32.rs` from the Metal block build; the rest new |

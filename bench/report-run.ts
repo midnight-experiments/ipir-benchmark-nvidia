@@ -22,7 +22,8 @@
  *   second (`throughput`).
  * - `update6.cuda` (with `--cuda`, when `cuda_budget` is built): one chain block with CUDA kernels only, the blocks
  *   built on the device and installed into the six tables while they answer 2 calls a second; `update6.cudaLargest`
- *   when the size does not fit, as for the WebGPU build.
+ *   when the size does not fit, as for the WebGPU build. `update6.metal` (macOS, when `metal_budget` is built): the
+ *   same with native Metal kernels. On macOS the fetch step also measures the native Metal fetch (`metal_fetch`).
  *
  * - `metal` (macOS, when `metal/target/release/metal_report` is built) and `cudaBuild` (with `--cuda`, when
  *   `cuda_build_report` is built): the computing of column blocks with native Metal or CUDA kernels, for the update
@@ -34,7 +35,7 @@
  * memory ran out), so the run goes on. `--quick`: the 1M size only, few repetitions, to check that it works.
  *
  * `--steps LIST` runs only the steps named (`build`, `redimension`, `update1`, `update6`, `native`, `fetch`,
- * `update6cuda`, comma-separated); `--merge FILE` starts from an earlier result file of this machine and replaces
+ * `update6cuda`, `update6metal`, comma-separated); `--merge FILE` starts from an earlier result file of this machine and replaces
  * only those steps in it (`reruns` records when).
  */
 import { LADDER, SET_OUTPUTS, SETS } from "./gpu-build-sets.ts";
@@ -98,10 +99,11 @@ function budget(set: string, mode: "gpu" | "pool"): Promise<Any> {
   return fileStep("budget.ts", args);
 }
 
-/** One chain block's work with CUDA kernels only (`cuda_budget`), at a set of six tables. */
-async function cudaBudget(set: string): Promise<Any> {
-  const r = await run(`${bin}/cuda_budget`, [SETS[set]!.map((t) => `${t.rows}x${t.cols}`).join(","), "--set", set, "--blocks", quick ? "4" : "30", "--baseline-s", quick ? "5" : "20"]);
-  const j = lastJson(r.lines) ?? { ok: false, error: "cuda_budget printed no result" };
+const metalBin = `${here}../metal/target/release`;
+/** One chain block's work with native kernels only (`cuda_budget`, `metal_budget`), at a set of six tables. */
+async function nativeBudget(program: string, set: string): Promise<Any> {
+  const r = await run(program, [SETS[set]!.map((t) => `${t.rows}x${t.cols}`).join(","), "--set", set, "--blocks", quick ? "4" : "30", "--baseline-s", quick ? "5" : "20"]);
+  const j = lastJson(r.lines) ?? { ok: false, error: `${program} printed no result` };
   if (j.ok === false && j.doesNotFit === undefined) j.doesNotFit = noFit(j.error);
   return j;
 }
@@ -223,7 +225,9 @@ for (const size of sizes) {
 
   if (want("update6")) {
     log(`${size}: one chain block (six tables), blocks computed on the GPU`);
-    s.update6 = { ...(s.update6?.cuda ? { cuda: s.update6.cuda, cudaLargest: s.update6.cudaLargest } : {}), gpu: await budget(size, "gpu") };
+    // The native paths' runs of an earlier pass stay.
+    const kept = Object.fromEntries(["cuda", "cudaLargest", "metal"].filter((k) => s.update6?.[k]).map((k) => [k, s.update6[k]]));
+    s.update6 = { ...kept, gpu: await budget(size, "gpu") };
     if (s.update6.gpu.ok === false && s.update6.gpu.doesNotFit && !cardInUse) {
       // The largest smaller size at which the six tables and the GPU build fit together.
       for (const smaller of LADDER.filter((x) => x.outputs < (SET_OUTPUTS[size] ?? 0))) {
@@ -244,18 +248,25 @@ for (const size of sizes) {
   if (withCuda && want("update6cuda") && await exists(`${bin}/cuda_budget`)) {
     log(`${size}: one chain block (six tables), built and installed with CUDA kernels`);
     s.update6 ??= {};
-    s.update6.cuda = await cudaBudget(size);
+    s.update6.cuda = await nativeBudget(`${bin}/cuda_budget`, size);
     delete s.update6.cudaLargest;
     if (s.update6.cuda.ok === false && s.update6.cuda.doesNotFit && !cardInUse) {
       for (const smaller of LADDER.filter((x) => x.outputs < (SET_OUTPUTS[size] ?? 0))) {
         log(`${size} does not fit with the CUDA build: trying ${smaller.set}`);
-        const r = await cudaBudget(smaller.set);
+        const r = await nativeBudget(`${bin}/cuda_budget`, smaller.set);
         if (r.ok || !r.doesNotFit) {
           s.update6.cudaLargest = r;
           break;
         }
       }
     }
+    await save();
+  }
+
+  if (Deno.build.os === "darwin" && want("update6metal") && await exists(`${metalBin}/metal_budget`)) {
+    log(`${size}: one chain block (six tables), built and installed with native Metal kernels`);
+    s.update6 ??= {};
+    s.update6.metal = await nativeBudget(`${metalBin}/metal_budget`, size);
     await save();
   }
 
@@ -277,6 +288,7 @@ for (const size of sizes) {
   if (want("fetch")) {
     log(`${size}: fetch 1 and fetch 32 on the read table, and the calls answered per second`);
     const native = withCuda && await exists(`${bin}/cuda_fetch_native`) ? ["--cuda-fetch-native", `${bin}/cuda_fetch_native`] : [];
+    if (Deno.build.os === "darwin" && await exists(`${metalBin}/metal_fetch`)) native.push("--metal-fetch", `${metalBin}/metal_fetch`);
     const f = await fileStep("cuda-compare.ts", ["--shapes", shape, "--runs", quick ? "3" : "9", "--throughput", quick ? "1" : "3", "--cpu-fetch", `${bin}/cpu_fetch`, "--cuda-fetch", `${bin}/cuda_fetch`, ...native, ...(withCuda ? [] : ["--no-cuda"])]);
     s.fetch = f.shapes?.[0] ?? f;
     await save();
