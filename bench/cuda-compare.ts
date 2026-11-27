@@ -22,7 +22,11 @@
  *
  *   deno run <permissions> bench/cuda-compare.ts --out FILE [--shapes 2048x2048,...] [--runs 9] [--no-cuda]
  *     [--cuda-fetch ipir/target/release/cuda_fetch] [--cpu-fetch ipir/target/release/cpu_fetch] [--timeout-s 1800]
- *     [--cuda-fetch-native ipir/target/release/cuda_fetch_native] [--throughput SECONDS]
+ *     [--cuda-fetch-native ipir/target/release/cuda_fetch_native] [--metal-fetch metal/target/release/metal_fetch]
+ *     [--throughput SECONDS]
+ *
+ * `--metal-fetch PATH` (macOS): the native Metal fetch (`metal_fetch`), measured and checked as `cuda_fetch_native` is
+ * (`metalNative`).
  *
  * `--throughput SECONDS`: every path also measures the calls it answers per second, for calls of 1 and of 32 (each
  * program's `--throughput`).
@@ -47,6 +51,7 @@ const cpuFetch = opts.get("cpu-fetch") ?? "ipir/target/release/cpu_fetch";
 const timeoutS = Number(opts.get("timeout-s") ?? 1800);
 const withCuda = !opts.has("no-cuda");
 const cudaFetchNative = opts.get("cuda-fetch-native");
+const metalFetch = opts.get("metal-fetch");
 const throughput = opts.get("throughput") ? ["--throughput", opts.get("throughput")!] : [];
 const here = new URL(".", import.meta.url).pathname;
 // deno-lint-ignore no-explicit-any
@@ -126,6 +131,19 @@ for (const [rows, cols] of shapes) {
         console.error(`cuda-compare ${rows}x${cols}:   call of 32: ${c.wallMs.median} ms (the device ${c.kernelMs}: first pass ${c.scanMs}, packing ${c.packMs})`);
       }
     }
+    if (metalFetch) {
+      console.error(`cuda-compare ${rows}x${cols}: native Metal`);
+      const native = await child(metalFetch, [String(rows), String(cols), String(runs), "--expect", dir, ...throughput]);
+      row.metalNative = native.parsed ?? { ok: false, error: `metal_fetch gave no result: ${native.stderr.slice(-500)}` };
+      if (!row.metalNative.ok) {
+        row.metalNative.doesNotFit = row.metalNative.doesNotFit ?? noFit(row.metalNative.error);
+        if (/compar/i.test(String(row.metalNative.stage))) different++;
+        console.error(`cuda-compare ${rows}x${cols}: native Metal ${row.metalNative.doesNotFit ? "does not fit" : "FAILED"} at ${row.metalNative.stage}: ${row.metalNative.error}`);
+      } else {
+        const c = row.metalNative.cuda["32"];
+        console.error(`cuda-compare ${rows}x${cols}:   call of 32: ${c.wallMs.median} ms (the device ${c.kernelMs}: first pass ${c.scanMs}, packing ${c.packMs})`);
+      }
+    }
     console.error(`cuda-compare ${rows}x${cols}: WebGPU`);
     const web = await child(Deno.execPath(), ["run", "--allow-read", "--allow-env", `${here}check-cpu-answer.ts`, dir, String(rows), String(cols), "--time", String(runs), ...throughput]);
     const w = web.parsed ?? { equal: null, error: `the WebGPU run gave no result: ${web.stderr.slice(-500)}` };
@@ -154,6 +172,6 @@ const result = {
   shapes: results,
 };
 await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
-const ran = results.filter((r) => r.cuda?.ok || r.cudaNative?.ok || r.webgpu?.ok).length;
+const ran = results.filter((r) => r.cuda?.ok || r.cudaNative?.ok || r.metalNative?.ok || r.webgpu?.ok).length;
 console.error(`cuda-compare: wrote ${out}; ${ran} of ${results.length} shape(s) ran${different ? `; ${different} DIFFERENT from the CPU's answers` : ""}`);
 if (different || ran === 0) Deno.exit(1);

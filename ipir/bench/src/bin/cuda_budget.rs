@@ -110,7 +110,7 @@ fn run(o: &Options) -> Result<String, String> {
     let build_dev = CudaDevice::new(0)?;
     let dev = FetchDevice::with_context(build_dev.context())?;
     let (used_at_start, total) = dev.memory()?;
-    let tuning = Tuning::from_env()?;
+    let tuning = Tuning::from_env("IPIR_CUDA_FETCH")?;
     let mut rng = Xorshift::new(0x6b10c);
     // One synthetic compiled matrix for every block of every table: 26-bit signed entries.
     let matrix: Vec<i32> = (0..BLOCK_COLS * KEY_WORDS).map(|_| (rng.next() as i32) >> 6).collect();

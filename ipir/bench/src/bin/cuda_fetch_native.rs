@@ -122,7 +122,7 @@ fn main() {
     let runs: usize = args.get(2).map_or(9, |x| x.parse().unwrap());
     let s = Shape { rows, cols };
     let blocks = cols / BLOCK_COLS;
-    let tuning = Tuning::from_env().unwrap_or_else(|e| fail(&s, "reading IPIR_CUDA_FETCH", &e));
+    let tuning = Tuning::from_env("IPIR_CUDA_FETCH").unwrap_or_else(|e| fail(&s, "reading IPIR_CUDA_FETCH", &e));
 
     let mut rng = Xorshift::new(0x5eed ^ rows as u32 ^ cols as u32);
     let cells = xorshift_cells(rows, cols, &mut rng);

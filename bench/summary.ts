@@ -44,6 +44,8 @@ for (const a of args) {
 const cpu = machines.find((m) => m.name === cpuName) ?? machines[0]!;
 const cudas = machines.filter((m) => m.r.cuda);
 const SIZES = ["1m", "10m"].filter((s) => machines.some((m) => m.r.sizes?.[s]));
+/** The sizes' names as sets: an update measured at another set says so. */
+const SET_VALUES: Record<string, boolean> = { "1m": true, "10m": true };
 const sizeName = (s: string) => s.toUpperCase();
 const MIB = 2 ** 20;
 
@@ -74,7 +76,15 @@ const summary: string[][] = [];
  */
 function table(
   name: string,
-  cells: { cpu: (z: Any) => string; webgpu: (z: Any, m: { name: string; r: Any }) => string; cuda: (z: Any) => string; metal?: (n: Any) => string | null; upstream?: (z: Any) => string },
+  cells: {
+    cpu: (z: Any) => string;
+    webgpu: (z: Any, m: { name: string; r: Any }) => string;
+    cuda: (z: Any) => string;
+    /** From the Metal machine's native build report (`metal`), or from its whole size (`metalSize`). */
+    metal?: (n: Any) => string | null;
+    metalSize?: (z: Any) => string | null;
+    upstream?: (z: Any) => string;
+  },
   rows: string[] = SIZES,
 ): string[] {
   const head = [...header, ...(cells.upstream ? cudas.map((m) => `CUDA, upstream's kernel ${m.name}`) : [])];
@@ -88,7 +98,7 @@ function table(
         inUse = false;
       }
     };
-    const row = [sizeName(s), on(cpu, () => cells.cpu(size(cpu, s))), cells.metal?.(metalOf(s)) ?? "no code", ...machines.map((m) => on(m, () => cells.webgpu(size(m, s), m))), ...cudas.map((m) => on(m, () => cells.cuda(size(m, s))))];
+    const row = [sizeName(s), on(cpu, () => cells.cpu(size(cpu, s))), (cells.metalSize ? cells.metalSize(metalSizeOf(s)) : cells.metal?.(metalOf(s))) ?? "no code", ...machines.map((m) => on(m, () => cells.webgpu(size(m, s), m))), ...cudas.map((m) => on(m, () => cells.cuda(size(m, s))))];
     lines.push(`| ${[...row, ...(cells.upstream ? cudas.map((m) => on(m, () => cells.upstream!(size(m, s)))) : [])].join(" | ")} |`);
     summary.push([name, ...row]);
   }
@@ -103,6 +113,8 @@ const native = (n: Any, f: (n: Any) => string | null, star = true): string | nul
   return v === null ? null : `${v}${star ? "\\*" : ""}`;
 };
 const metalOf = (s: string): Any => machines.map((m) => size(m, s)?.metal).find(Boolean) ?? null;
+/** The size of the machine that ran the native Metal kernels. */
+const metalSizeOf = (s: string): Any => machines.map((m) => size(m, s)).find((z) => z?.metal || z?.fetch?.metalNative || z?.update6?.metal) ?? null;
 const pct = (ms: number) => `${time(ms)} (${((ms / 6000) * 100).toFixed(1)} %)`;
 /** The run of a budget result in `mode` (its block work at 2 calls a second). */
 const runOf = (b: Any, mode: string): Any => (b?.ok ? (b.runs ?? []).find((x: Any) => x.mode === mode) : null);
@@ -125,7 +137,7 @@ const any = machines.map((m) => m.r).find((r) => SIZES.every((s) => r.sizes?.[s]
 L.push("# Report: a table's four operations at 1 million and 10 million values", "");
 L.push(
   "Written by `bench/summary.ts` from the result files named at the end; every figure is a median measured by `./bench.sh --report` on that machine. " +
-    "A cell without a figure says why: `not run`, `does not fit` (the GPU's memory ran out), `failed`, `no code` (no native Metal fetch exists here), " +
+    "A cell without a figure says why: `not run`, `does not fit` (the GPU's memory ran out), `failed`, `no code`, " +
     "`no GPU code`.",
   "",
 );
@@ -135,8 +147,8 @@ L.push(
   "- **Value**: one shielded output's read record, 98 bytes (49 cells of 2 bytes).",
   "- **Matrix**: the table of all values, rows × columns of cells. One fetch reads one row.",
   "- **Column block**: 2,048 columns of a matrix, the unit that is computed again when data is added.",
-  `- **CPU ${cpu.name}**: the vendored crates with patch 0002. **Metal**: native Metal kernels for the build of a column block; there is no native Metal fetch. **WebGPU**: Deno's WebGPU, on Metal on the Mac and on Vulkan on the NVIDIA cards.`,
-  "- **CUDA**: this benchmark's own CUDA kernels. A fetch answers all the requests of a call in one pass over the matrix and does the packing on the GPU; a column block is built on the GPU and installed into the matrix that answers.",
+  `- **CPU ${cpu.name}**: the vendored crates with patch 0002. **WebGPU**: Deno's WebGPU, on Metal on the Mac and on Vulkan on the NVIDIA cards.`,
+  "- **Metal** and **CUDA**: this benchmark's own native kernels, the same design on both. A fetch answers all the requests of a call in one pass over the matrix and does the packing on the GPU; a column block is built on the GPU and installed into the matrix that answers.",
   "- **CUDA, upstream's kernel**: the CUDA kernel of the IPIR+SP crates as it is. It does the first pass of a fetch for one request per call; the packing runs on that host's CPU. It has no code for a build or an update.",
   "",
 );
@@ -159,7 +171,7 @@ L.push(...table("Build from scratch", {
   metal: (n) => native(n, (x) => time(x.build?.wallMs)),
 }));
 L.push("", "The WebGPU figure is from the cells in host memory to a table that answers; the table built on the GPU answers 32 requests exactly as the CPU-built one.", "");
-const STAR = "\\* Computing only, with native kernels: the blocks' hint columns and packing matrices are computed and compared with the CPU's, but nothing is installed into a matrix that answers and no calls are answered meanwhile. Metal has no native fetch to install into; the CUDA build from scratch is not joined to the CUDA fetch.";
+const STAR = "\\* Computing only, with native kernels: the blocks' hint columns and packing matrices are computed and compared with the CPU's, but nothing is installed into a matrix that answers and no calls are answered meanwhile: the native build from scratch is not joined to the native fetch.";
 if (SIZES.some((s) => metalOf(s) || machines.some((m) => size(m, s)?.cudaBuild))) L.push(STAR, "");
 
 L.push("## 3. Update: data added to one column block", "");
@@ -193,9 +205,9 @@ L.push(...table("Update, 6×: one chain block", {
     const l = u.cudaLargest;
     return l?.ok ? `${why(u.cuda)}; ${work(l, "cuda")} at ${String(l.set).toUpperCase()}` : why(u.cuda);
   },
-  metal: (n) => native(n, (x) => (x.update6?.wallMs ? pct(x.update6.wallMs) : null)),
+  metalSize: (z) => (z?.update6?.metal ? work(z.update6.metal, "metal") ?? why(z.update6.metal) : native(z?.metal, (x) => (x.update6?.wallMs ? pct(x.update6.wallMs) : null))),
 }));
-L.push("", `The CPU column computes the six blocks on a low-priority pool of half the cores and writes them to the GPU that answers. The WebGPU and CUDA columns compute them on the GPU that answers and install them into its matrices.`, "");
+L.push("", `The CPU column computes the six blocks on a low-priority pool of half the cores and writes them to the GPU that answers. The WebGPU, Metal and CUDA columns compute them on the GPU that answers and install them into its matrices.`, "");
 if (SIZES.some((s) => metalOf(s) || machines.some((m) => size(m, s)?.cudaBuild))) L.push(STAR, "");
 
 for (const [n, title] of [["1", "## 4. Fetch 1 value"], ["32", "## 5. Fetch 32 values (one wallet call)"]] as const) {
@@ -205,11 +217,12 @@ for (const [n, title] of [["1", "## 4. Fetch 1 value"], ["32", "## 5. Fetch 32 v
     cpu: (z) => time(z?.fetch?.cpu?.timing?.[n]?.wallMs?.median) ?? why(z?.fetch?.cpu?.timing ? null : z?.fetch),
     webgpu: (z) => (z?.fetch?.webgpu?.ok ? time(z.fetch.webgpu.timing?.[n]?.wallMs?.median)! : why(z?.fetch?.webgpu)),
     cuda: (z) => (z?.fetch?.cudaNative?.ok ? time(z.fetch.cudaNative.cuda?.[n]?.wallMs?.median)! : why(z?.fetch?.cudaNative)),
+    metalSize: (z) => (z?.fetch?.metalNative ? (z.fetch.metalNative.ok ? time(z.fetch.metalNative.cuda?.[n]?.wallMs?.median) : why(z.fetch.metalNative)) : null),
     upstream: (z) => (z?.fetch?.cuda?.ok ? time(z.fetch.cuda.cuda?.[n]?.wallMs?.median)! : why(z?.fetch?.cuda)),
   }));
   L.push("");
 }
-L.push("The CUDA cells answer the 32 requests in one pass over the matrix, with the packing on the GPU. Upstream's kernel does the first pass one request at a time and leaves the packing to that NVIDIA host's CPU, so its call of 32 costs about 32 calls of 1. Every WebGPU and CUDA answer equals the CPU's, byte for byte.", "");
+L.push("The Metal and CUDA cells answer the 32 requests in one pass over the matrix, with the packing on the GPU. Upstream's kernel does the first pass one request at a time and leaves the packing to that NVIDIA host's CPU, so its call of 32 costs about 32 calls of 1. Every WebGPU, Metal and CUDA answer equals the CPU's, byte for byte.", "");
 
 L.push("## 6. Answers per second", "");
 L.push(
@@ -222,13 +235,14 @@ for (const [n, title] of [["1", "**Calls of 1 per second**"], ["32", "**Calls of
     cpu: (z) => rate(z?.fetch?.cpu?.throughput, n) ?? "not run",
     webgpu: (z) => (z?.fetch?.webgpu?.ok ? rate(z.fetch.webgpu.throughput, n) ?? "not run" : why(z?.fetch?.webgpu)),
     cuda: (z) => (z?.fetch?.cudaNative?.ok ? rate(z.fetch.cudaNative.throughput, n) ?? "not run" : why(z?.fetch?.cudaNative)),
+    metalSize: (z) => (z?.fetch?.metalNative ? (z.fetch.metalNative.ok ? rate(z.fetch.metalNative.throughput, n) ?? "not run" : why(z.fetch.metalNative)) : null),
     upstream: (z) => (z?.fetch?.cuda?.ok ? rate(z.fetch.cuda.throughput, n) ?? "not run" : why(z?.fetch?.cuda)),
   }));
   L.push("");
 }
 
 L.push("## 7. Memory: what fits on each GPU", "");
-L.push("What the WebGPU path's buffers hold on the GPU, at most, during each operation (the same on every machine). The CUDA path's memory is in section 8.", "");
+L.push("What the WebGPU path's buffers hold on the GPU, at most, during each operation (the same on every machine). The Metal and CUDA paths' memory is in section 8.", "");
 L.push("| Values | To answer (six matrices) | To answer and update (and one chain block being computed) | To build the matrix from scratch (alone on the card) | To re-dimension the matrix while it serves (old and new together) |", "|---|---|---|---|---|");
 const first = (s: string, f: (z: Any) => number | null | undefined): string => {
   for (const m of machines) {
@@ -284,19 +298,25 @@ for (const m of machines) {
     for (const [what, n] of [["Metal", z.metal], ["CUDA", z.cudaBuild]] as const) {
       if (n?.digestsChecked) bits.push(`the native ${what} build's output equals the CPU's in ${n.digestsEqual} of ${n.digestsChecked} blocks; its six blocks alone ${time(n.update6?.wallMs)}, and ${time(n.update6?.afterIdle?.wallMs)} after 6 s of idle`);
     }
-    const cn = z.fetch?.cudaNative?.ok ? z.fetch.cudaNative : null;
-    const c32 = cn?.cuda?.["32"];
-    if (c32) {
-      bits.push(`CUDA fetch 32: ${time(c32.kernelMs)} on the device (first pass ${time(c32.scanMs)}, packing ${time(c32.packMs)}), and on the host ${time(c32.parseMs + c32.copyInMs)} to read and copy the requests in and ${time(c32.serializeMs)} to write the answers, the SHA-256 of the requests (${time(c32.hashMs)}) running while the device works`);
-      bits.push(`CUDA: the matrix holds ${gib(cn.residentBytes / MIB)} on the device and a call's buffers ${gib(cn.callBytes / MIB)}; one changed column block is written from the host in ${time(cn.writeBlockMs)}, and installed from the block build's buffers in ${time(cn.installMs)}`);
+    // The native paths: the fetch's parts and memory, and the update while answering.
+    const natives: [string, Any, Any, string][] = [
+      ["Metal", z.fetch?.metalNative, z.update6?.metal, "metal"],
+      ["CUDA", z.fetch?.cudaNative, z.update6?.cuda?.ok ? z.update6.cuda : z.update6?.cudaLargest, "cuda"],
+    ];
+    for (const [what, fetch, update, mode] of natives) {
+      const n32 = fetch?.ok ? fetch.cuda?.["32"] : null;
+      if (n32) {
+        bits.push(`${what} fetch 32: ${time(n32.kernelMs)} on the device (first pass ${time(n32.scanMs)}, packing ${time(n32.packMs)}), and on the host ${time(n32.parseMs + n32.copyInMs)} to read and copy the requests in and ${time(n32.serializeMs)} to write the answers, the SHA-256 of the requests (${time(n32.hashMs)}) running while the device works`);
+        bits.push(`${what}: the matrix holds ${gib(fetch.residentBytes / MIB)} on the device and a call's buffers ${gib(fetch.callBytes / MIB)}; one changed column block is written from the host in ${time(fetch.writeBlockMs)}, and installed from the block build's buffers in ${time(fetch.installMs)}`);
+      }
+      const nr = runOf(update, mode);
+      if (nr) {
+        const nb = update.runs?.find((x: Any) => x.mode === "none");
+        const at = SET_VALUES[s] && update.set && String(update.set).toLowerCase() !== s ? ` (at ${String(update.set).toUpperCase()})` : "";
+        bits.push(`${what} 6× update${at}: ${time(nr.compileMs?.p50)} to build the six blocks and ${time(nr.uploadMs?.p50)} to install them; fetch 32 while it runs ${time(nr.answerLatencyMs?.duringBlockWork?.p50)}, against ${time(nb?.answerLatencyMs?.p50)} otherwise; no block of ${nr.blocks} over 1 s: ${nr.overGoal === 0 ? "yes" : `no, ${nr.overGoal}`}; the six matrices, the calls' buffers and the build hold ${gib(update.gpuPeakMiB)} on the device`);
+      }
     }
-    const cu = z.update6?.cuda?.ok ? z.update6.cuda : z.update6?.cudaLargest?.ok ? z.update6.cudaLargest : null;
-    const cr = runOf(cu, "cuda");
-    if (cr) {
-      const cb = cu.runs?.find((x: Any) => x.mode === "none");
-      bits.push(`CUDA 6× update${cu === z.update6?.cuda ? "" : ` (at ${String(cu.set).toUpperCase()})`}: ${time(cr.compileMs?.p50)} to build the six blocks and ${time(cr.uploadMs?.p50)} to install them; fetch 32 while it runs ${time(cr.answerLatencyMs?.duringBlockWork?.p50)}, against ${time(cb?.answerLatencyMs?.p50)} otherwise; no block of ${cr.blocks} over 1 s: ${cr.overGoal === 0 ? "yes" : `no, ${cr.overGoal}`}; the six matrices, the calls' buffers and the build hold ${gib(cu.gpuPeakMiB)} on the device`);
-    }
-    const reached = ([["the CPU", z.fetch?.cpu?.throughput], ["WebGPU", z.fetch?.webgpu?.ok ? z.fetch.webgpu.throughput : null], ["CUDA", cn?.throughput]] as [string, Any][])
+    const reached = ([["the CPU", z.fetch?.cpu?.throughput], ["WebGPU", z.fetch?.webgpu?.ok ? z.fetch.webgpu.throughput : null], ["Metal", z.fetch?.metalNative?.ok ? z.fetch.metalNative.throughput : null], ["CUDA", z.fetch?.cudaNative?.ok ? z.fetch.cudaNative.throughput : null]] as [string, Any][])
       .filter(([, t]) => t?.["1"] && t?.["32"])
       .map(([name, t]) => `${name} ${t["1"].callers} and ${t["32"].callers}`);
     if (reached.length) bits.push(`callers at the highest rate of answers per second, for calls of 1 and of 32: ${reached.join(", ")}`);

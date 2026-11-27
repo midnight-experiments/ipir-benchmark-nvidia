@@ -264,6 +264,7 @@ name = "mbb"
 version = "0.1.0"
 dependencies = [
  "ipir-sp",
+ "libc",
  "metal",
  "rand 0.8.6",
  "rand_chacha",
