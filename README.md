@@ -47,7 +47,7 @@ Then write the tables from the machines' result files, here the three files on `
 .tools/deno/deno run --allow-read --allow-write bench/summary.ts --out REPORT.md --readme README.md --cpu M4 \
   "results/m4-max-2026-11-26-report.json=M4" \
   "results/pop-os-2026-11-26-report.json=RTX 20" \
-  "results/rtx4090-2026-11-26-report.json=RTX 40"
+  "results/rtx4090-2026-11-27-report.json=RTX 40"
 ```
 
 This writes [`REPORT.md`](REPORT.md) and the table under [Quick results summary](#quick-results-summary). No figure
@@ -122,7 +122,7 @@ block is 2,048 of its columns.
 |---|---|---|---|
 | M4 | Apple M4 Max, 40-core GPU | Apple M4 Max, 16 cores | A laptop in use |
 | RTX 20 | GeForce RTX 2060, 6 GB, no resizable BAR | Ryzen 7 2700X | A desktop in use; needs the Vulkan layer |
-| RTX 40 | GeForce RTX 4090, 24 GB, resizable BAR on | Ryzen 7 7700X | A shared host: another user's process holds about 21 of the card's 24 GiB |
+| RTX 40 | GeForce RTX 4090, 24 GB, resizable BAR on | Ryzen 7 7700X | A shared host: another user's process usually holds about 21 of the card's 24 GiB, and was stopped for the report run |
 
 **Code paths, and what each has code for**
 
@@ -150,36 +150,39 @@ a second, and a CPU backend ([docs/full-run.md](docs/full-run.md)).
 <!-- report-summary:start -->
 | Operation | Values | CPU M4 | Metal M4 | WebGPU M4 | WebGPU RTX 20 | WebGPU RTX 40 | CUDA RTX 20 | CUDA RTX 40 |
 |---|---|---|---|---|---|---|---|---|
-| Build from scratch | 1M | 622 ms | 78.1 ms\* | 305 ms | 307 ms | 153 ms | 116 ms\* | 55.7 ms\* |
-| Build from scratch | 10M | 2.44 s | 250 ms\* | 966 ms | 1.34 s | not run (card in use) | 443 ms\* | not run (card in use) |
-| Update, 1×: one column block | 1M | 101 ms | 28.4 ms | 61.5 ms | 59.3 ms | 47.4 ms | 41.8 ms | 22.5 ms |
-| Update, 1×: one column block | 10M | 121 ms | 30.9 ms | 66.9 ms | 71.1 ms | 44.9 ms | 52.4 ms | not run (card in use) |
-| Update, 6×: one chain block | 1M | 544 ms (9.1 %) | 53.1 ms (0.9 %)\* | 266 ms (4.4 %) | 252 ms (4.2 %) | not run (card in use) | 84.7 ms (1.4 %)\* | 34.5 ms (0.6 %)\* |
-| Update, 6×: one chain block | 10M | 627 ms (10.4 %) | 60.7 ms (1.0 %)\* | 264 ms (4.4 %) | does not fit; 268 ms (4.5 %) at 8M | not run (card in use) | 106 ms (1.8 %)\* | not run (card in use) |
-| Fetch 1 | 1M | 2.1 ms | no code | 15.2 ms | 13.4 ms | 12.3 ms | 7.8 ms | 6.5 ms |
-| Fetch 1 | 10M | 11.0 ms | no code | 18.0 ms | 18.2 ms | 14.7 ms | 25.2 ms | 23.1 ms |
-| Fetch 32 | 1M | 66.1 ms | no code | 29.6 ms | 30.1 ms | 15.6 ms | 257 ms | 217 ms |
-| Fetch 32 | 10M | 363 ms | no code | 72.7 ms | 82.7 ms | 30.7 ms | 832 ms | 769 ms |
+| Build from scratch | 1M | 622 ms | 78.1 ms\* | 305 ms | 307 ms | 154 ms | 116 ms\* | 57.5 ms\* |
+| Build from scratch | 10M | 2.44 s | 250 ms\* | 966 ms | 1.34 s | 495 ms | 443 ms\* | 317 ms\* |
+| Update, 1×: one column block | 1M | 101 ms | 28.4 ms | 61.5 ms | 59.3 ms | 47.9 ms | 41.8 ms | 23.1 ms |
+| Update, 1×: one column block | 10M | 121 ms | 30.9 ms | 66.9 ms | 71.1 ms | 45.1 ms | 52.4 ms | 34.2 ms |
+| Update, 6×: one chain block | 1M | 544 ms (9.1 %) | 53.1 ms (0.9 %)\* | 266 ms (4.4 %) | 252 ms (4.2 %) | 353 ms (5.9 %) | 84.7 ms (1.4 %)\* | 35.8 ms (0.6 %)\* |
+| Update, 6×: one chain block | 10M | 627 ms (10.4 %) | 60.7 ms (1.0 %)\* | 264 ms (4.4 %) | does not fit; 268 ms (4.5 %) at 8M | 384 ms (6.4 %) | 106 ms (1.8 %)\* | 66.5 ms (1.1 %)\* |
+| Fetch 1 | 1M | 2.1 ms | no code | 15.2 ms | 13.4 ms | 12.5 ms | 7.8 ms | 7.4 ms |
+| Fetch 1 | 10M | 11.0 ms | no code | 18.0 ms | 18.2 ms | 14.5 ms | 25.2 ms | 27.1 ms |
+| Fetch 32 | 1M | 66.1 ms | no code | 29.6 ms | 30.1 ms | 14.9 ms | 257 ms | 235 ms |
+| Fetch 32 | 10M | 363 ms | no code | 72.7 ms | 82.7 ms | 31.2 ms | 832 ms | 777 ms |
 
 \* Computing only, with native kernels: nothing is installed into a table that answers, and no calls are answered meanwhile.
 
-59 of the 70 cells hold a figure; the others: 6 `not run (card in use)`, 1 `does not fit`, 4 `no code`.
+65 of the 70 cells hold a figure; the others: 1 `does not fit`, 4 `no code`.
 
-Medians of `./bench.sh --report`: M4 (Apple M4 Max) on 2026-11-26, RTX 20 (RTX 2060 + Ryzen 7 2700X) on 2026-11-26, RTX 40 (RTX 4090 + Ryzen 7 7700X) on 2026-11-26. The 6× rows give the share of the 6 s between two chain blocks in brackets.
+Medians of `./bench.sh --report`: M4 (Apple M4 Max) on 2026-11-26, RTX 20 (RTX 2060 + Ryzen 7 2700X) on 2026-11-26, RTX 40 (RTX 4090 + Ryzen 7 7700X) on 2026-11-27. The 6× rows give the share of the 6 s between two chain blocks in brackets.
 <!-- report-summary:end -->
 
 - **Update of a chain block (6×)**, the figure the 6 s depend on: every GPU path is under the 1 s goal. With WebGPU,
-  while the GPU answers calls, it takes 4 to 5 % of the 6 s on the two GPUs where it ran. The native kernels compute
-  the six blocks in under 2 % of the 6 s, computing only. The CPU takes 9 to 10 %.
+  while the GPU answers calls, it takes 4 to 6 % of the 6 s on the three GPUs. The native kernels compute the six
+  blocks in under 2 % of the 6 s, computing only. The CPU takes 9 to 10 %.
+- **WebGPU's 6× update is slowest on the fastest card.** The RTX 40 takes 353 ms at 1M, against 266 ms on the M4 and
+  252 ms on the RTX 20. Of the 353 ms, 256 ms is computing the six blocks, which the same card does in 50 ms when
+  it has just worked: after the idle time between two chain blocks the WebGPU build is five times slower there. The
+  CUDA build on that card does not slow after idle (38 ms). The cause is not known yet.
 - **Fetch 32**: WebGPU is the fastest path on every GPU. The CUDA path is 8 to 25 times slower on the same card,
   because its packing runs on the CPU.
 - **Fetch 1**: the CPU is the fastest at 1M. WebGPU's time holds about 12 ms that do not depend on the call:
   submitting the work and reading the answer back in this harness.
 - **One column block (1×)**: native Metal and native CUDA compute it in half to three quarters of the time WebGPU
   takes on the same GPU.
-- **Not measured**: the RTX 40 cells marked `not run (card in use)` wait for the other user's process to leave the
-  card. A 6 GB card cannot hold the six 10M matrices and build their blocks at once: the largest size at which it
-  does both is 8M.
+- **Does not fit**: a 6 GB card cannot hold the six 10M matrices and build their blocks at once: the largest size at
+  which it does both is 8M.
 - **No code yet**: a native Metal fetch, and a CUDA fetch with the packing on the GPU. A real 6× update on those two
   paths needs them.
 

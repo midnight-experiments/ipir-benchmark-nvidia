@@ -20,9 +20,11 @@ on 2026-11-26: 24 of 24 blocks equal the CPU's, and the block budget ran at both
 
 A full run with the GPU build was then made on each of the two NVIDIA hosts ([other-results.md](other-results.md)).
 
-Not run yet: the block budget at the 10-million-output shapes with the blocks built on an NVIDIA GPU (it needs more
-than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead, and the RTX 4090's memory was
-held by another user; on the M4 Max it ran), and the container check in `setup.sh`. Checked on macOS without a benchmark run:
+Not run yet: the full run's block budget at the 10-million-output shapes with the blocks built on an NVIDIA GPU (it
+needs more than the 6 GB of the RTX 2060, where it was measured at 8 million outputs instead, and the RTX 4090's
+memory was held by another user during its full run; on the M4 Max it ran), and the container check in `setup.sh`.
+The report run of 2026-11-27 on the RTX 4090, with the card free, did measure it at 2 calls a second
+([REPORT.md](../REPORT.md), section 3). Checked on macOS without a benchmark run:
 `bench/check-run.ts` and the export against the committed Metal run and against copies of it renamed to `nvidia`,
 `nvidia-no-bar` and `nvidia-unknown-bar`; resizable BAR detection against `nvidia-smi -q -d MEMORY` reports with
 BAR1 above the framebuffer, at 256 MiB, and absent; and `bench.sh`'s order of steps, with stand-ins for `setup.sh`,
