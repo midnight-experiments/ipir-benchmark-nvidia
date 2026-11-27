@@ -47,6 +47,8 @@ while [[ $# -gt 0 ]]; do
     --cpu-only) CPU_ONLY=1 ;;
     --cuda) CUDA=1; FULL_ARGS+=(--cuda) ;;
     --report) REPORT=1 ;;
+    --steps) REPORT_STEPS="$2"; shift ;;
+    --merge) REPORT_MERGE="$2"; shift ;;
     --budget-sets) FULL_ARGS+=(--budget-sets "$2"); shift ;;
     --host) export IPIR_BENCH_HOST="$2"; shift ;;
     --label) LABEL="$2"; shift ;;
@@ -145,6 +147,8 @@ if [[ $REPORT == 1 ]]; then
   args=(--out "$OUT")
   [[ -n "$LABEL" ]] && args+=(--label "$LABEL")
   [[ $QUICK_ONLY == 1 ]] && args+=(--quick)
+  [[ -n "${REPORT_STEPS:-}" ]] && args+=(--steps "$REPORT_STEPS")
+  [[ -n "${REPORT_MERGE:-}" ]] && args+=(--merge "$REPORT_MERGE")
   if [[ $CUDA == 1 ]]; then
     feature=$("$ROOT/tools/cuda-feature.sh")
     echo "building cuda_fetch ($feature)"
@@ -155,6 +159,13 @@ if [[ $REPORT == 1 ]]; then
       (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$feature" --bin cuda_build_report 2>/dev/null \
         || cargo build --release --locked -p ipir-bench --features "$feature" --bin cuda_build_report; }) || echo "cuda_build_report did not build: the CUDA build cells stay empty" >&2
     fi
+    # This benchmark's own CUDA fetch and its update while answering, when this checkout has them.
+    for bin in cuda_fetch_native cuda_budget; do
+      if grep -q "name = \"$bin\"" ipir/bench/Cargo.toml; then
+        (cd ipir && { cargo build --release --locked --offline -p ipir-bench --features "$feature" --bin $bin 2>/dev/null \
+          || cargo build --release --locked -p ipir-bench --features "$feature" --bin $bin; }) || echo "$bin did not build: its cells stay empty" >&2
+      fi
+    done
     args+=(--cuda)
   fi
   if [[ $OS == Darwin && -d metal ]]; then

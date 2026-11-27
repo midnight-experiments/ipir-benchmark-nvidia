@@ -17,8 +17,15 @@
  * 3. `check-cpu-answer.ts DIR <rows> <cols> --time <runs>`: the WebGPU path's answers for the dumped table, compared
  *    byte for byte with the CPU's, its times, and the write of one changed column block.
  *
+ * 4. With `--cuda-fetch-native PATH` (`cuda_fetch_native`): this benchmark's own CUDA kernels, the first pass for
+ *    all 32 requests in one launch and the packing on the GPU; its answers compared in the same way (`cudaNative`).
+ *
  *   deno run <permissions> bench/cuda-compare.ts --out FILE [--shapes 2048x2048,...] [--runs 9] [--no-cuda]
  *     [--cuda-fetch ipir/target/release/cuda_fetch] [--cpu-fetch ipir/target/release/cpu_fetch] [--timeout-s 1800]
+ *     [--cuda-fetch-native ipir/target/release/cuda_fetch_native] [--throughput SECONDS]
+ *
+ * `--throughput SECONDS`: every path also measures the calls it answers per second, for calls of 1 and of 32 (each
+ * program's `--throughput`).
  *
  * `--no-cuda` leaves step 2 out (a host without CUDA): the CPU's and the WebGPU path's times for the same table.
  * Step 1 runs `cpu_fetch` with the same number of runs, so its times of the CPU alone are kept too (`cpu`).
@@ -39,6 +46,8 @@ const cudaFetch = opts.get("cuda-fetch") ?? "ipir/target/release/cuda_fetch";
 const cpuFetch = opts.get("cpu-fetch") ?? "ipir/target/release/cpu_fetch";
 const timeoutS = Number(opts.get("timeout-s") ?? 1800);
 const withCuda = !opts.has("no-cuda");
+const cudaFetchNative = opts.get("cuda-fetch-native");
+const throughput = opts.get("throughput") ? ["--throughput", opts.get("throughput")!] : [];
 const here = new URL(".", import.meta.url).pathname;
 // deno-lint-ignore no-explicit-any
 type Any = any;
@@ -81,7 +90,7 @@ for (const [rows, cols] of shapes) {
   console.error(`cuda-compare ${rows}x${cols}: building the table on the CPU`);
   const dir = await Deno.makeTempDir({ prefix: "ipir-cuda-compare-" });
   try {
-    const dumped = await child(cpuFetch, [String(rows), String(cols), String(runs), "--dump", dir]);
+    const dumped = await child(cpuFetch, [String(rows), String(cols), String(runs), "--dump", dir, ...throughput]);
     if (!dumped.success) {
       row.error = `cpu_fetch --dump failed: ${dumped.parsed?.error ?? dumped.stderr.slice(-500)}`;
       console.error(`cuda-compare ${rows}x${cols}: ${row.error}`);
@@ -89,10 +98,10 @@ for (const [rows, cols] of shapes) {
       continue;
     }
     // The CPU alone (`NativeServer::respond`), from the program that made the dump.
-    row.cpu = { buildMs: dumped.parsed?.buildMs ?? null, timing: dumped.parsed?.timing ?? null };
+    row.cpu = { buildMs: dumped.parsed?.buildMs ?? null, timing: dumped.parsed?.timing ?? null, throughput: dumped.parsed?.throughput ?? null };
     if (withCuda) {
       console.error(`cuda-compare ${rows}x${cols}: CUDA first pass and CPU packing`);
-      const cuda = await child(cudaFetch, [String(rows), String(cols), String(runs), "--expect", dir]);
+      const cuda = await child(cudaFetch, [String(rows), String(cols), String(runs), "--expect", dir, ...throughput]);
       row.cuda = cuda.parsed ?? { ok: false, error: `cuda_fetch gave no result: ${cuda.stderr.slice(-500)}` };
     }
     if (!withCuda) {
@@ -104,8 +113,21 @@ for (const [rows, cols] of shapes) {
     } else {
       console.error(`cuda-compare ${rows}x${cols}:   call of 32: ${row.cuda.cuda["32"].wallMs.median} ms (first pass ${row.cuda.cuda["32"].firstPassMs}, of which the device ${row.cuda.cuda["32"].kernelMs}; packing ${row.cuda.cuda["32"].packMs}); CPU alone ${row.cuda.cpu["32"].wallMs.median} ms`);
     }
+    if (withCuda && cudaFetchNative) {
+      console.error(`cuda-compare ${rows}x${cols}: CUDA, this benchmark's kernels`);
+      const native = await child(cudaFetchNative, [String(rows), String(cols), String(runs), "--expect", dir, ...throughput]);
+      row.cudaNative = native.parsed ?? { ok: false, error: `cuda_fetch_native gave no result: ${native.stderr.slice(-500)}` };
+      if (!row.cudaNative.ok) {
+        row.cudaNative.doesNotFit = row.cudaNative.doesNotFit ?? noFit(row.cudaNative.error);
+        if (/compar/i.test(String(row.cudaNative.stage))) different++;
+        console.error(`cuda-compare ${rows}x${cols}: CUDA (own kernels) ${row.cudaNative.doesNotFit ? "does not fit" : "FAILED"} at ${row.cudaNative.stage}: ${row.cudaNative.error}`);
+      } else {
+        const c = row.cudaNative.cuda["32"];
+        console.error(`cuda-compare ${rows}x${cols}:   call of 32: ${c.wallMs.median} ms (the device ${c.kernelMs}: first pass ${c.scanMs}, packing ${c.packMs})`);
+      }
+    }
     console.error(`cuda-compare ${rows}x${cols}: WebGPU`);
-    const web = await child(Deno.execPath(), ["run", "--allow-read", "--allow-env", `${here}check-cpu-answer.ts`, dir, String(rows), String(cols), "--time", String(runs)]);
+    const web = await child(Deno.execPath(), ["run", "--allow-read", "--allow-env", `${here}check-cpu-answer.ts`, dir, String(rows), String(cols), "--time", String(runs), ...throughput]);
     const w = web.parsed ?? { equal: null, error: `the WebGPU run gave no result: ${web.stderr.slice(-500)}` };
     row.webgpu = { ok: w.equal === true, ...w };
     if (w.equal === false && !w.error) different++;
@@ -132,6 +154,6 @@ const result = {
   shapes: results,
 };
 await Deno.writeTextFile(out, JSON.stringify(result, null, 1));
-const ran = results.filter((r) => r.cuda?.ok || r.webgpu?.ok).length;
+const ran = results.filter((r) => r.cuda?.ok || r.cudaNative?.ok || r.webgpu?.ok).length;
 console.error(`cuda-compare: wrote ${out}; ${ran} of ${results.length} shape(s) ran${different ? `; ${different} DIFFERENT from the CPU's answers` : ""}`);
 if (different || ran === 0) Deno.exit(1);

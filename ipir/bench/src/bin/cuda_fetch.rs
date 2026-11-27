@@ -2,7 +2,7 @@
 //! `simplepir_kernel::cuda::CudaKernel`, one request at a time as the kernel allows, and everything else of
 //! `NativeServer::respond` (parsing, the packing of every column block, serializing) on this host's CPU.
 //!
-//!   cuda_fetch <rows> <cols> [runs] [--expect DIR]
+//!   cuda_fetch <rows> <cols> [runs] [--expect DIR] [--throughput SECONDS]
 //!
 //! The table and the 32 requests are those of `cpu_fetch` for the shape (the same xorshift cells, setup and
 //! requests). The answers go through `NativeServer::respond_with_first_pass` (patch 0004) and are compared, byte for
@@ -16,6 +16,9 @@
 //! `kernelMs` (the device's own time, from CUDA events), `firstPassMs` (the first pass as the host sees it: the
 //! request's copy to the device, the two kernels, the result's copy back), `deserializeMs`, `packMs`, `serializeMs`.
 //! `cpu` holds the same call answered by `NativeServer::respond` alone, for the same table in the same process.
+//!
+//! `--throughput SECONDS` adds the calls answered per second (`throughput`) for calls of 1 and of 32, one call after
+//! another for SECONDS: the kernel takes one request at a time, so there is one caller.
 //!
 //! Built only with `--features cuda`; at run time it needs the CUDA driver library and NVRTC.
 use ipir_bench::*;
@@ -47,8 +50,13 @@ fn main() {
         args.drain(i..i + 2);
         d
     });
+    let throughput_s: Option<f64> = args.iter().position(|a| a == "--throughput").map(|i| {
+        let v = args[i + 1].parse().unwrap();
+        args.drain(i..i + 2);
+        v
+    });
     if args.len() < 2 {
-        eprintln!("usage: cuda_fetch <rows> <cols> [runs] [--expect DIR]");
+        eprintln!("usage: cuda_fetch <rows> <cols> [runs] [--expect DIR] [--throughput SECONDS]");
         std::process::exit(2);
     }
     let rows: usize = args[0].parse().unwrap();
@@ -187,6 +195,19 @@ fn main() {
         ));
     }
 
+    let throughput = throughput_s.map_or(String::new(), |seconds| {
+        let line = throughput_json(seconds, &[1], &mut |count, _| {
+            let t = Instant::now();
+            let mut n = 0usize;
+            while t.elapsed().as_secs_f64() < seconds {
+                call(count);
+                n += 1;
+            }
+            Ok(n as f64 / t.elapsed().as_secs_f64())
+        });
+        format!("{},", line.unwrap())
+    });
+
     // A changed column block: the kernel has no call for one block, so the table goes up whole again.
     let mut again = Vec::new();
     for _ in 0..3 {
@@ -200,7 +221,7 @@ fn main() {
     println!(
         "{{\"ok\":true,\"backend\":\"cuda\",\"rows\":{rows},\"cols\":{cols},\"cells\":{},\"colBlocks\":{},\"tableBytes\":{},\
          \"matrixStorage\":\"{}\",\"rayonThreads\":{},\"buildMs\":{build_ms:.2},\"initMs\":{init_ms:.2},\"uploadMs\":{upload_ms:.2},\
-         \"reuploadMedianMs\":{:.2},\"runs\":{runs},\"answersEqual\":{equal},\"comparedWithDump\":{},\"cuda\":{{{}}},\"cpu\":{{{}}}}}",
+         \"reuploadMedianMs\":{:.2},\"runs\":{runs},\"answersEqual\":{equal},\"comparedWithDump\":{},{throughput}\"cuda\":{{{}}},\"cpu\":{{{}}}}}",
         rows * cols,
         cols / BLOCK_COLS,
         rows * cols * 2,

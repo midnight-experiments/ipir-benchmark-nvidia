@@ -3,7 +3,7 @@
  * `GpuIpirTable` on this host's GPU, for the same table (the same xorshift cells, the setup id and the compiled
  * packing matrices that the CPU server built), and compares the answers with the CPU's, byte for byte.
  *
- *   deno run <permissions> bench/check-cpu-answer.ts <dir> <rows> <cols> [--time RUNS]
+ *   deno run <permissions> bench/check-cpu-answer.ts <dir> <rows> <cols> [--time RUNS] [--throughput SECONDS]
  *
  * Prints one JSON line: `{"equal":true|false,...}`, with the first differing answer and byte when they differ. Exits
  * 1 when they differ or the check fails.
@@ -12,6 +12,10 @@
  * upload (`uploadMs`), calls of 1 and of 32 of the dump's requests (`timing`: wall time and the GPU's own time per
  * stage, medians of RUNS after a warm-up), and the write of one changed column block from host memory
  * (`blockUploadMs`, median of 5). `bench/cuda-compare.ts` reads these next to `cuda_fetch`'s for the same table.
+ *
+ * `--throughput SECONDS` adds the calls answered per second (`throughput`): for calls of 1 and of 32, callers that
+ * each send their next call when their last one is answered, for SECONDS, with 1, 2 and 4 callers. A number of
+ * callers that fails (the calls' buffers did not fit together) is recorded as null and ends that call size's levels.
  */
 import { GpuIpirTable } from "../gpu/ipir.ts";
 import { ipirRequestBytes, ipirResponseBytes } from "../ipir/sizes.ts";
@@ -19,6 +23,8 @@ import { median, openBenchGpu, scoped, syntheticCells, xorshift } from "./lib.ts
 
 const timeAt = Deno.args.indexOf("--time");
 const timeRuns = timeAt >= 0 ? Number(Deno.args[timeAt + 1]) : 0;
+const throughputAt = Deno.args.indexOf("--throughput");
+const throughputS = throughputAt >= 0 ? Number(Deno.args[throughputAt + 1]) : 0;
 const [dir, rowsArg, colsArg] = Deno.args;
 if (!dir || !rowsArg || !colsArg) throw new Error("usage: check-cpu-answer.ts <dir> <rows> <cols>");
 const rows = Number(rowsArg);
@@ -81,6 +87,41 @@ try {
       one.release();
     }
     Object.assign(timed, { uploadMs, runs: timeRuns, timing, blockUploadMs: median(writes) });
+  }
+  if (throughputS > 0) {
+    const eachRequest = requests.length / count;
+    const throughput: Record<string, unknown> = { seconds: throughputS };
+    for (const n of [1, 32].filter((n) => n <= count)) {
+      const call = requests.subarray(0, n * eachRequest);
+      const byCallers: Record<string, number | null> = {};
+      let best = { callers: 0, rate: 0 };
+      for (const callers of [1, 2, 4]) {
+        stage = `calls per second: calls of ${n}, ${callers} caller(s)`;
+        let done = 0;
+        let failed: unknown = null;
+        const t0 = performance.now();
+        const until = t0 + throughputS * 1000;
+        await Promise.all(Array.from({ length: callers }, async () => {
+          while (performance.now() < until && !failed) {
+            try {
+              await scoped(gpu.device, stage, () => table.respond(call, n));
+              done++;
+            } catch (e) {
+              failed = e;
+            }
+          }
+        }));
+        if (failed) {
+          byCallers[String(callers)] = null;
+          break;
+        }
+        const rate = done / ((performance.now() - t0) / 1000);
+        byCallers[String(callers)] = Math.round(rate * 100) / 100;
+        if (rate > best.rate) best = { callers, rate };
+      }
+      throughput[String(n)] = { callsPerSecond: Math.round(best.rate * 100) / 100, callers: best.callers, byCallers };
+    }
+    timed.throughput = throughput;
   }
   table.release();
   gpu.device.destroy();

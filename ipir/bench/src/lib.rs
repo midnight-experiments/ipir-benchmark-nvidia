@@ -9,7 +9,9 @@ use rand_chacha::{
     rand_core::{RngCore, SeedableRng},
     ChaCha20Rng,
 };
-use reinspiring::native::{NativeParams, SecretDistribution};
+use rayon::prelude::*;
+use reinspiring::lift_ntt::LiftContext;
+use reinspiring::native::{NativeParams, NativePreprocessed, SecretDistribution};
 use std::time::{Duration, Instant};
 
 /// Columns of one column block.
@@ -89,6 +91,42 @@ pub fn request_bytes(rows: usize) -> usize {
     36 + (4096 * 54) / 8 + (rows * 49).div_ceil(8)
 }
 
+/// The packing preprocessing of whole column blocks, one after another, from their cells (column-major, a multiple
+/// of `rows × 2,048` of them): the public calls `NativeServer::build_with_concurrency` makes for each block
+/// (`LiftContext::public_dot` per column, then `NativePreprocessed::build_two_mask`). `each` gets a block's index in
+/// `cells` and its result, which does not depend on where the block is in a table.
+pub fn for_packing_blocks(setup: &NativePublicSetup, cells: &[u16], mut each: impl FnMut(usize, NativePreprocessed)) {
+    let p = setup.profile();
+    let (d, q, rows) = (p.packing().d(), p.packing().q(), p.rows());
+    assert_eq!(cells.len() % (rows * d), 0, "whole column blocks");
+    let lift = LiftContext::new(d, q).unwrap();
+    let public = lift.prepare_public_dot(setup.query_masks(), (p.packing().p() - 1).min(q / 2)).unwrap();
+    for (k, block) in cells.chunks_exact(rows * d).enumerate() {
+        let masks: Vec<Vec<u64>> = block
+            .par_chunks_exact(rows)
+            .map(|col| {
+                let coeffs: Vec<Vec<u64>> = col.chunks_exact(d).map(|poly| poly.iter().map(|&x| x.into()).collect()).collect();
+                lift.public_dot(&public, &coeffs).unwrap()
+            })
+            .collect();
+        each(k, NativePreprocessed::build_two_mask(setup.packing_setup(), &masks).unwrap());
+    }
+}
+
+/// A block's compiled packing matrix as the GPU paths take it: 2,048 × 4,096 signed 32-bit words, row-major (the
+/// canonical residues modulo q, centred).
+pub fn matrix_words(pre: &NativePreprocessed, q: u64) -> Vec<i32> {
+    let m = pre.matrix().to_compiled();
+    assert_eq!((m.rows, m.cols), (2048, 4096), "a compiled packing matrix is 2,048 × 4,096");
+    m.data
+        .iter()
+        .map(|&x| {
+            let v = if x >= q / 2 { x as i128 - q as i128 } else { x as i128 };
+            i32::try_from(v).expect("a compiled matrix entry fits in 32 bits")
+        })
+        .collect()
+}
+
 /// `rows × 2,048` random 16-bit cells (the time does not depend on them).
 pub fn cells(rows: usize, seed: u64) -> Vec<u16> {
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
@@ -152,6 +190,58 @@ pub fn lower_thread_priority() -> &'static str {
     }
     #[allow(unreachable_code)]
     "unsupported OS: normal priority"
+}
+
+/// Calls answered per second by `callers` callers that each send their next call as soon as their last one is
+/// answered, for `seconds`. `call` answers one call; its first error ends the measure.
+pub fn calls_per_second(callers: usize, seconds: f64, call: &(dyn Fn() -> Result<(), String> + Sync)) -> Result<f64, String> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let stop = AtomicBool::new(false);
+    let t = Instant::now();
+    let done: Vec<Result<usize, String>> = std::thread::scope(|sc| {
+        let handles: Vec<_> = (0..callers)
+            .map(|_| {
+                sc.spawn(|| -> Result<usize, String> {
+                    let mut n = 0usize;
+                    while !stop.load(Ordering::Relaxed) {
+                        call()?;
+                        n += 1;
+                    }
+                    Ok(n)
+                })
+            })
+            .collect();
+        std::thread::sleep(Duration::from_secs_f64(seconds));
+        stop.store(true, Ordering::Relaxed);
+        handles.into_iter().map(|h| h.join().unwrap()).collect()
+    });
+    let elapsed = t.elapsed().as_secs_f64();
+    let mut total = 0usize;
+    for d in done {
+        total += d?;
+    }
+    Ok(total as f64 / elapsed)
+}
+
+/// The calls-per-second measure of a path, for calls of 1 and of 32 requests and each number of callers in `levels`:
+/// `"throughput":{"seconds":S,"1":{"callsPerSecond":best,"callers":its callers,"byCallers":{...}},"32":{...}}`.
+/// `rate(count, callers)` measures one combination.
+pub fn throughput_json(seconds: f64, levels: &[usize], rate: &mut dyn FnMut(usize, usize) -> Result<f64, String>) -> Result<String, String> {
+    let mut per_count = Vec::new();
+    for count in [1usize, 32] {
+        let mut by = Vec::new();
+        let mut best = (0usize, 0f64);
+        for &callers in levels {
+            let r = rate(count, callers)?;
+            eprintln!("calls per second: calls of {count}, {callers} caller(s): {r:.1}");
+            if r > best.1 {
+                best = (callers, r);
+            }
+            by.push(format!("\"{callers}\":{r:.2}"));
+        }
+        per_count.push(format!("\"{count}\":{{\"callsPerSecond\":{:.2},\"callers\":{},\"byCallers\":{{{}}}}}", best.1, best.0, by.join(",")));
+    }
+    Ok(format!("\"throughput\":{{\"seconds\":{seconds},{}}}", per_count.join(",")))
 }
 
 pub fn logical_cpus() -> usize {
